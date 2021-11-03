@@ -1,4 +1,4 @@
-# Faster.Map
+# Faster.Map fastest robinhood hashmap
 
     /// This hashmap uses the following
     /// - Open addressing
