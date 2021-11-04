@@ -115,8 +115,7 @@ namespace Faster
             index++;
 
             insertableEntry.Key = key;
-            insertableEntry.Value = value;
-            insertableEntry.Psl = psl;
+            insertableEntry.Value = value;        
 
             for (; ; ++psl, ++index)
             {
@@ -129,7 +128,7 @@ namespace Faster
                     return true;
                 }
 
-                if (entry.Psl < psl)
+                if (psl > entry.Psl)
                 {
                     swap(ref insertableEntry, ref _entries[index]);
                     psl = insertableEntry.Psl; // reset psl;
