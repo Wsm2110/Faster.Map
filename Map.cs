@@ -1,9 +1,21 @@
 ﻿using System;
+using System.Numerics;
+
 
 namespace Faster
 {
     /// <summary>
+    /// The default dictionary in targetframework 4.0 is no match for this implementation of a hashmap...
     /// 
+    /// it`s speed and memory footprint is thorougly tested in Servicelocator.Tests.Benchmark.
+    ///
+    /// This hashmap uses the following
+    /// - Open addressing
+    /// - Uses linear probing
+    /// - Robing hood hash
+    /// - Upper limit on the probe sequence lenght(psl) which is Log2(size)
+    /// - fixed uint key in order not having to call GetHashCode() which is an override... and overrides are not ideal in terms of performance
+    /// - fibonacci hashing
     /// </summary>
     public class Map<TKey, TValue>
     {
@@ -45,7 +57,7 @@ namespace Faster
         /// </summary>
         /// <param name="length">The length.</param>
         /// <param name="loadFactor">The load factor.</param>
-        public Map(uint length, double loadFactor = 0.88d)
+        public Map(uint length = 16, double loadFactor = 0.88d)
         {
             //default length is 16
             _maxLoopUps = length == 0 ? 16 : length;
@@ -54,7 +66,7 @@ namespace Faster
             _loadFactor = loadFactor;
 
             var powerOfTwo = NextPow2(_maxLoopUps);
-       
+
             _shift = _shift - (int)_probeSequenceLength + 1;
             _entries = new Entry<TKey, TValue>[powerOfTwo + _probeSequenceLength];
         }
@@ -77,8 +89,7 @@ namespace Faster
             }
 
             uint hashcode = (uint)key.GetHashCode();
-                       
-            uint index = hashcode * Prime >> _shift;
+            uint index =  hashcode * Prime >> _shift;
 
             //validate if the key is unique
             if (KeyExists(index, hashcode))
@@ -112,10 +123,11 @@ namespace Faster
             Entry<TKey, TValue> insertableEntry = default;
             
             byte psl = 1;
-            index++;
+            ++index;
 
             insertableEntry.Key = key;
-            insertableEntry.Value = value;        
+            insertableEntry.Value = value;
+            insertableEntry.Psl = 0; // set not empty
 
             for (; ; ++psl, ++index)
             {
@@ -130,8 +142,9 @@ namespace Faster
 
                 if (psl > entry.Psl)
                 {
+                    insertableEntry.Psl = psl;
                     swap(ref insertableEntry, ref _entries[index]);
-                    psl = insertableEntry.Psl; // reset psl;
+                    psl = insertableEntry.Psl;
                 }
                 else
                 {
@@ -164,11 +177,10 @@ namespace Faster
                 return true;
             }
             
-            byte psl = currentEntry.Psl;
-
+            var maxDistance = index + _probeSequenceLength - 1;
             ++index;
 
-            for (; currentEntry.Psl >= psl; ++index, ++psl)
+            for (; index < maxDistance; ++index)
             {
                 currentEntry = _entries[index];
                 if (currentEntry.IsEmpty())
@@ -176,7 +188,7 @@ namespace Faster
                     return false;
                 }
 
-                if (currentEntry.Psl >= psl && currentEntry.Key.GetHashCode() == hashcode)
+                if (currentEntry.Key.GetHashCode() == hashcode)
                 {
                     return true;
                 }
@@ -200,11 +212,11 @@ namespace Faster
                 _entries[index] = currentEntry;
                 return;
             }
-
-            byte psl = currentEntry.Psl;
-
+            
+            var maxDistance = index + _probeSequenceLength - 1;
             ++index;
-            for (; currentEntry.Psl >= psl; ++index, ++psl)
+
+            for (; index < maxDistance; ++index)
             {
                 currentEntry = _entries[index];
                 if (currentEntry.Key.GetHashCode() == hashcode)
@@ -214,7 +226,6 @@ namespace Faster
                     return;
                 }
             }
-
         }
 
         /// <summary>
@@ -262,18 +273,18 @@ namespace Faster
         {
             var hashcode = (uint)key.GetHashCode();
             uint index = hashcode * Prime >> _shift;
-
+            
             var currentEntry = _entries[index];
             if (currentEntry.Key.GetHashCode() == hashcode)
             {
                 value = currentEntry.Value;
                 return;
             }
+            
+            var maxDistance = index + _probeSequenceLength - 1;
+            ++index;
 
-            ++index; // increase index since the initial index is already checked
-
-            byte psl = currentEntry.Psl;
-            for (; currentEntry.Psl >= psl; ++index, ++psl)
+            for (; index < maxDistance; ++index)
             {
                 currentEntry = _entries[index];
                 if (currentEntry.Key.GetHashCode() == hashcode)
