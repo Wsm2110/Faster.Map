@@ -8,10 +8,10 @@
 
 Usage:
 private Map<uint, uint> _map = new Map<uint, uint>(16);
- _map.Emplace(1, 50); 
- _map.Remove(1);
- _map.Get(1, out var result);
- _map.Update(1, 51);
+ * _map.Emplace(1, 50); 
+ * _map.Remove(1);
+ * _map.Get(1, out var result);
+ * _map.Update(1, 51);
 
 | Method |   N   | Mean     | Error     | StdDev    |  BranchInstructionRetired/Op | CacheMisses/Op | LLCMisses/Op  |
 |--------|-------|----------|-----------|-----------|------------------------------|----------------|---------------|
