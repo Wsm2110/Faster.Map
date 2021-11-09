@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 
 
 namespace Faster
@@ -44,7 +45,7 @@ namespace Faster
         private uint _maxLoopUps;
         private readonly double _loadFactor;
         private Entry<TKey, TValue>[] _entries;
-        private const uint Prime = 0x9E3779B9; // 2654435769; 
+        private const uint GoldenRatio = 0x9E3779B9; // 2654435769; 
         private int _shift = 32;
         private uint _probeSequenceLength;
 
@@ -72,7 +73,7 @@ namespace Faster
         }
 
         #endregion
-        
+
         #region Public Methods
 
         /// <summary>
@@ -81,6 +82,7 @@ namespace Faster
         /// <param name="key">The key.</param>
         /// <param name="value">The value.</param>
         /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Emplace(TKey key, TValue value)
         {
             if ((double)EntryCount / _maxLoopUps > _loadFactor || EntryCount >= _maxLoopUps)
@@ -89,7 +91,7 @@ namespace Faster
             }
 
             uint hashcode = (uint)key.GetHashCode();
-            uint index =  hashcode * Prime >> _shift;
+            uint index =  hashcode * GoldenRatio >> _shift;
 
             //validate if the key is unique
             if (KeyExists(index, hashcode))
@@ -107,6 +109,7 @@ namespace Faster
         /// <param name="value">The value.</param>
         /// <param name="index">The index.</param>
         /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool EmplaceNew(TKey key, TValue value, uint index)
         {
             var entry = _entries[index];
@@ -164,6 +167,7 @@ namespace Faster
         /// <param name="index">The index.</param>
         /// <param name="hashcode">The hashcode.</param>
         /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool KeyExists(uint index, uint hashcode)
         {
             var currentEntry = _entries[index];
@@ -200,10 +204,11 @@ namespace Faster
         /// <summary>
         /// update the entry
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Update(TKey key, TValue value)
         {
             uint hashcode = (uint)key.GetHashCode();
-            uint index = hashcode * Prime >> _shift;
+            uint index = hashcode * GoldenRatio >> _shift;
 
             var currentEntry = _entries[index];
             if (currentEntry.Key.GetHashCode() == hashcode)
@@ -231,10 +236,11 @@ namespace Faster
         /// <summary>
         /// Removes tehe current entry using a backshift removal
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Remove(TKey key)
         {
             uint hashcode = (uint)key.GetHashCode();
-            uint index = hashcode * Prime >> _shift;
+            uint index = hashcode * GoldenRatio >> _shift;
             byte psl = 0;
             bool found = false;
             var bounds = index + _probeSequenceLength;
@@ -269,10 +275,11 @@ namespace Faster
         /// </summary>
         /// <param name="key">The key.</param>
         /// <param name="value">The value.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Get(TKey key, out TValue value)
         {
             var hashcode = (uint)key.GetHashCode();
-            uint index = hashcode * Prime >> _shift;
+            uint index = hashcode * GoldenRatio >> _shift;
             
             var currentEntry = _entries[index];
             if (currentEntry.Key.GetHashCode() == hashcode)
@@ -328,7 +335,7 @@ namespace Faster
                 }
 
                 var hashcode = (uint)entry.Key.GetHashCode();
-                uint index = hashcode * Prime >> _shift;
+                uint index = hashcode * GoldenRatio >> _shift;
 
                 EmplaceNew(entry.Key, entry.Value, index);
             }
