@@ -15,8 +15,8 @@ private Map<uint, uint> _map = new Map<uint, uint>(16);
 
 | Method |   N   | Mean     | Error     | StdDev    |  BranchInstructionRetired/Op | CacheMisses/Op | LLCMisses/Op  |
 |--------|-------|----------|-----------|-----------|------------------------------|----------------|---------------|
-|RunRobin|1000000|3.104 ms  |0.0156 ms  |0.0146 ms  |6,031,893                     |201             |188            |
-|RunDictionary 5.0|1000000|6.653 ms  |0.0255 ms |0.0226 ms|  11,068,416	           | 420            |410            |
+|Map     |1000000|1.451 ms  |0.0155s  |0.0145ms  |3015435                  |175          |137          |
+|Dictionary|1000000|6.902 ms  |0.1305 ms |0.1451 ms|  11,075,4822	           | 1050          |922            |
 
 
 BenchmarkDotNet=v0.13.1, OS=Windows 10.0.19042.631 (20H2/October2020Update)
