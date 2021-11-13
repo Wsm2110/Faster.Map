@@ -7,6 +7,15 @@
     /// - Upper limit on the probe sequence lenght(psl) which is Log2(size)
 
 Usage:
+
+private NumericalMap<uint, uint>  _map = new NumericalMap<uint, uint>(16);
+ * _map.Emplace(1, 50); 
+ * _map.Remove(1);
+ * _map.Get(1, out var result);
+ * _map.Update(1, 51);
+
+OR
+
 private Map<uint, uint> _map = new Map<uint, uint>(16);
  * _map.Emplace(1, 50); 
  * _map.Remove(1);
