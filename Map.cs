@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 namespace Faster
@@ -43,7 +42,6 @@ namespace Faster
 
         private uint _maxLoopUps;
         private readonly double _loadFactor;
-        private readonly IEqualityComparer<TKey> _cmp;
         private Entry<TKey, TValue>[] _entries;
         private const uint GoldenRatio = 0x9E3779B9; // 2654435769; 
         private int _shift = 32;
@@ -58,14 +56,13 @@ namespace Faster
         /// </summary>
         /// <param name="length">The length.</param>
         /// <param name="loadFactor">The load factor.</param>
-        public Map(uint length = 16, double loadFactor = 0.88d, IEqualityComparer<TKey> cmp = null)
+        public Map(uint length = 16, double loadFactor = 0.88d)
         {
             //default length is 16
             _maxLoopUps = length == 0 ? 16 : length;
 
             _probeSequenceLength = Log2(_maxLoopUps);
             _loadFactor = loadFactor;
-            _cmp = cmp ?? EqualityComparer<TKey>.Default;
 
             var powerOfTwo = NextPow2(_maxLoopUps);
             _shift = _shift - (int)_probeSequenceLength + 1;
@@ -278,7 +275,7 @@ namespace Faster
         }
 
         /// <summary>
-        /// Gets the value with the corresponding key
+        /// Gets the value with the corresponding key, will returns true or false if the key is found or not
         /// </summary>
         /// <param name="key">The key.</param>
         /// <param name="value">The value.</param>
@@ -303,7 +300,7 @@ namespace Faster
                 currentEntry = _entries[index];
                 var currentKey = currentEntry.Key;
                 if (currentKey != null &&
-                    (uint)currentKey.GetHashCode() == hashcode && 
+                    (uint)currentKey.GetHashCode() == hashcode &&
                     currentKey.Equals(key))
                 {
                     value = currentEntry.Value;
@@ -314,6 +311,24 @@ namespace Faster
             value = default;
             return false;
         }
+
+        /// <summary>
+        /// Gets the value with the corresponding key, will actually throw if the key isnt found, if this is an issue you should just use Get()
+        /// </summary>
+        /// <param name="key">The key.</param>
+        /// <param name="value">The value.</param>
+        public TValue this[TKey key]
+        {
+            get
+            {
+                if (Get(key, out var result)) 
+                {
+                    return result;
+                }
+
+                throw new InvalidOperationException($"Unable to find {key} in hashmap");
+            }
+        } 
 
         #endregion
 

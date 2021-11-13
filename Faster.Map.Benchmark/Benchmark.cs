@@ -1,11 +1,15 @@
 ﻿using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Diagnosers;
+using Faster.Map;
 using System;
 using System.Collections.Generic;
 
 namespace Faster.Map.Benchmark
 {
-    [HardwareCounters(HardwareCounter.BranchInstructions, HardwareCounter.CacheMisses, HardwareCounter.BranchMispredictions, HardwareCounter.LlcMisses)]
+    [HardwareCounters(HardwareCounter.BranchInstructions,
+        HardwareCounter.CacheMisses,
+        HardwareCounter.BranchMispredictions,
+        HardwareCounter.LlcMisses)]
     public class Benchmark
     {
         #region Fields

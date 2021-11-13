@@ -88,14 +88,14 @@ namespace Faster
             }
 
             uint hashcode = (uint)key.GetHashCode();
-            uint index =  hashcode * GoldenRatio >> _shift;
+            uint index = hashcode * GoldenRatio >> _shift;
 
             //validate if the key is unique
             if (KeyExists(index, hashcode))
             {
                 return false;
             }
-            
+
             return EmplaceNew(key, value, index);
         }
 
@@ -121,7 +121,7 @@ namespace Faster
             }
 
             Entry<TKey, TValue> insertableEntry = default;
-            
+
             byte psl = 1;
             ++index;
 
@@ -177,7 +177,7 @@ namespace Faster
             {
                 return true;
             }
-            
+
             var maxDistance = index + _probeSequenceLength - 1;
             ++index;
 
@@ -214,7 +214,7 @@ namespace Faster
                 _entries[index] = currentEntry;
                 return;
             }
-            
+
             var maxDistance = index + _probeSequenceLength - 1;
             ++index;
 
@@ -242,7 +242,7 @@ namespace Faster
             bool found = false;
             var bounds = index + _probeSequenceLength;
 
-            for (;index < bounds ; ++index)
+            for (; index < bounds; ++index)
             {
                 var currentEntry = _entries[index];
                 if (currentEntry.Key.GetHashCode() == hashcode)
@@ -273,18 +273,18 @@ namespace Faster
         /// <param name="key">The key.</param>
         /// <param name="value">The value.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Get(TKey key, out TValue value)
+        public bool Get(TKey key, out TValue value)
         {
             var hashcode = (uint)key.GetHashCode();
             uint index = hashcode * GoldenRatio >> _shift;
-            
+
             var currentEntry = _entries[index];
             if (currentEntry.Key.GetHashCode() == hashcode)
             {
                 value = currentEntry.Value;
-                return;
+                return true;
             }
-            
+
             var maxDistance = index + _probeSequenceLength - 1;
             ++index;
 
@@ -294,11 +294,30 @@ namespace Faster
                 if (currentEntry.Key.GetHashCode() == hashcode)
                 {
                     value = currentEntry.Value;
-                    return;
+                    return true;
                 }
             }
 
             value = default;
+            return false;
+        }
+
+        /// <summary>
+        /// Gets the value with the corresponding key, will returns true or false if the key is found or not
+        /// </summary>
+        /// <param name="key">The key.</param>
+        /// <param name="value">The value.</param>
+        public TValue this[TKey key]
+        {
+            get
+            {
+                if (Get(key, out var result))
+                {
+                    return result;
+                }
+
+                throw new InvalidOperationException($"Unable to find {key} in hashmap");
+            }
         }
 
         #endregion
@@ -322,7 +341,7 @@ namespace Faster
             Array.Copy(_entries, oldEntries, _entries.Length);
             _entries = new Entry<TKey, TValue>[_maxLoopUps + _probeSequenceLength];
             EntryCount = 0;
-            
+
             for (var i = 0; i < oldEntries.Length; i++)
             {
                 var entry = oldEntries[i];
@@ -337,7 +356,6 @@ namespace Faster
                 EmplaceNew(entry.Key, entry.Value, index);
             }
         }
-
         private static uint NextPow2(uint c)
         {
             c--;
