@@ -15,7 +15,7 @@ namespace Faster.Map.Benchmark
         #region Fields
 
         Map<uint, uint> _map = new Map<uint, uint>();
-        NumericalMap<uint, uint> _numericalMap = new NumericalMap<uint, uint>();
+
         Dictionary<uint, uint> _dict = new Dictionary<uint, uint>();
 
         #endregion
@@ -40,20 +40,10 @@ namespace Faster.Map.Benchmark
             //    _numericalMap.Emplace((uint)result, (uint)result);
             //}
 
-            _map.Emplace(33, 33);
-            _numericalMap.Emplace(33, 33);
+            _map.Emplace(33, 33);          
             _dict.Add(33, 33);
         }
-
-        [Benchmark]
-        public void NumericalMap()
-        {
-            uint result = 0;
-            for (int i = 0; i < N; i++)
-            {
-                _numericalMap.Get(33, out result);
-            }         
-        }
+ 
 
         [Benchmark]
         public void Map()
@@ -61,7 +51,7 @@ namespace Faster.Map.Benchmark
             uint result = 0;
             for (int i = 0; i < N; i++)
             {
-                _numericalMap.Get(33, out result);
+                _map.Get(33, out result);
             }
         }
 

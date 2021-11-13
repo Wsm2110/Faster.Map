@@ -4,10 +4,9 @@ using System.Runtime.CompilerServices;
 namespace Faster
 {
     /// <summary>
-    /// The default dictionary is no match for this implementation of a hashmap...
+    ///   This hashmap is heavily optimized to be used with numerical keys 
+    ///   And is alot faster than Map which allows all sorts of keys :)
     /// 
-    /// it`s speed and memory footprint is thorougly tested in Servicelocator.Tests.Benchmark.
-    ///
     /// This hashmap uses the following
     /// - Open addressing
     /// - Uses linear probing
@@ -16,7 +15,7 @@ namespace Faster
     /// - fixed uint key in order not having to call GetHashCode() which is an override... and overrides are not ideal in terms of performance
     /// - fibonacci hashing
     /// </summary>
-    public class Map<TKey, TValue>
+    public class Map<TKey, TValue> where TKey : unmanaged, IComparable, IEquatable<TKey>
     {
         #region properties
 
@@ -65,6 +64,7 @@ namespace Faster
             _loadFactor = loadFactor;
 
             var powerOfTwo = NextPow2(_maxLoopUps);
+
             _shift = _shift - (int)_probeSequenceLength + 1;
             _entries = new Entry<TKey, TValue>[powerOfTwo + _probeSequenceLength];
         }
@@ -91,7 +91,7 @@ namespace Faster
             uint index = hashcode * GoldenRatio >> _shift;
 
             //validate if the key is unique
-            if (KeyExists(key, index, hashcode))
+            if (KeyExists(index, hashcode))
             {
                 return false;
             }
@@ -165,7 +165,7 @@ namespace Faster
         /// <param name="hashcode">The hashcode.</param>
         /// <returns></returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool KeyExists(TKey key, uint index, uint hashcode)
+        private bool KeyExists(uint index, uint hashcode)
         {
             var currentEntry = _entries[index];
             if (currentEntry.IsEmpty())
@@ -173,8 +173,7 @@ namespace Faster
                 return false;
             }
 
-            if (hashcode == (uint)currentEntry.Key.GetHashCode()
-                && currentEntry.Key.Equals(key))
+            if (currentEntry.Key.GetHashCode() == hashcode)
             {
                 return true;
             }
@@ -190,8 +189,7 @@ namespace Faster
                     return false;
                 }
 
-                if (hashcode == (uint)currentEntry.Key.GetHashCode()
-                    && currentEntry.Key.Equals(key))
+                if (currentEntry.Key.GetHashCode() == hashcode)
                 {
                     return true;
                 }
@@ -210,9 +208,7 @@ namespace Faster
             uint index = hashcode * GoldenRatio >> _shift;
 
             var currentEntry = _entries[index];
-
-            if (hashcode == (uint)currentEntry.Key.GetHashCode()
-                && currentEntry.Key.Equals(key))
+            if (currentEntry.Key.GetHashCode() == hashcode)
             {
                 currentEntry.Value = value;
                 _entries[index] = currentEntry;
@@ -225,8 +221,7 @@ namespace Faster
             for (; index < maxDistance; ++index)
             {
                 currentEntry = _entries[index];
-                if (hashcode == (uint)currentEntry.Key.GetHashCode()
-                    && currentEntry.Key.Equals(key))
+                if (currentEntry.Key.GetHashCode() == hashcode)
                 {
                     currentEntry.Value = value;
                     _entries[index] = currentEntry;
@@ -250,9 +245,7 @@ namespace Faster
             for (; index < bounds; ++index)
             {
                 var currentEntry = _entries[index];
-
-                if (hashcode == (uint)currentEntry.Key.GetHashCode()
-                    && currentEntry.Key.Equals(key))
+                if (currentEntry.Key.GetHashCode() == hashcode)
                 {
                     _entries[index] = default; //reset current entry
                     EntryCount--;
@@ -275,7 +268,7 @@ namespace Faster
         }
 
         /// <summary>
-        /// Gets the value with the corresponding key, will returns true or false if the key is found or not
+        /// Gets the value with the corresponding key
         /// </summary>
         /// <param name="key">The key.</param>
         /// <param name="value">The value.</param>
@@ -286,7 +279,7 @@ namespace Faster
             uint index = hashcode * GoldenRatio >> _shift;
 
             var currentEntry = _entries[index];
-            if (hashcode == (uint)currentEntry.Key.GetHashCode() && currentEntry.Key.Equals(key))
+            if (currentEntry.Key.GetHashCode() == hashcode)
             {
                 value = currentEntry.Value;
                 return true;
@@ -298,10 +291,7 @@ namespace Faster
             for (; index < maxDistance; ++index)
             {
                 currentEntry = _entries[index];
-                var currentKey = currentEntry.Key;
-                if (currentKey != null &&
-                    (uint)currentKey.GetHashCode() == hashcode &&
-                    currentKey.Equals(key))
+                if (currentEntry.Key.GetHashCode() == hashcode)
                 {
                     value = currentEntry.Value;
                     return true;
@@ -313,7 +303,7 @@ namespace Faster
         }
 
         /// <summary>
-        /// Gets the value with the corresponding key, will actually throw if the key isnt found, if this is an issue you should just use Get()
+        /// Gets the value with the corresponding key, will returns true or false if the key is found or not
         /// </summary>
         /// <param name="key">The key.</param>
         /// <param name="value">The value.</param>
@@ -321,14 +311,14 @@ namespace Faster
         {
             get
             {
-                if (Get(key, out var result)) 
+                if (Get(key, out var result))
                 {
                     return result;
                 }
 
                 throw new InvalidOperationException($"Unable to find {key} in hashmap");
             }
-        } 
+        }
 
         #endregion
 
@@ -340,6 +330,7 @@ namespace Faster
             x = y;
             y = tmp;
         }
+
         private void Resize()
         {
             _shift--;
@@ -365,7 +356,6 @@ namespace Faster
                 EmplaceNew(entry.Key, entry.Value, index);
             }
         }
-
         private static uint NextPow2(uint c)
         {
             c--;
