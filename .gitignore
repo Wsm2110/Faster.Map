@@ -1,0 +1,10 @@
+
+*.testlog
+*.manifest
+*.dll
+*.pdb
+/obj
+/TestResults/
+/bin/
+/Faster.Map.Benchmark/bin/
+/Faster.Map.Benchmark/obj/

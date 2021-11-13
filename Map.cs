@@ -1,12 +1,11 @@
 ﻿using System;
-using System.Numerics;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-
 
 namespace Faster
 {
     /// <summary>
-    /// The default dictionary in targetframework 4.0 is no match for this implementation of a hashmap...
+    /// The default dictionary is no match for this implementation of a hashmap...
     /// 
     /// it`s speed and memory footprint is thorougly tested in Servicelocator.Tests.Benchmark.
     ///
@@ -44,6 +43,7 @@ namespace Faster
 
         private uint _maxLoopUps;
         private readonly double _loadFactor;
+        private readonly IEqualityComparer<TKey> _cmp;
         private Entry<TKey, TValue>[] _entries;
         private const uint GoldenRatio = 0x9E3779B9; // 2654435769; 
         private int _shift = 32;
@@ -58,16 +58,16 @@ namespace Faster
         /// </summary>
         /// <param name="length">The length.</param>
         /// <param name="loadFactor">The load factor.</param>
-        public Map(uint length = 16, double loadFactor = 0.88d)
+        public Map(uint length = 16, double loadFactor = 0.88d, IEqualityComparer<TKey> cmp = null)
         {
             //default length is 16
             _maxLoopUps = length == 0 ? 16 : length;
 
             _probeSequenceLength = Log2(_maxLoopUps);
             _loadFactor = loadFactor;
+            _cmp = cmp ?? EqualityComparer<TKey>.Default;
 
             var powerOfTwo = NextPow2(_maxLoopUps);
-
             _shift = _shift - (int)_probeSequenceLength + 1;
             _entries = new Entry<TKey, TValue>[powerOfTwo + _probeSequenceLength];
         }
@@ -91,14 +91,14 @@ namespace Faster
             }
 
             uint hashcode = (uint)key.GetHashCode();
-            uint index =  hashcode * GoldenRatio >> _shift;
+            uint index = hashcode * GoldenRatio >> _shift;
 
             //validate if the key is unique
-            if (KeyExists(index, hashcode))
+            if (KeyExists(key, index, hashcode))
             {
                 return false;
             }
-            
+
             return EmplaceNew(key, value, index);
         }
 
@@ -124,7 +124,7 @@ namespace Faster
             }
 
             Entry<TKey, TValue> insertableEntry = default;
-            
+
             byte psl = 1;
             ++index;
 
@@ -168,7 +168,7 @@ namespace Faster
         /// <param name="hashcode">The hashcode.</param>
         /// <returns></returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool KeyExists(uint index, uint hashcode)
+        private bool KeyExists(TKey key, uint index, uint hashcode)
         {
             var currentEntry = _entries[index];
             if (currentEntry.IsEmpty())
@@ -176,11 +176,12 @@ namespace Faster
                 return false;
             }
 
-            if (currentEntry.Key.GetHashCode() == hashcode)
+            if (hashcode == (uint)currentEntry.Key.GetHashCode()
+                && currentEntry.Key.Equals(key))
             {
                 return true;
             }
-            
+
             var maxDistance = index + _probeSequenceLength - 1;
             ++index;
 
@@ -192,7 +193,8 @@ namespace Faster
                     return false;
                 }
 
-                if (currentEntry.Key.GetHashCode() == hashcode)
+                if (hashcode == (uint)currentEntry.Key.GetHashCode()
+                    && currentEntry.Key.Equals(key))
                 {
                     return true;
                 }
@@ -211,20 +213,23 @@ namespace Faster
             uint index = hashcode * GoldenRatio >> _shift;
 
             var currentEntry = _entries[index];
-            if (currentEntry.Key.GetHashCode() == hashcode)
+
+            if (hashcode == (uint)currentEntry.Key.GetHashCode()
+                && currentEntry.Key.Equals(key))
             {
                 currentEntry.Value = value;
                 _entries[index] = currentEntry;
                 return;
             }
-            
+
             var maxDistance = index + _probeSequenceLength - 1;
             ++index;
 
             for (; index < maxDistance; ++index)
             {
                 currentEntry = _entries[index];
-                if (currentEntry.Key.GetHashCode() == hashcode)
+                if (hashcode == (uint)currentEntry.Key.GetHashCode()
+                    && currentEntry.Key.Equals(key))
                 {
                     currentEntry.Value = value;
                     _entries[index] = currentEntry;
@@ -245,10 +250,12 @@ namespace Faster
             bool found = false;
             var bounds = index + _probeSequenceLength;
 
-            for (;index < bounds ; ++index)
+            for (; index < bounds; ++index)
             {
                 var currentEntry = _entries[index];
-                if (currentEntry.Key.GetHashCode() == hashcode)
+
+                if (hashcode == (uint)currentEntry.Key.GetHashCode()
+                    && currentEntry.Key.Equals(key))
                 {
                     _entries[index] = default; //reset current entry
                     EntryCount--;
@@ -276,32 +283,36 @@ namespace Faster
         /// <param name="key">The key.</param>
         /// <param name="value">The value.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Get(TKey key, out TValue value)
+        public bool Get(TKey key, out TValue value)
         {
             var hashcode = (uint)key.GetHashCode();
             uint index = hashcode * GoldenRatio >> _shift;
-            
+
             var currentEntry = _entries[index];
-            if (currentEntry.Key.GetHashCode() == hashcode)
+            if (hashcode == (uint)currentEntry.Key.GetHashCode() && currentEntry.Key.Equals(key))
             {
                 value = currentEntry.Value;
-                return;
+                return true;
             }
-            
+
             var maxDistance = index + _probeSequenceLength - 1;
             ++index;
 
             for (; index < maxDistance; ++index)
             {
                 currentEntry = _entries[index];
-                if (currentEntry.Key.GetHashCode() == hashcode)
+                var currentKey = currentEntry.Key;
+                if (currentKey != null &&
+                    (uint)currentKey.GetHashCode() == hashcode && 
+                    currentKey.Equals(key))
                 {
                     value = currentEntry.Value;
-                    return;
+                    return true;
                 }
             }
 
             value = default;
+            return false;
         }
 
         #endregion
@@ -314,7 +325,6 @@ namespace Faster
             x = y;
             y = tmp;
         }
-
         private void Resize()
         {
             _shift--;
@@ -325,7 +335,7 @@ namespace Faster
             Array.Copy(_entries, oldEntries, _entries.Length);
             _entries = new Entry<TKey, TValue>[_maxLoopUps + _probeSequenceLength];
             EntryCount = 0;
-            
+
             for (var i = 0; i < oldEntries.Length; i++)
             {
                 var entry = oldEntries[i];
