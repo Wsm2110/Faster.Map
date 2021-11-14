@@ -1,7 +1,5 @@
 ﻿using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Diagnosers;
-using Faster.Map;
-using System;
 using System.Collections.Generic;
 
 namespace Faster.Map.Benchmark
@@ -10,12 +8,14 @@ namespace Faster.Map.Benchmark
         HardwareCounter.CacheMisses,
         HardwareCounter.BranchMispredictions,
         HardwareCounter.LlcMisses)]
+   
     public class Benchmark
     {
         #region Fields
 
         Map<uint, uint> _map = new Map<uint, uint>();
-
+        GenericMap<uint, uint> _genericMap = new GenericMap<uint, uint>(16, 0.5);
+        ExampleMap<uint> _fixedKeyMap = new ExampleMap<uint>(16, 0.5);
         Dictionary<uint, uint> _dict = new Dictionary<uint, uint>();
 
         #endregion
@@ -42,8 +42,20 @@ namespace Faster.Map.Benchmark
 
             _map.Emplace(33, 33);          
             _dict.Add(33, 33);
+            _genericMap.Emplace(33, 33);
+            _fixedKeyMap.Emplace(33, 33);
         }
- 
+
+        [Benchmark]
+        public void FixedKeyMap()
+        {
+            uint result = 0;
+            for (int i = 0; i < N; i++)
+            {
+                _fixedKeyMap.Get(33, out result);
+            }
+        }
+
 
         [Benchmark]
         public void Map()
@@ -55,6 +67,17 @@ namespace Faster.Map.Benchmark
             }
         }
 
+
+        [Benchmark]
+        public void GenericMap()
+        {
+            uint result = 0;
+            for (int i = 0; i < N; i++)
+            {
+                _genericMap.Get(33, out result);
+            }
+        }
+
         [Benchmark]
         public void Dictionary()
         {
@@ -62,7 +85,7 @@ namespace Faster.Map.Benchmark
             for (int i = 0; i < N; i++)
             {
                 _dict.TryGetValue(33, out result);
-            }         
+            }
         }
     }
 }

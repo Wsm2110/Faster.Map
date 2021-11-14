@@ -289,7 +289,7 @@ namespace Faster
             ++index;
 
             for (; index < maxDistance; ++index)
-            {
+            {       
                 currentEntry = _entries[index];
                 if (currentEntry.Key.GetHashCode() == hashcode)
                 {

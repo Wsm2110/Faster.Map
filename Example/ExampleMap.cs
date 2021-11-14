@@ -1,14 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 
 namespace Faster
 {
     /// <summary>
-    /// The default dictionary is no match for this implementation of a hashmap...
-    ///   
-    ///
+    ///   This hashmap is heavily optimized to be used with numerical keys 
+    ///   And is alot faster than Map which allows all sorts of keys :)
+    /// 
     /// This hashmap uses the following
     /// - Open addressing
     /// - Uses linear probing
@@ -17,7 +15,7 @@ namespace Faster
     /// - fixed uint key in order not having to call GetHashCode() which is an override... and overrides are not ideal in terms of performance
     /// - fibonacci hashing
     /// </summary>
-    public class GenericMap<TKey, TValue>
+    public class ExampleMap<TValue>
     {
         #region properties
 
@@ -43,10 +41,7 @@ namespace Faster
 
         private uint _maxLoopUps;
         private readonly double _loadFactor;
-
-        public IEqualityComparer<TKey> _cmp { get; }
-
-        private Entry<TKey, TValue>[] _entries;
+        private ExampleEntry<TValue>[] _entries;
         private const uint GoldenRatio = 0x9E3779B9; // 2654435769; 
         private int _shift = 32;
         private uint _probeSequenceLength;
@@ -60,18 +55,18 @@ namespace Faster
         /// </summary>
         /// <param name="length">The length.</param>
         /// <param name="loadFactor">The load factor.</param>
-        public GenericMap(uint length = 16, double loadFactor = 0.88d, IEqualityComparer<TKey> cmp = null)
+        public ExampleMap(uint length = 16, double loadFactor = 0.88d)
         {
             //default length is 16
             _maxLoopUps = length == 0 ? 16 : length;
 
             _probeSequenceLength = Log2(_maxLoopUps);
             _loadFactor = loadFactor;
-            _cmp = cmp ?? EqualityComparer<TKey>.Default;
 
             var powerOfTwo = NextPow2(_maxLoopUps);
+
             _shift = _shift - (int)_probeSequenceLength + 1;
-            _entries = new Entry<TKey, TValue>[powerOfTwo + _probeSequenceLength];
+            _entries = new ExampleEntry<TValue>[powerOfTwo + _probeSequenceLength];
         }
 
         #endregion
@@ -85,18 +80,17 @@ namespace Faster
         /// <param name="value">The value.</param>
         /// <returns></returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Emplace(TKey key, TValue value)
+        public bool Emplace(uint key, TValue value)
         {
             if ((double)EntryCount / _maxLoopUps > _loadFactor || EntryCount >= _maxLoopUps)
             {
                 Resize();
             }
-
-            uint hashcode = (uint)key.GetHashCode();
-            uint index = hashcode * GoldenRatio >> _shift;
+        
+            uint index = key * GoldenRatio >> _shift;
 
             //validate if the key is unique
-            if (KeyExists(key, index, hashcode))
+            if (KeyExists(index, key))
             {
                 return false;
             }
@@ -112,7 +106,7 @@ namespace Faster
         /// <param name="index">The index.</param>
         /// <returns></returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool EmplaceNew(TKey key, TValue value, uint index)
+        private bool EmplaceNew(uint key, TValue value, uint index)
         {
             var entry = _entries[index];
             if (entry.IsEmpty())
@@ -125,14 +119,14 @@ namespace Faster
                 return true;
             }
 
-            Entry<TKey, TValue> insertableEntry = default;
+            ExampleEntry<TValue> insertableEntry = default;
 
             byte psl = 1;
             ++index;
 
             insertableEntry.Key = key;
             insertableEntry.Value = value;
-            insertableEntry.Psl = 0; // set not empty          
+            insertableEntry.Psl = 0; // set not empty
 
             for (; ; ++psl, ++index)
             {
@@ -170,7 +164,7 @@ namespace Faster
         /// <param name="hashcode">The hashcode.</param>
         /// <returns></returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool KeyExists(TKey key, uint index, uint hashcode)
+        private bool KeyExists(uint index, uint hashcode)
         {
             var currentEntry = _entries[index];
             if (currentEntry.IsEmpty())
@@ -178,8 +172,7 @@ namespace Faster
                 return false;
             }
 
-            if (hashcode == (uint)currentEntry.Key.GetHashCode()
-                && currentEntry.Key.Equals(key))
+            if (currentEntry.Key == hashcode)
             {
                 return true;
             }
@@ -195,8 +188,7 @@ namespace Faster
                     return false;
                 }
 
-                if (hashcode == (uint)currentEntry.Key.GetHashCode()
-                    && currentEntry.Key.Equals(key))
+                if (currentEntry.Key == hashcode)
                 {
                     return true;
                 }
@@ -209,14 +201,12 @@ namespace Faster
         /// update the entry
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Update(TKey key, TValue value)
-        {
-            uint hashcode = (uint)key.GetHashCode();
-            uint index = hashcode * GoldenRatio >> _shift;
+        public void Update(uint key, TValue value)
+        {         
+            uint index = key * GoldenRatio >> _shift;
 
             var currentEntry = _entries[index];
-
-            if (_cmp.Equals(currentEntry.Key, key))
+            if (currentEntry.Key == key)
             {
                 currentEntry.Value = value;
                 _entries[index] = currentEntry;
@@ -229,7 +219,7 @@ namespace Faster
             for (; index < maxDistance; ++index)
             {
                 currentEntry = _entries[index];
-                if (_cmp.Equals(currentEntry.Key, key))
+                if (currentEntry.Key == key)
                 {
                     currentEntry.Value = value;
                     _entries[index] = currentEntry;
@@ -242,10 +232,9 @@ namespace Faster
         /// Removes tehe current entry using a backshift removal
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Remove(TKey key)
-        {
-            uint hashcode = (uint)key.GetHashCode();
-            uint index = hashcode * GoldenRatio >> _shift;
+        public void Remove(uint key)
+        {          
+            uint index = key * GoldenRatio >> _shift;
             byte psl = 0;
             bool found = false;
             var bounds = index + _probeSequenceLength;
@@ -253,9 +242,7 @@ namespace Faster
             for (; index < bounds; ++index)
             {
                 var currentEntry = _entries[index];
-
-                if (hashcode == (uint)currentEntry.Key.GetHashCode()
-                    && currentEntry.Key.Equals(key))
+                if (currentEntry.Key == key)
                 {
                     _entries[index] = default; //reset current entry
                     EntryCount--;
@@ -278,44 +265,32 @@ namespace Faster
         }
 
         /// <summary>
-        /// Gets the value with the corresponding key, will returns true or false if the key is found or not
+        /// Gets the value with the corresponding key
         /// </summary>
         /// <param name="key">The key.</param>
         /// <param name="value">The value.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Get(TKey key, out TValue value)
-        {
-            var hashcode = (uint)key.GetHashCode();
-            uint index = hashcode * GoldenRatio >> _shift;
-
+        public bool Get(uint key, out TValue value)
+        {          
+            uint index = key * GoldenRatio >> _shift;
             var currentEntry = _entries[index];
-            if (currentEntry.Key.GetHashCode() == hashcode)
+          
+            if (currentEntry.Key== key)
             {
-                if (_cmp.Equals(key, currentEntry.Key))
-                {
-                    value = currentEntry.Value;
-                    return true;
-                }
+                value = currentEntry.Value;
+                return true;
             }
 
             var maxDistance = index + _probeSequenceLength - 1;
             ++index;
 
             for (; index < maxDistance; ++index)
-            {
-                if (currentEntry.IsEmpty())
-                {
-                    break; // not found
-                }
-
+            {       
                 currentEntry = _entries[index];
-                if (currentEntry.Key.GetHashCode() == hashcode)
+                if (currentEntry.Key == key)
                 {
-                    if (_cmp.Equals(key, currentEntry.Key))
-                    {
-                        value = currentEntry.Value;
-                        return true;
-                    }
+                    value = currentEntry.Value;
+                    return true;
                 }
             }
 
@@ -324,11 +299,11 @@ namespace Faster
         }
 
         /// <summary>
-        /// Gets the value with the corresponding key, will actually throw if the key isnt found, if this is an issue you should just use Get()
+        /// Gets the value with the corresponding key, will returns true or false if the key is found or not
         /// </summary>
         /// <param name="key">The key.</param>
         /// <param name="value">The value.</param>
-        public TValue this[TKey key]
+        public TValue this[uint key]
         {
             get
             {
@@ -345,21 +320,22 @@ namespace Faster
 
         #region Private Methods
 
-        private void swap(ref Entry<TKey, TValue> x, ref Entry<TKey, TValue> y)
+        private void swap(ref ExampleEntry<TValue> x, ref ExampleEntry<TValue> y)
         {
             var tmp = x;
             x = y;
             y = tmp;
         }
+
         private void Resize()
         {
             _shift--;
             _maxLoopUps = NextPow2(_maxLoopUps + 1);
             _probeSequenceLength = Log2(_maxLoopUps);
 
-            var oldEntries = new Entry<TKey, TValue>[_entries.Length];
+            var oldEntries = new ExampleEntry<TValue>[_entries.Length];
             Array.Copy(_entries, oldEntries, _entries.Length);
-            _entries = new Entry<TKey, TValue>[_maxLoopUps + _probeSequenceLength];
+            _entries = new ExampleEntry<TValue>[_maxLoopUps + _probeSequenceLength];
             EntryCount = 0;
 
             for (var i = 0; i < oldEntries.Length; i++)
@@ -376,7 +352,6 @@ namespace Faster
                 EmplaceNew(entry.Key, entry.Value, index);
             }
         }
-
         private static uint NextPow2(uint c)
         {
             c--;
