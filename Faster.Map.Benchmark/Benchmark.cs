@@ -26,19 +26,19 @@ namespace Faster.Map.Benchmark
         [GlobalSetup]
         public void Setup()
         {
-            var r = new Random();
-            for (int i = 0; i < 1000000; i++)
-            {
-                var result = r.Next(100, 1000000);
+            //var r = new Random();
+            //for (int i = 0; i < 1000000; i++)
+            //{
+            //    var result = r.Next(100, 1000000);
 
-                if (!_dict.ContainsKey((uint)result))
-                {
-                    _dict.Add((uint)result, (uint)result);
-                }
+            //    if (!_dict.ContainsKey((uint)result))
+            //    {
+            //        _dict.Add((uint)result, (uint)result);
+            //    }
 
-                _map.Emplace((uint)result, (uint)result);
-                _numericalMap.Emplace((uint)result, (uint)result);
-            }
+            //    _map.Emplace((uint)result, (uint)result);
+            //    _numericalMap.Emplace((uint)result, (uint)result);
+            //}
 
             _map.Emplace(33, 33);
             _numericalMap.Emplace(33, 33);
@@ -52,12 +52,7 @@ namespace Faster.Map.Benchmark
             for (int i = 0; i < N; i++)
             {
                 _numericalMap.Get(33, out result);
-            }
-
-            if (result != 33)
-            {
-                throw new InvalidOperationException("benchmark failed");
-            }
+            }         
         }
 
         [Benchmark]
@@ -68,11 +63,6 @@ namespace Faster.Map.Benchmark
             {
                 _numericalMap.Get(33, out result);
             }
-
-            if (result != 33)
-            {
-                throw new InvalidOperationException("benchmark failed");
-            }
         }
 
         [Benchmark]
@@ -82,12 +72,7 @@ namespace Faster.Map.Benchmark
             for (int i = 0; i < N; i++)
             {
                 _dict.TryGetValue(33, out result);
-            }
-
-            if (result != 33)
-            {
-                throw new InvalidOperationException("benchmark failed");
-            }
+            }         
         }
     }
 }
