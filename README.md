@@ -20,9 +20,13 @@ private GenericMap<uint, uint> _map = new GenericMap<uint, uint>(16); // is slow
  * _map.Get(1, out var result);
  * _map.Update(1, 51);
 
+if this isn`t enough you should probably implement your own fixedKeyMap 
+
 | Method |   N   | Mean     | Error     | StdDev    |  BranchInstructionRetired/Op | CacheMisses/Op | LLCMisses/Op  |
 |--------|-------|----------|-----------|-----------|------------------------------|----------------|---------------|
-|Map     |1000000|1.451 ms  |0.0155s  |0.0145ms  |3015435                  |175          |137          |
+|FixedKeyMap |1000000|1.151 ms  |0.067s  |0.062ms  |3013435                  |125          |137          |
+|Map     |1000000|1.451 ms  |0.0155s  |0.0145ms  |3015435                  |175          |232          |
+|GenericMap |1000000|3.751 ms  |0.0102s  |0.0095ms  |8040841                |610          |3358          |
 |Dictionary|1000000|6.902 ms  |0.1305 ms |0.1451 ms|  11,075,4822	           | 1050          |922            |
 
 
