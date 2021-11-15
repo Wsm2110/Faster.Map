@@ -14,7 +14,7 @@ private Map<uint, uint> _map = new Map<uint, uint>(16);
  * _map.Get(1, out var result);
  * _map.Update(1, 51);
 
-private GenericMap<uint, uint> _map = new GenericMap<uint, uint>(16); // is slower, still faster than IDictionary :)
+private GenericMap<string, uint> _map = new GenericMap<uint, uint>(16); // is slower, still faster than IDictionary :)
  * _map.Emplace(1, 50); 
  * _map.Remove(1);
  * _map.Get(1, out var result);
