@@ -306,7 +306,6 @@ namespace Faster
         /// Gets the value with the corresponding key, will returns true or false if the key is found or not
         /// </summary>
         /// <param name="key">The key.</param>
-        /// <param name="value">The value.</param>
         public TValue this[TKey key]
         {
             get

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 
 namespace Faster
 {
@@ -43,9 +42,7 @@ namespace Faster
 
         private uint _maxLoopUps;
         private readonly double _loadFactor;
-
-        public IEqualityComparer<TKey> _cmp { get; }
-
+        private readonly IEqualityComparer<TKey> _cmp;
         private Entry<TKey, TValue>[] _entries;
         private const uint GoldenRatio = 0x9E3779B9; // 2654435769; 
         private int _shift = 32;
@@ -56,7 +53,7 @@ namespace Faster
         #region Constructor
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="Map" /> class.
+        /// Initializes a new instance of the GenericMap class
         /// </summary>
         /// <param name="length">The length.</param>
         /// <param name="loadFactor">The load factor.</param>
@@ -178,8 +175,7 @@ namespace Faster
                 return false;
             }
 
-            if (hashcode == (uint)currentEntry.Key.GetHashCode()
-                && currentEntry.Key.Equals(key))
+            if (_cmp.Equals(key, currentEntry.Key))
             {
                 return true;
             }
@@ -195,8 +191,7 @@ namespace Faster
                     return false;
                 }
 
-                if (hashcode == (uint)currentEntry.Key.GetHashCode()
-                    && currentEntry.Key.Equals(key))
+                if (_cmp.Equals(key, currentEntry.Key))
                 {
                     return true;
                 }
@@ -289,15 +284,13 @@ namespace Faster
             uint index = hashcode * GoldenRatio >> _shift;
 
             var currentEntry = _entries[index];
-            if (currentEntry.Key.GetHashCode() == hashcode)
+            
+            if (_cmp.Equals(key, currentEntry.Key))
             {
-                if (_cmp.Equals(key, currentEntry.Key))
-                {
-                    value = currentEntry.Value;
-                    return true;
-                }
+                value = currentEntry.Value;
+                return true;
             }
-
+            
             var maxDistance = index + _probeSequenceLength - 1;
             ++index;
 
@@ -309,14 +302,13 @@ namespace Faster
                 }
 
                 currentEntry = _entries[index];
-                if (currentEntry.Key.GetHashCode() == hashcode)
+
+                if (_cmp.Equals(key, currentEntry.Key))
                 {
-                    if (_cmp.Equals(key, currentEntry.Key))
-                    {
-                        value = currentEntry.Value;
-                        return true;
-                    }
+                    value = currentEntry.Value;
+                    return true;
                 }
+
             }
 
             value = default;
@@ -327,7 +319,6 @@ namespace Faster
         /// Gets the value with the corresponding key, will actually throw if the key isnt found, if this is an issue you should just use Get()
         /// </summary>
         /// <param name="key">The key.</param>
-        /// <param name="value">The value.</param>
         public TValue this[TKey key]
         {
             get

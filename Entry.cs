@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace Faster
@@ -39,7 +40,11 @@ namespace Faster
         /// <value>
         /// The key.
         /// </value>
-        public TKey Key { get; set; }
+        public TKey Key
+        {
+            get;
+            set;
+        }
 
         /// <summary>
         /// Sets the bit.
