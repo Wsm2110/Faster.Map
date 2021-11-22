@@ -183,7 +183,7 @@ namespace Faster
             var maxDistance = index + _probeSequenceLength - 1;
             ++index;
 
-            for (; index < maxDistance; ++index)
+            for (; index <= maxDistance; ++index)
             {
                 currentEntry = _entries[index];
                 if (currentEntry.IsEmpty())
@@ -221,7 +221,7 @@ namespace Faster
             var maxDistance = index + _probeSequenceLength - 1;
             ++index;
 
-            for (; index < maxDistance; ++index)
+            for (; index <= maxDistance; ++index)
             {
                 currentEntry = _entries[index];
                 if (_cmp.Equals(currentEntry.Key, key))
@@ -294,7 +294,7 @@ namespace Faster
             var maxDistance = index + _probeSequenceLength - 1;
             ++index;
 
-            for (; index < maxDistance; ++index)
+            for (; index <== maxDistance; ++index)
             {
                 if (currentEntry.IsEmpty())
                 {
