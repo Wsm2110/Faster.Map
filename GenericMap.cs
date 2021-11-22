@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace Faster
 {
@@ -13,7 +14,7 @@ namespace Faster
     /// - Uses linear probing
     /// - Robing hood hash
     /// - Upper limit on the probe sequence lenght(psl) which is Log2(size)
-    /// - fixed uint key in order not having to call GetHashCode() which is an override... and overrides are not ideal in terms of performance
+    /// resolves hashcollisions
     /// - fibonacci hashing
     /// </summary>
     public class GenericMap<TKey, TValue>
@@ -42,7 +43,7 @@ namespace Faster
 
         private uint _maxLoopUps;
         private readonly double _loadFactor;
-        private readonly IEqualityComparer<TKey> _cmp;
+        private IEqualityComparer<TKey> _cmp;
         private Entry<TKey, TValue>[] _entries;
         private const uint GoldenRatio = 0x9E3779B9; // 2654435769; 
         private int _shift = 32;
@@ -57,6 +58,7 @@ namespace Faster
         /// </summary>
         /// <param name="length">The length.</param>
         /// <param name="loadFactor">The load factor.</param>
+        /// <param name="cmp">The CMP.</param>
         public GenericMap(uint length = 16, double loadFactor = 0.88d, IEqualityComparer<TKey> cmp = null)
         {
             //default length is 16
@@ -81,7 +83,7 @@ namespace Faster
         /// <param name="key">The key.</param>
         /// <param name="value">The value.</param>
         /// <returns></returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(256)]
         public bool Emplace(TKey key, TValue value)
         {
             if ((double)EntryCount / _maxLoopUps > _loadFactor || EntryCount >= _maxLoopUps)
@@ -93,7 +95,7 @@ namespace Faster
             uint index = hashcode * GoldenRatio >> _shift;
 
             //validate if the key is unique
-            if (KeyExists(key, index, hashcode))
+            if (KeyExists(key, index))
             {
                 return false;
             }
@@ -108,7 +110,7 @@ namespace Faster
         /// <param name="value">The value.</param>
         /// <param name="index">The index.</param>
         /// <returns></returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(256)]
         private bool EmplaceNew(TKey key, TValue value, uint index)
         {
             var entry = _entries[index];
@@ -150,7 +152,7 @@ namespace Faster
                 }
                 else
                 {
-                    if (psl == _probeSequenceLength - 1)
+                    if (psl == _probeSequenceLength)
                     {
                         Resize();
                         Emplace(insertableEntry.Key, insertableEntry.Value);
@@ -163,11 +165,11 @@ namespace Faster
         /// <summary>
         /// Find if key exists in the map
         /// </summary>
+        /// <param name="key">The key.</param>
         /// <param name="index">The index.</param>
-        /// <param name="hashcode">The hashcode.</param>
         /// <returns></returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool KeyExists(TKey key, uint index, uint hashcode)
+        [MethodImpl(256)]
+        private bool KeyExists(TKey key, uint index)
         {
             var currentEntry = _entries[index];
             if (currentEntry.IsEmpty())
@@ -180,10 +182,10 @@ namespace Faster
                 return true;
             }
 
-            var maxDistance = index + _probeSequenceLength - 1;
+            var maxDistance = index + _probeSequenceLength;
             ++index;
 
-            for (; index <= maxDistance; ++index)
+            for (; index < maxDistance; ++index)
             {
                 currentEntry = _entries[index];
                 if (currentEntry.IsEmpty())
@@ -203,7 +205,7 @@ namespace Faster
         /// <summary>
         /// update the entry
         /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(256)]
         public void Update(TKey key, TValue value)
         {
             uint hashcode = (uint)key.GetHashCode();
@@ -218,10 +220,10 @@ namespace Faster
                 return;
             }
 
-            var maxDistance = index + _probeSequenceLength - 1;
+            var maxDistance = index + _probeSequenceLength;
             ++index;
 
-            for (; index <= maxDistance; ++index)
+            for (; index < maxDistance; ++index)
             {
                 currentEntry = _entries[index];
                 if (_cmp.Equals(currentEntry.Key, key))
@@ -236,7 +238,7 @@ namespace Faster
         /// <summary>
         /// Removes tehe current entry using a backshift removal
         /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(256)]
         public void Remove(TKey key)
         {
             uint hashcode = (uint)key.GetHashCode();
@@ -249,8 +251,7 @@ namespace Faster
             {
                 var currentEntry = _entries[index];
 
-                if (hashcode == (uint)currentEntry.Key.GetHashCode()
-                    && currentEntry.Key.Equals(key))
+                if (_cmp.Equals(currentEntry.Key, key))
                 {
                     _entries[index] = default; //reset current entry
                     EntryCount--;
@@ -277,31 +278,30 @@ namespace Faster
         /// </summary>
         /// <param name="key">The key.</param>
         /// <param name="value">The value.</param>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(256)]
         public bool Get(TKey key, out TValue value)
         {
             var hashcode = (uint)key.GetHashCode();
             uint index = hashcode * GoldenRatio >> _shift;
 
             var currentEntry = _entries[index];
-            
+
             if (_cmp.Equals(key, currentEntry.Key))
             {
                 value = currentEntry.Value;
                 return true;
             }
-            
-            var maxDistance = index + _probeSequenceLength - 1;
+
+            var maxDistance = index + _probeSequenceLength;
             ++index;
 
-            for (; index <== maxDistance; ++index)
+            for (; index < maxDistance;)
             {
+                currentEntry = _entries[index];
                 if (currentEntry.IsEmpty())
                 {
                     break; // not found
                 }
-
-                currentEntry = _entries[index];
 
                 if (_cmp.Equals(key, currentEntry.Key))
                 {
@@ -309,6 +309,7 @@ namespace Faster
                     return true;
                 }
 
+                ++index;
             }
 
             value = default;
@@ -319,7 +320,7 @@ namespace Faster
         /// Gets the value with the corresponding key, will actually throw if the key isnt found, if this is an issue you should just use Get()
         /// </summary>
         /// <param name="key">The key.</param>
-        public TValue this[TKey key]
+       public TValue this[TKey key]
         {
             get
             {

@@ -289,7 +289,7 @@ namespace Faster
             ++index;
 
             for (; index < maxDistance; ++index)
-            {       
+            {
                 currentEntry = _entries[index];
                 if (currentEntry.Key.GetHashCode() == hashcode)
                 {
@@ -300,6 +300,14 @@ namespace Faster
 
             value = default;
             return false;
+        }
+
+        public static unsafe byte[] GetBytes(TKey value)
+        {
+            byte[] numArray = new byte[4];
+            fixed (byte* numPtr = numArray)
+                *(TKey*)numPtr = value;
+            return numArray;
         }
 
         /// <summary>
