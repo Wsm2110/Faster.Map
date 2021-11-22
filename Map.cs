@@ -181,7 +181,7 @@ namespace Faster
             var maxDistance = index + _probeSequenceLength - 1;
             ++index;
 
-            for (; index < maxDistance; ++index)
+            for (; index <= maxDistance; ++index)
             {
                 currentEntry = _entries[index];
                 if (currentEntry.IsEmpty())
@@ -218,7 +218,7 @@ namespace Faster
             var maxDistance = index + _probeSequenceLength - 1;
             ++index;
 
-            for (; index < maxDistance; ++index)
+            for (; index <= maxDistance; ++index)
             {
                 currentEntry = _entries[index];
                 if (currentEntry.Key.GetHashCode() == hashcode)
@@ -288,7 +288,7 @@ namespace Faster
             var maxDistance = index + _probeSequenceLength - 1;
             ++index;
 
-            for (; index < maxDistance; ++index)
+            for (; index <= maxDistance; ++index)
             {       
                 currentEntry = _entries[index];
                 if (currentEntry.Key.GetHashCode() == hashcode)
