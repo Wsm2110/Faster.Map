@@ -76,8 +76,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Entry.cs" />
-    <Compile Include="Example\ExampleEntry.cs" />
-    <Compile Include="Example\ExampleMap.cs" />
     <Compile Include="Map.cs" />
     <Compile Include="GenericMap.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

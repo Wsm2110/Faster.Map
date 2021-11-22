@@ -55,7 +55,7 @@ namespace Faster
         /// </summary>
         /// <param name="length">The length.</param>
         /// <param name="loadFactor">The load factor.</param>
-        public Map(uint length = 16, double loadFactor = 0.88d)
+        public Map(uint length = 16, double loadFactor = 0.5d)
         {
             //default length is 16
             _maxLoopUps = length == 0 ? 16 : length;
@@ -148,7 +148,7 @@ namespace Faster
                 }
                 else
                 {
-                    if (psl == _probeSequenceLength - 1)
+                    if (psl == _probeSequenceLength)
                     {
                         Resize();
                         Emplace(insertableEntry.Key, insertableEntry.Value);

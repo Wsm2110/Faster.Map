@@ -59,7 +59,7 @@ namespace Faster
         /// <param name="length">The length.</param>
         /// <param name="loadFactor">The load factor.</param>
         /// <param name="cmp">The CMP.</param>
-        public GenericMap(uint length = 16, double loadFactor = 0.88d, IEqualityComparer<TKey> cmp = null)
+        public GenericMap(uint length = 16, double loadFactor = 0.5d, IEqualityComparer<TKey> cmp = null)
         {
             //default length is 16
             _maxLoopUps = length == 0 ? 16 : length;
