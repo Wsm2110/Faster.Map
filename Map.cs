@@ -178,10 +178,10 @@ namespace Faster
                 return true;
             }
 
-            var maxDistance = index + _probeSequenceLength - 1;
+            var maxDistance = index + _probeSequenceLength;
             ++index;
 
-            for (; index <= maxDistance; ++index)
+            for (; index < maxDistance; ++index)
             {
                 currentEntry = _entries[index];
                 if (currentEntry.IsEmpty())
@@ -215,10 +215,10 @@ namespace Faster
                 return;
             }
 
-            var maxDistance = index + _probeSequenceLength - 1;
+            var maxDistance = index + _probeSequenceLength;
             ++index;
 
-            for (; index <= maxDistance; ++index)
+            for (; index < maxDistance; ++index)
             {
                 currentEntry = _entries[index];
                 if (currentEntry.Key.GetHashCode() == hashcode)
@@ -285,10 +285,10 @@ namespace Faster
                 return true;
             }
 
-            var maxDistance = index + _probeSequenceLength - 1;
+            var maxDistance = index + _probeSequenceLength;
             ++index;
 
-            for (; index <= maxDistance; ++index)
+            for (; index < maxDistance; ++index)
             {       
                 currentEntry = _entries[index];
                 if (currentEntry.Key.GetHashCode() == hashcode)
