@@ -2,10 +2,9 @@
 
 The goal of Faster is to provide the fastest dict/set that integrates into the .net scientific ecosystem.
 
- This hashmap uses the following:
+ ### Faster.Map uses the following:
    - Open addressing
-   - Uses linear probing
-   - Robing hood hash
+   - linear probing
    - Upper limit on the probe sequence lenght(psl) which is Log2(size)   
    - Fibonacci hashing 
 
