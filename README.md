@@ -1,32 +1,43 @@
-# Fastest robinhood hashmap
+# Faster.Map - fastest c# hashmap (Robinhood hashmap)
 
-    /// This hashmap uses the following
-    /// - Open addressing
-    /// - Uses linear probing
-    /// - Robing hood hash
-    /// - Upper limit on the probe sequence lenght(psl) which is Log2(size)
+The goal of Faster is to provide the fastest dict/set that integrates into the .net scientific ecosystem.
 
-Usage:
+## About
 
-private Map<uint, uint> _map = new Map<uint, uint>(16); 
- * _map.Emplace(1, 50); 
- * _map.Remove(1);
- * _map.Get(1, out var result);
- * _map.Update(1, 51);
+Faster is a small robinhood hashmap with minimal memory overhead and incredibly fast runtime speed. See benchmarks, or try it out yourself. Faster.Map evolved from the fact that C# dictionaries in targetframework 4.0 are terribly slow. So i decided to create my own robinhood hashmap, turns out that this hashmap even performs better than the current dictionary written in .net5.
 
-private GenericMap<string, uint> _map = new GenericMap<string, uint>(16); // is slower, still faster than IDictionary :)
- * _map.Emplace(1, 50); 
- * _map.Remove(1);
- * _map.Get(1, out var result);
- * _map.Update(1, 51);
+## How to use
+Faster.Map provides 2 hashmaps. Map<> which is highly optimized to be used with numerical keys. And GenericMap<> which has no key constraints and will resolve hashcollissions. the main difference between these two maps is the use of the EqualityComparer<T>. Numerical keys dont need an EqualityComparer<T>, hence the speedboost.
 
-if this isn`t enough you should probably implement your own fixedKeyMap 
+ ## Examples
+    
+  ### Default Example
+```C#
+
+private Map<uint, uint> _map = new Map<uint, uint>(16);     
+  _map.Emplace(1, 50); 
+  _map.Remove(1);
+  _map.Get(1, out var result);
+  _map.Update(1, 51);
+  
+ var result = _map[1];    
+``` 
+  ### GenericMap Example
+```C#
+private GenericMap<string, uint> _map = new GenericMap<string, uint>(16);
+ _map.Emplace(1, 50); 
+ _map.Remove(1);
+ _map.Get(1, out var result);
+ _map.Update(1, 51);
+    
+``` 
+
+## Benchmark
 
 | Method |   N   | Mean     | Error     | StdDev    |  BranchInstructionRetired/Op | CacheMisses/Op | LLCMisses/Op  |
 |--------|-------|----------|-----------|-----------|------------------------------|----------------|---------------|
-|FixedKeyMap |1000000|1.151 ms  |0.067s  |0.062ms  |3013435                  |125          |137          |
 |Map     |1000000|1.451 ms  |0.0155s  |0.0145ms  |3015435                  |175          |232          |
-|GenericMap |1000000|3.751 ms  |0.0102s  |0.0095ms  |8040841                |610          |3358          |
+|GenericMap |1000000|3.451 ms  |0.0102s  |0.0095ms  |8040841                |610          |3358          |
 |Dictionary|1000000|6.902 ms  |0.1305 ms |0.1451 ms|  11,075,4822	           | 1050          |922            |
 
 
