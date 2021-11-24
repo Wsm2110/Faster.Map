@@ -19,14 +19,15 @@ private Map<uint, uint> _map = new Map<uint, uint>(16);
   _map.Remove(1);
   _map.Get(1, out var result);
   _map.Update(1, 51);
-  var result = _map[1];    
+  
+ var result = _map[1];    
 ``` 
   ### GenericMap Example
 ```C#
 private GenericMap<string, uint> _map = new GenericMap<string, uint>(16);
  _map.Emplace(1, 50); 
  _map.Remove(1);
-  _map.Get(1, out var result);
+ _map.Get(1, out var result);
  _map.Update(1, 51);
     
 ``` 
