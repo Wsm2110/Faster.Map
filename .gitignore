@@ -8,3 +8,7 @@
 /bin/
 /Faster.Map.Benchmark/bin/
 /Faster.Map.Benchmark/obj/
+*.txt
+.vs/Faster.Map/v17/.suo
+*.nupkg
+*.exe
