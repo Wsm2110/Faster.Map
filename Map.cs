@@ -60,7 +60,12 @@ namespace Faster
             //default length is 16
             _maxLoopUps = length == 0 ? 16 : length;
 
-            _probeSequenceLength = Log2(_maxLoopUps);
+            _probeSequenceLength = Log2(_maxLoopUps); // only have 4 bits to store
+            if (_probeSequenceLength > 15)
+            {
+                _probeSequenceLength = 15;
+            }
+
             _loadFactor = loadFactor;
 
             var powerOfTwo = NextPow2(_maxLoopUps);
@@ -148,7 +153,7 @@ namespace Faster
                     continue;
                 }
 
-                if (psl == _probeSequenceLength || index == _maxLoopUps)
+                if (psl == _probeSequenceLength)
                 {
                     Resize();
                     Emplace(insertableEntry.Key, insertableEntry.Value);
@@ -301,14 +306,6 @@ namespace Faster
             return false;
         }
 
-        public static unsafe byte[] GetBytes(TKey value)
-        {
-            byte[] numArray = new byte[4];
-            fixed (byte* numPtr = numArray)
-                *(TKey*)numPtr = value;
-            return numArray;
-        }
-
         /// <summary>
         /// Gets the value with the corresponding key, will returns true or false if the key is found or not
         /// </summary>
@@ -342,6 +339,11 @@ namespace Faster
             _shift--;
             _maxLoopUps = NextPow2(_maxLoopUps + 1);
             _probeSequenceLength = Log2(_maxLoopUps);
+          
+            if (_probeSequenceLength > 15)
+            {
+                _probeSequenceLength = 15;
+            }
 
             var oldEntries = new Entry<TKey, TValue>[_entries.Length];
             Array.Copy(_entries, oldEntries, _entries.Length);

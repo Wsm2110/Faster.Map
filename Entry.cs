@@ -18,13 +18,13 @@ namespace Faster
         /// </value>
         public byte Psl
         {
-            get => (byte)(_psl & 0x0F);
+            get => (byte)(_psl & 0x0F); // clear 4 left bits which means psl cannot be higher than 15
             set
             {
-                var b = SetBit(value); //set 7th bit to indicate this struct is not empty
+                var b = SetSeventhBit(value); //set 7th bit to indicate this struct is not empty
                 _psl = b;
             }
-        } // 0 - 255 
+        } // 0 - 128
 
         /// <summary>
         /// Gets or sets the value.
@@ -51,7 +51,7 @@ namespace Faster
         /// </summary>
         /// <param name="b">The b.</param>
         /// <returns></returns>
-        public static byte SetBit(byte b)
+        public static byte SetSeventhBit(byte b)
         {
             b |= 1 << 7;
             return b;

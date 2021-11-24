@@ -64,6 +64,10 @@ namespace Faster
             _maxLoopUps = length == 0 ? 16 : length;
 
             _probeSequenceLength = Log2(_maxLoopUps);
+                        if (_probeSequenceLength > 15)
+            {
+                _probeSequenceLength = 15;
+            }
             _loadFactor = loadFactor;
             _cmp = cmp ?? EqualityComparer<TKey>.Default;
 
@@ -151,7 +155,7 @@ namespace Faster
                     continue;
                 }
 
-                if (psl == _probeSequenceLength || index == _maxLoopUps)
+                if (psl == _probeSequenceLength)
                 {
                     Resize();
                     Emplace(insertableEntry.Key, insertableEntry.Value);
@@ -346,6 +350,11 @@ namespace Faster
             _shift--;
             _maxLoopUps = NextPow2(_maxLoopUps + 1);
             _probeSequenceLength = Log2(_maxLoopUps);
+
+            if (_probeSequenceLength > 15)
+            {
+                _probeSequenceLength = 15;
+            }
 
             var oldEntries = new Entry<TKey, TValue>[_entries.Length];
             Array.Copy(_entries, oldEntries, _entries.Length);
