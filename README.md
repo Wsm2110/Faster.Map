@@ -2,12 +2,20 @@
 
 The goal of Faster is to provide the fastest dict/set that integrates into the .net scientific ecosystem.
 
+ This hashmap uses the following:
+   - Open addressing
+   - Uses linear probing
+   - Robing hood hash
+   - Upper limit on the probe sequence lenght(psl) which is Log2(size)   
+   - Fibonacci hashing 
+
 ## About
 
 Faster is a small robinhood hashmap with minimal memory overhead and incredibly fast runtime speed. See benchmarks, or try it out yourself. Faster.Map evolved from the fact that C# dictionaries in targetframework 4.0 are terribly slow. So i decided to create my own robinhood hashmap, turns out that this hashmap even performs better than the current dictionary written in .net5.
 
 ## How to use
 Faster.Map provides 2 hashmaps. Map<> which is highly optimized to be used with numerical keys. And GenericMap<> which has no key constraints and will resolve hashcollissions. the main difference between these two maps is the use of the EqualityComparer<T>. Numerical keys dont need an EqualityComparer<T>, hence the speedboost.
+  
 
  ## Examples
     
