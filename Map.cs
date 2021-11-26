@@ -117,12 +117,9 @@ namespace Faster
                 entry.Value = value;
                 _entries[index] = entry;
                 ++EntryCount;
-                return true;
+               return true;
             }
-
-            //notify initial slot
-            _entries[index] = entry;
-
+            
             Entry<TKey, TValue> insertableEntry = default;
 
             byte psl = 1;
@@ -355,6 +352,7 @@ namespace Faster
             y.Psl = tmp.Psl;
         }
 
+        [MethodImpl(256)]
         private void Resize()
         {
             _shift--;
