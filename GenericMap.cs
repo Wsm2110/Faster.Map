@@ -64,10 +64,6 @@ namespace Faster
             _maxLoopUps = length == 0 ? 16 : length;
 
             _probeSequenceLength = Log2(_maxLoopUps);
-                        if (_probeSequenceLength > 15)
-            {
-                _probeSequenceLength = 15;
-            }
             _loadFactor = loadFactor;
             _cmp = cmp ?? EqualityComparer<TKey>.Default;
 
@@ -155,7 +151,7 @@ namespace Faster
                     continue;
                 }
 
-                if (psl == _probeSequenceLength)
+                if (psl == _probeSequenceLength || index == _maxLoopUps)
                 {
                     Resize();
                     Emplace(insertableEntry.Key, insertableEntry.Value);
@@ -187,20 +183,22 @@ namespace Faster
             var maxDistance = index + _probeSequenceLength;
             ++index;
 
-            for (; index < maxDistance; ++index)
+            byte psl = currentEntry.Psl;
+            for (; index <= maxDistance; ++index)
             {
                 currentEntry = _entries[index];
-                if (currentEntry.IsEmpty())
+                if (currentEntry.Psl < psl)
                 {
-                    return false;
+                    break;
                 }
+
+                psl = currentEntry.Psl;
 
                 if (_cmp.Equals(key, currentEntry.Key))
                 {
                     return true;
                 }
             }
-
             return false;
         }
 
@@ -225,9 +223,16 @@ namespace Faster
             var maxDistance = index + _probeSequenceLength;
             ++index;
 
-            for (; index < maxDistance; ++index)
+            byte psl = currentEntry.Psl;
+            for (; index <= maxDistance; ++index)
             {
                 currentEntry = _entries[index];
+                if (currentEntry.Psl < psl)
+                {
+                    break;
+                }
+
+                psl = currentEntry.Psl;
                 if (_cmp.Equals(currentEntry.Key, key))
                 {
                     currentEntry.Value = value;
@@ -283,9 +288,8 @@ namespace Faster
         [MethodImpl(256)]
         public bool Get(TKey key, out TValue value)
         {
-            var hashcode = (uint)key.GetHashCode();
+            uint hashcode = (uint)key.GetHashCode();
             uint index = hashcode * GoldenRatio >> _shift;
-
             var currentEntry = _entries[index];
 
             if (_cmp.Equals(key, currentEntry.Key))
@@ -294,26 +298,25 @@ namespace Faster
                 return true;
             }
 
-            var maxDistance = index + _probeSequenceLength;
+            uint maxDistance = index + _probeSequenceLength;
             ++index;
 
-            for (; index < maxDistance;)
+            byte psl = currentEntry.Psl;
+            for (; index <= maxDistance; ++index)
             {
                 currentEntry = _entries[index];
-                if (currentEntry.IsEmpty())
+                if (currentEntry.Psl < psl)
                 {
-                    break; // not found
+                    break;
                 }
 
+                psl = currentEntry.Psl;
                 if (_cmp.Equals(key, currentEntry.Key))
                 {
                     value = currentEntry.Value;
                     return true;
                 }
-
-                ++index;
             }
-
             value = default;
             return false;
         }
@@ -350,11 +353,6 @@ namespace Faster
             _shift--;
             _maxLoopUps = NextPow2(_maxLoopUps + 1);
             _probeSequenceLength = Log2(_maxLoopUps);
-
-            if (_probeSequenceLength > 15)
-            {
-                _probeSequenceLength = 15;
-            }
 
             var oldEntries = new Entry<TKey, TValue>[_entries.Length];
             Array.Copy(_entries, oldEntries, _entries.Length);

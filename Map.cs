@@ -39,10 +39,10 @@ namespace Faster
 
         #region Fields
 
-        private uint _maxLoopUps;
+        private uint _maxlookups;
         private readonly double _loadFactor;
         private Entry<TKey, TValue>[] _entries;
-        private const uint GoldenRatio = 0x9E3779B9; // 2654435769; 
+        private const uint GoldenRatio =  0x9E3779B9; // 2654435769; 
         private int _shift = 32;
         private uint _probeSequenceLength;
 
@@ -58,17 +58,12 @@ namespace Faster
         public Map(uint length = 16, double loadFactor = 0.88d)
         {
             //default length is 16
-            _maxLoopUps = length == 0 ? 16 : length;
+            _maxlookups = length == 0 ? 16 : length;
 
-            _probeSequenceLength = Log2(_maxLoopUps); // only have 4 bits to store
-            if (_probeSequenceLength > 15)
-            {
-                _probeSequenceLength = 15;
-            }
-
+            _probeSequenceLength = Log2(_maxlookups);
             _loadFactor = loadFactor;
 
-            var powerOfTwo = NextPow2(_maxLoopUps);
+            var powerOfTwo = NextPow2(_maxlookups);
 
             _shift = _shift - (int)_probeSequenceLength + 1;
             _entries = new Entry<TKey, TValue>[powerOfTwo + _probeSequenceLength];
@@ -87,7 +82,7 @@ namespace Faster
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Emplace(TKey key, TValue value)
         {
-            if ((double)EntryCount / _maxLoopUps > _loadFactor || EntryCount >= _maxLoopUps)
+            if ((double)EntryCount / _maxlookups > _loadFactor || EntryCount >= _maxlookups)
             {
                 Resize();
             }
@@ -124,6 +119,9 @@ namespace Faster
                 ++EntryCount;
                 return true;
             }
+
+            //notify initial slot
+            _entries[index] = entry;
 
             Entry<TKey, TValue> insertableEntry = default;
 
@@ -185,20 +183,21 @@ namespace Faster
             var maxDistance = index + _probeSequenceLength;
             ++index;
 
-            for (; index < maxDistance; ++index)
+            byte psl = currentEntry.Psl;
+            for (; index <= maxDistance; ++index)
             {
                 currentEntry = _entries[index];
-                if (currentEntry.IsEmpty())
+                if (currentEntry.Psl < psl)
                 {
-                    return false;
+                    break;
                 }
 
+                psl = currentEntry.Psl;
                 if (currentEntry.Key.GetHashCode() == hashcode)
                 {
                     return true;
                 }
             }
-
             return false;
         }
 
@@ -218,13 +217,21 @@ namespace Faster
                 _entries[index] = currentEntry;
                 return;
             }
-
+            
             var maxDistance = index + _probeSequenceLength;
             ++index;
 
-            for (; index < maxDistance; ++index)
+            byte psl = currentEntry.Psl;
+            for (; index <= maxDistance; ++index)
             {
                 currentEntry = _entries[index];
+                if (currentEntry.Psl < psl)
+                {
+                    break;
+                }
+
+                psl = currentEntry.Psl;
+
                 if (currentEntry.Key.GetHashCode() == hashcode)
                 {
                     currentEntry.Value = value;
@@ -292,9 +299,17 @@ namespace Faster
             var maxDistance = index + _probeSequenceLength;
             ++index;
 
-            for (; index < maxDistance; ++index)
+            byte psl = currentEntry.Psl;
+            for (; index <= maxDistance  ; ++index)
             {
                 currentEntry = _entries[index];
+                if (currentEntry.Psl < psl)
+                {
+                    break;
+                }
+
+                psl = currentEntry.Psl;
+
                 if (currentEntry.Key.GetHashCode() == hashcode)
                 {
                     value = currentEntry.Value;
@@ -330,24 +345,25 @@ namespace Faster
         private void swap(ref Entry<TKey, TValue> x, ref Entry<TKey, TValue> y)
         {
             var tmp = x;
-            x = y;
-            y = tmp;
+            
+            x.Key = y.Key;
+            x.Value = y.Value;
+            x.Psl = y.Psl;
+            
+            y.Key = tmp.Key;
+            y.Value = tmp.Value;
+            y.Psl = tmp.Psl;
         }
 
         private void Resize()
         {
             _shift--;
-            _maxLoopUps = NextPow2(_maxLoopUps + 1);
-            _probeSequenceLength = Log2(_maxLoopUps);
-          
-            if (_probeSequenceLength > 15)
-            {
-                _probeSequenceLength = 15;
-            }
+            _maxlookups = NextPow2(_maxlookups + 1);
+            _probeSequenceLength = Log2(_maxlookups);
 
             var oldEntries = new Entry<TKey, TValue>[_entries.Length];
             Array.Copy(_entries, oldEntries, _entries.Length);
-            _entries = new Entry<TKey, TValue>[_maxLoopUps + _probeSequenceLength];
+            _entries = new Entry<TKey, TValue>[_maxlookups + _probeSequenceLength];
             EntryCount = 0;
 
             for (var i = 0; i < oldEntries.Length; i++)
