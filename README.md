@@ -4,7 +4,7 @@ The goal of Faster is to provide the fastest dict/set that integrates into the .
 
  ### Faster.Map uses the following:
    - Open addressing
-   - linear probing
+   - Linear probing
    - Upper limit on the probe sequence lenght(psl) which is Log2(size)   
    - Fibonacci hashing 
 
@@ -41,11 +41,12 @@ private GenericMap<string, uint> _map = new GenericMap<string, uint>(16);
 
 ## Benchmark
 
-| Method |   N   | Mean     | Error     | StdDev    |  BranchInstructionRetired/Op | CacheMisses/Op | LLCMisses/Op  |
-|--------|-------|----------|-----------|-----------|------------------------------|----------------|---------------|
-|Map     |1000000|1.451 ms  |0.0155s  |0.0145ms  |3015435                  |175          |232          |
-|GenericMap |1000000|3.451 ms  |0.0102s  |0.0095ms  |8040841                |610          |3358          |
-|Dictionary|1000000|6.902 ms  |0.1305 ms |0.1451 ms|  11,075,4822	           | 1050          |922            |
+| Method    |   N    | Mean     | Error     | StdDev    |  BranchInstructionRetired/Op | CacheMisses/Op | LLCMisses/Op  |
+|-----------|------- |----------|-----------|-----------|------------------------------|----------------|---------------|
+|Map        |1000000 |1.451 ms  |0.0155s    |0.0145ms   |3015435                       |175             |232            |
+|GenericMap |1000000 |3.451 ms  |0.0102s    |0.0095ms   |8040841                       |610             |3358           |
+|Dictionary |1000000 |6.902 ms  |0.1305 ms  |0.1451 ms  |11,075,4822	               | 1050           |922            |
+
 
 
 BenchmarkDotNet=v0.13.1, OS=Windows 10.0.19042.631 (20H2/October2020Update)

@@ -79,7 +79,7 @@ namespace Faster
         /// <param name="key">The key.</param>
         /// <param name="value">The value.</param>
         /// <returns></returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(256)]
         public bool Emplace(TKey key, TValue value)
         {
             if ((double)EntryCount / _maxlookups > _loadFactor || EntryCount >= _maxlookups)
@@ -106,7 +106,7 @@ namespace Faster
         /// <param name="value">The value.</param>
         /// <param name="index">The index.</param>
         /// <returns></returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(256)]
         private bool EmplaceNew(TKey key, TValue value, uint index)
         {
             var entry = _entries[index];
@@ -163,7 +163,7 @@ namespace Faster
         /// <param name="index">The index.</param>
         /// <param name="hashcode">The hashcode.</param>
         /// <returns></returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(256)]
         private bool KeyExists(uint index, uint hashcode)
         {
             var currentEntry = _entries[index];
@@ -201,7 +201,7 @@ namespace Faster
         /// <summary>
         /// update the entry
         /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(256)]
         public void Update(TKey key, TValue value)
         {
             uint hashcode = (uint)key.GetHashCode();
@@ -241,7 +241,7 @@ namespace Faster
         /// <summary>
         /// Removes tehe current entry using a backshift removal
         /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(256)]
         public void Remove(TKey key)
         {
             uint hashcode = (uint)key.GetHashCode();
@@ -280,7 +280,7 @@ namespace Faster
         /// </summary>
         /// <param name="key">The key.</param>
         /// <param name="value">The value.</param>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(256)]
         public bool Get(TKey key, out TValue value)
         {
             var hashcode = (uint)key.GetHashCode();
