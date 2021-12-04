@@ -39,13 +39,12 @@ namespace Faster
 
         #region Fields
 
-        private Info[] _info;
+        private InfoByte[] _info;
         public int[] _keys;
-
         private uint _maxlookups;
         private readonly double _loadFactor;
         private Entry<TValue>[] _entries;
-        private const uint GoldenRatio = 0x9E3779B9; // 2654435769; 
+        private const uint _multiplier = 0x9E3779B9; // 2654435769; 
         private int _shift = 32;
         private uint _pslLimitor;
 
@@ -69,7 +68,7 @@ namespace Faster
 
             _shift = _shift - (int)Log2(_maxlookups) + 1;
             _entries = new Entry<TValue>[size + _pslLimitor];
-            _info = new Info[size + _pslLimitor];
+            _info = new InfoByte[size + _pslLimitor];
             _keys = new int[size + _pslLimitor];
         }
 
@@ -92,7 +91,7 @@ namespace Faster
             }
 
             int hashcode = key.GetHashCode();
-            uint index = (uint)hashcode * GoldenRatio >> _shift;
+            uint index = (uint)hashcode * _multiplier >> _shift;
 
             // validate if the key is unique
             if (KeyExists(index, hashcode))
@@ -144,7 +143,7 @@ namespace Faster
                     insertableEntry.Psl = psl;
 
                     //some weird stuff
-                    var idx = (uint)hashcode * GoldenRatio >> _shift;
+                    var idx = (uint)hashcode * _multiplier >> _shift;
                     var ie = _info[idx];
                     ie.Offset = (byte)(index - idx);
                     _info[idx] = ie;
@@ -162,7 +161,7 @@ namespace Faster
                     swap(ref insertableEntry, ref _entries[index]);
 
                     //calculate the offset from it's original position
-                    var idx = (uint)hashcode * GoldenRatio >> _shift;
+                    var idx = (uint)hashcode * _multiplier >> _shift;
                     var ie = _info[idx];
                     ie.Offset = (byte)(index - idx);
                     _info[idx] = ie;
@@ -174,7 +173,7 @@ namespace Faster
                 if (psl == _pslLimitor)
                 {
                     Resize();
-                    var idx = (uint)hashcode * GoldenRatio >> _shift;
+                    var idx = (uint)hashcode * _multiplier >> _shift;
                     EmplaceNew(insertableEntry.Value, ref idx, ref hashcode);
                 }
             }
@@ -188,7 +187,7 @@ namespace Faster
         public TValue Get(TKey key)
         {
             var hashcode = key.GetHashCode();
-            uint index = (uint)hashcode * GoldenRatio >> _shift;
+            uint index = (uint)hashcode * _multiplier >> _shift;
 
             var info = _info[index];
             if (info.Count == 0)
@@ -198,19 +197,13 @@ namespace Faster
 
             uint offset = index + info.Offset;
 
-            for (; offset >= index; offset -= 2)
+            for (; offset >= index; --offset)
             {
                 var entry = _keys[offset];
                 if (entry == hashcode)
                 {
                     return _entries[offset].Value;
-                }
-
-                entry = _keys[offset - 1];
-                if (entry == hashcode)
-                {
-                    return _entries[offset].Value;
-                }
+                }              
             }
 
             return default;
@@ -235,7 +228,7 @@ namespace Faster
             uint offset = index + info.Offset;
             if (offset == 0)
             {
-                var entry = _keys[offset];
+                var entry = _keys[index];
                 if (entry == hashcode)
                 {
                     return true;
@@ -263,7 +256,7 @@ namespace Faster
         public bool Update(TKey key, TValue value)
         {
             var hashcode = key.GetHashCode();
-            uint index = (uint)hashcode * GoldenRatio >> _shift;
+            uint index = (uint)hashcode * _multiplier >> _shift;
 
             var info = _info[index];
             if (info.Count == 0)
@@ -273,28 +266,19 @@ namespace Faster
 
             uint offset = index + info.Offset;
 
-            for (; offset >= index; offset -= 2)
+            for (; offset >= index; --offset)
             {
                 var storedKey = _keys[offset];
                 if (storedKey == hashcode)
                 {
                     var entry = _entries[offset];
+
                     entry.Value = value;
                     _entries[offset] = entry;
 
                     return true;
-                }
-
-                storedKey = _keys[offset - 1];
-                if (storedKey == hashcode)
-                {
-                    var entry = _entries[offset];
-                    entry.Value = value;
-                    _entries[offset] = entry;
-                    return true;
-                }
+                }      
             }
-
             return default;
         }
 
@@ -305,7 +289,7 @@ namespace Faster
         public bool Remove(TKey key)
         {
             uint hashcode = (uint)key.GetHashCode();
-            uint index = hashcode * GoldenRatio >> _shift;
+            uint index = hashcode * _multiplier >> _shift;
 
             var info = _info[index];
             if (info.Count == 0)
@@ -319,7 +303,7 @@ namespace Faster
             //delete entry
             uint offset = index + info.Offset;
             byte psl = 0;
-            for (; offset >= index; offset -= 2)
+            for (; offset >= index; --offset)
             {
                 var entry = _keys[offset];
                 if (entry == hashcode)
@@ -343,31 +327,7 @@ namespace Faster
                     --EntryCount;
 
                     break;
-                }
-
-                entry = _keys[offset - 1];
-                if (entry == hashcode)
-                {
-                    //remove entry
-                    var ee = _entries[offset];
-                    psl = ee.Psl;
-                    ee = default; // reset entry
-                    _entries[offset] = ee;
-                    idx = (int)offset;
-
-                    //update info
-                    --info.Count;
-                    _info[index] = info;
-
-                    //remove key fromlist
-                    --info.Count;
-                    var oldKey = _keys[index];
-                    oldKey = default;
-                    _keys[index] = oldKey;
-
-                    --EntryCount;
-                    break;
-                }
+                }        
             }
 
             if (idx == -1)
@@ -382,19 +342,19 @@ namespace Faster
                 var skey = _keys[idx + 1];
                 if (skey == 0)
                 {
-                    return true;
                     //empty slot, stop backshift removal
+                    break;                    
                 }
 
                 var sEntry = _entries[idx + 1];
                 if (sEntry.Psl == 0)
                 {
-                    return true;
+                    break;
                 }
 
                 if (sEntry.Psl >= psl)
                 {
-                    uint originalIndex = (uint)skey * GoldenRatio >> _shift;
+                    uint originalIndex = (uint)skey * _multiplier >> _shift;
                     var off = idx - originalIndex;
                     var i = _info[originalIndex];
                     i.Offset = (byte)off;
@@ -413,20 +373,16 @@ namespace Faster
                     //clear entry
                     sEntry = default;
                     _entries[idx + 1] = sEntry;
-                }
-                else
-                {
-                    return true;
-                }
+                }              
             }
 
-            return false;
+            return true;
         }
 
         public bool ContainsKey(TKey key)
         {
             var hashcode = key.GetHashCode();
-            uint index = (uint)hashcode * GoldenRatio >> _shift;
+            uint index = (uint)hashcode * _multiplier >> _shift;
 
             var info = _info[index];
             if (info.Count == 0)
@@ -526,7 +482,7 @@ namespace Faster
             _pslLimitor = PslLimit(_maxlookups);
             
             _entries = new Entry<TValue>[_maxlookups + _pslLimitor];
-            _info = new Info[_maxlookups + _pslLimitor];
+            _info = new InfoByte[_maxlookups + _pslLimitor];
             _keys = new int[_maxlookups + _pslLimitor];
 
             EntryCount = 0;
@@ -540,7 +496,7 @@ namespace Faster
                 }
 
                 var value = oldEntries[i].Value;
-                uint index = (uint)key * GoldenRatio >> _shift;
+                uint index = (uint)key * _multiplier >> _shift;
                 EmplaceNew(value, ref index, ref key);
             }
         }
@@ -569,8 +525,6 @@ namespace Faster
         }
 
         #endregion
-
-
 
     }
 

@@ -5,7 +5,7 @@ namespace Faster
 {
     [StructLayout(LayoutKind.Explicit)]
     [DebuggerDisplay("offset  {Offset} - count {Count}")]
-    public struct Info
+    public struct InfoByte
     {
         [FieldOffset(0)]
         private byte _offset;
