@@ -10,7 +10,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Faster</RootNamespace>
     <AssemblyName>Faster</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
     <TargetFrameworkProfile />
@@ -80,9 +80,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Entry.cs" />
-    <Compile Include="Map.cs" />
     <Compile Include="GenericMap.cs" />
+    <Compile Include="Core\GenericEntry.cs" />
+    <Compile Include="Map.cs" />
+    <Compile Include="Core\Entry.cs" />
+    <Compile Include="Core\InfoByte.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup />
