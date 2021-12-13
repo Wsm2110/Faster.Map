@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Faster.Core;
@@ -6,8 +6,8 @@ using Faster.Core;
 namespace Faster
 {
     /// <summary>
+    ///
     /// This hashmap uses the following
-    /// 
     /// - Open addressing
     /// - Uses linear probing
     /// - Robing hood hash
@@ -105,81 +105,6 @@ namespace Faster
         }
 
         /// <summary>
-        /// Emplaces a new entry without checking for key existence
-        /// </summary>
-        /// <param name="key">The key.</param>
-        /// <param name="value">The value.</param>
-        /// <param name="index">The index.</param>
-        /// <param name="hashcode">The hashcode.</param>
-        /// <returns></returns>
-        [MethodImpl(256)]
-        private bool EmplaceNew(TKey key, TValue value, ref uint index, ref int hashcode)
-        {
-            _info[index].Offset = 0;
-
-            var infoByte = _info[index];
-            if (infoByte.IsEmpty())
-            {
-                infoByte.Psl = 0;
-
-                _entries[index].Hashcode = (byte)(hashcode & 0xFF16);
-                _entries[index].Value = value;
-                _entries[index].Key = key;
-
-                _info[index] = infoByte;
-                ++EntryCount;
-                return true;
-            }
-
-            InfoByte insertableInfo = default;
-            GenericEntry<TKey, TValue> insertableEntry = default;
-
-            byte psl = 1;
-            ++index;
-
-            insertableEntry.Value = value;
-            insertableEntry.Key = key;
-            insertableEntry.Hashcode = (byte)(hashcode & 0xFF16);
-
-            insertableInfo.Offset = 0;
-            insertableInfo.Psl = 0; // set not empty
-
-            for (; ; ++psl, ++index)
-            {
-                infoByte = _info[index];
-                if (infoByte.IsEmpty())
-                {
-                    insertableInfo.Psl = psl;
-                    //calculate the offset from it's original position
-                    _info[index - psl].Offset = psl;
-                    _info[index] = insertableInfo;
-                    _entries[index] = insertableEntry;
-                    ++EntryCount;
-                    return true;
-                }
-
-                if (psl > infoByte.Psl)
-                {
-                    insertableInfo.Psl = psl;
-                    swap(ref insertableInfo, ref _info[index]);
-                    swap(ref insertableEntry, ref _entries[index]);
-
-                    //calculate the offset from it's original position
-                    _info[index - psl].Offset = psl;
-                    psl = insertableInfo.Psl;
-                }
-
-                if (psl == _pslLimitor)
-                {
-                    Resize();
-                    var hc = insertableEntry.Key.GetHashCode();
-                    var idx = (uint)hc * _multiplier >> _shift;
-                    EmplaceNew(insertableEntry.Key, insertableEntry.Value, ref idx, ref hc);
-                }
-            }
-        }
-
-        /// <summary>
         /// Gets the value with the corresponding key
         /// </summary>
         /// <param name="key">The key.</param>
@@ -226,50 +151,7 @@ namespace Faster
             value = default;
             return default;
         }
-
-        // <summary>
-        // Find if key exists in the map
-        // </summary>
-        // <param name = "index" > The index.</param>
-        // <param name = "key" > The key.</param>
-        // <param name = "hashcode" > The hashcode.</param>
-        // <returns></returns>
-        [MethodImpl(256)]
-        private bool KeyExists(uint index, TKey key, int hashcode)
-        {
-            var info = _info[index];
-            if (info.IsEmpty())
-            {
-                //slot is  empty
-                return false;
-            }
-
-            var partialKey = (byte)(hashcode & 0xFF16);
-            int offset = (int)index + info.Offset;
-
-            for (; offset >= index; offset -= 2)
-            {
-                var entry = _entries[offset];
-                if (entry.Hashcode == partialKey && _cmp.Equals(key, entry.Key))
-                {
-                    return true;
-                }
-
-                if (offset == 0)
-                {
-                    return false;
-                }
-
-                entry = _entries[offset - 1];
-                if (entry.Hashcode == partialKey && _cmp.Equals(key, entry.Key))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
+        
         /// <summary>
         /// update the entry
         /// </summary>
@@ -417,11 +299,9 @@ namespace Faster
                     return true;
                 }
             }
-
             return false;
         }
-
-
+        
         /// <summary>
         /// Determines whether the specified key contains key.
         /// </summary>
@@ -468,9 +348,192 @@ namespace Faster
             return false;
         }
 
+        /// <summary>
+        /// Gets all values stored in this hashmap
+        /// </summary>
+        /// <returns></returns>
+        public IEnumerable<TValue> Values()
+        {
+            for (var index = 0; index < _info.Length; ++index)
+            {
+                var info = _info[index];
+                if (!info.IsEmpty())
+                {
+                    yield return _entries[index].Value;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets all keys stored in this hashmap
+        /// </summary>
+        /// <returns></returns>
+        public IEnumerable<TKey> Keys()
+        {
+            for (var index = 0; index < _info.Length; ++index)
+            {
+                var info = _info[index];
+                if (!info.IsEmpty())
+                {
+                    yield return _entries[index].Key;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the <see cref="TValue"/> with the specified key.
+        /// </summary>
+        /// <value>
+        /// The <see cref="TValue"/>.
+        /// </value>
+        /// <param name="key">The key.</param>
+        /// <returns></returns>
+        /// <exception cref="KeyNotFoundException">
+        /// Unable to find entry - {key.GetType().FullName} key - {key.GetHashCode()}
+        /// or
+        /// Unable to find entry - {key.GetType().FullName} key - {key.GetHashCode()}
+        /// </exception>
+        public TValue this[TKey key]
+        {
+            get
+            {
+                if (Get(key, out var result))
+                {
+                    return result;
+                }
+
+                throw new KeyNotFoundException($"Unable to find entry - {key.GetType().FullName} key - {key.GetHashCode()}");
+            }
+            set
+            {
+                if (!Update(key, value))
+                {
+                    throw new KeyNotFoundException($"Unable to find entry - {key.GetType().FullName} key - {key.GetHashCode()}");
+                }
+            }
+        }
+
         #endregion
 
         #region Private Methods
+
+        /// <summary>
+        /// Emplaces a new entry without checking for key existence
+        /// </summary>
+        /// <param name="key">The key.</param>
+        /// <param name="value">The value.</param>
+        /// <param name="index">The index.</param>
+        /// <param name="hashcode">The hashcode.</param>
+        /// <returns></returns>
+        [MethodImpl(256)]
+        private bool EmplaceNew(TKey key, TValue value, ref uint index, ref int hashcode)
+        {
+            _info[index].Offset = 0;
+
+            var infoByte = _info[index];
+            if (infoByte.IsEmpty())
+            {
+                infoByte.Psl = 0;
+
+                _entries[index].Hashcode = (byte)(hashcode & 0xFF16);
+                _entries[index].Value = value;
+                _entries[index].Key = key;
+
+                _info[index] = infoByte;
+                ++EntryCount;
+                return true;
+            }
+
+            InfoByte insertableInfo = default;
+            GenericEntry<TKey, TValue> insertableEntry = default;
+
+            byte psl = 1;
+            ++index;
+
+            insertableEntry.Value = value;
+            insertableEntry.Key = key;
+            insertableEntry.Hashcode = (byte)(hashcode & 0xFF16);
+
+            insertableInfo.Offset = 0;
+            insertableInfo.Psl = 0; // set not empty
+
+            for (; ; ++psl, ++index)
+            {
+                infoByte = _info[index];
+                if (infoByte.IsEmpty())
+                {
+                    insertableInfo.Psl = psl;
+                    //calculate the offset from it's original position
+                    _info[index - psl].Offset = psl;
+                    _info[index] = insertableInfo;
+                    _entries[index] = insertableEntry;
+                    ++EntryCount;
+                    return true;
+                }
+
+                if (psl > infoByte.Psl)
+                {
+                    insertableInfo.Psl = psl;
+                    swap(ref insertableInfo, ref _info[index]);
+                    swap(ref insertableEntry, ref _entries[index]);
+
+                    //calculate the offset from it's original position
+                    _info[index - psl].Offset = psl;
+                    psl = insertableInfo.Psl;
+                }
+
+                if (psl == _pslLimitor)
+                {
+                    Resize();
+                    var hc = insertableEntry.Key.GetHashCode();
+                    var idx = (uint)hc * _multiplier >> _shift;
+                    EmplaceNew(insertableEntry.Key, insertableEntry.Value, ref idx, ref hc);
+                }
+            }
+        }
+
+        // <summary>
+        // Find if key exists in the map
+        // </summary>
+        // <param name = "index" > The index.</param>
+        // <param name = "key" > The key.</param>
+        // <param name = "hashcode" > The hashcode.</param>
+        // <returns></returns>
+        [MethodImpl(256)]
+        private bool KeyExists(uint index, TKey key, int hashcode)
+        {
+            var info = _info[index];
+            if (info.IsEmpty())
+            {
+                //slot is  empty
+                return false;
+            }
+
+            var partialKey = (byte)(hashcode & 0xFF16);
+            int offset = (int)index + info.Offset;
+
+            for (; offset >= index; offset -= 2)
+            {
+                var entry = _entries[offset];
+                if (entry.Hashcode == partialKey && _cmp.Equals(key, entry.Key))
+                {
+                    return true;
+                }
+
+                if (offset == 0)
+                {
+                    return false;
+                }
+
+                entry = _entries[offset - 1];
+                if (entry.Hashcode == partialKey && _cmp.Equals(key, entry.Key))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
 
         private void swap(ref InfoByte x, ref InfoByte y)
         {
@@ -525,7 +588,6 @@ namespace Faster
         [MethodImpl(256)]
         private void Resize()
         {
-
             _shift--;
             _maxlookups = NextPow2(_maxlookups + 1);
 
@@ -581,6 +643,5 @@ namespace Faster
         }
 
         #endregion
-
     }
 }
