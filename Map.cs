@@ -15,6 +15,7 @@ namespace Faster
     /// - Robing hood hash
     /// - Upper limit on the probe sequence lenght(psl) which is Log2(size)
     /// - fixed uint key in order not having to call GetHashCode() which is an override... and overrides are not ideal in terms of performance
+    /// - Calculates offset from original index
     /// - fibonacci hashing
     /// </summary>
     public class Map<TKey, TValue> where TKey : unmanaged, IComparable, IEquatable<TKey>

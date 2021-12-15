@@ -7,6 +7,7 @@ The goal of Faster is to provide the fastest dict/set that integrates into the .
    - Linear probing
    - Upper limit on the probe sequence lenght(psl) which is Log2(size)   
    - Fibonacci hashing 
+   - Calculates offset from original index, which enables us to set the loadfactor to 0.95%
 
 ## About
 
