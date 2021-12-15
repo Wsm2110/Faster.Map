@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Faster.Core;
@@ -12,7 +12,7 @@ namespace Faster
     /// - Uses linear probing
     /// - Robing hood hash
     /// - Upper limit on the probe sequence lenght(psl) which is Log2(size)
-    /// - fixed uint key in order not having to call GetHashCode() which is an override... and overrides are not ideal in terms of performance
+    /// - calculates offset from original index
     /// - fibonacci hashing
     /// </summary>
     public class GenericMap<TKey, TValue> where TKey : IEquatable<TKey>
@@ -25,7 +25,7 @@ namespace Faster
         /// <value>
         /// The entry count.
         /// </value>
-        public uint EntryCount { get; private set; }
+        public uint Count { get; private set; }
 
         /// <summary>
         /// Gets the size of the map
@@ -87,7 +87,7 @@ namespace Faster
         [MethodImpl(256)]
         public bool Emplace(TKey key, TValue value)
         {
-            if ((double)EntryCount / _maxlookups > _loadFactor || EntryCount >= _maxlookups)
+            if ((double)Count / _maxlookups > _loadFactor || Count >= _maxlookups)
             {
                 Resize();
             }
@@ -151,7 +151,7 @@ namespace Faster
             value = default;
             return default;
         }
-        
+
         /// <summary>
         /// update the entry
         /// </summary>
@@ -233,7 +233,7 @@ namespace Faster
                     //update info
                     --info.Offset;
                     _info[index] = info;
-                    --EntryCount;
+                    --Count;
 
                     break;
                 }
@@ -254,7 +254,7 @@ namespace Faster
                     //update info
                     --info.Offset;
                     _info[index] = info;
-                    --EntryCount;
+                    --Count;
 
                     break;
                 }
@@ -299,9 +299,10 @@ namespace Faster
                     return true;
                 }
             }
+
             return false;
         }
-        
+
         /// <summary>
         /// Determines whether the specified key contains key.
         /// </summary>
@@ -413,6 +414,26 @@ namespace Faster
             }
         }
 
+
+        /// <summary>
+        /// Copies entries from one map to another
+        /// </summary>
+        /// <param name="map">The map.</param>
+        public void CopyTo(GenericMap<TKey, TValue> map)
+        {
+            for (var i = 0; i < map.Count; i++)
+            {
+                var info = map._info[i];
+                if (info.IsEmpty())
+                {
+                    continue;
+                }
+
+                var entry = map._entries[i];             
+                Emplace(entry.Key, entry.Value);
+            }
+        }
+
         #endregion
 
         #region Private Methods
@@ -440,7 +461,7 @@ namespace Faster
                 _entries[index].Key = key;
 
                 _info[index] = infoByte;
-                ++EntryCount;
+                ++Count;
                 return true;
             }
 
@@ -467,7 +488,7 @@ namespace Faster
                     _info[index - psl].Offset = psl;
                     _info[index] = insertableInfo;
                     _entries[index] = insertableEntry;
-                    ++EntryCount;
+                    ++Count;
                     return true;
                 }
 
@@ -602,7 +623,7 @@ namespace Faster
             _entries = new GenericEntry<TKey, TValue>[_maxlookups + _pslLimitor];
             _info = new InfoByte[_maxlookups + _pslLimitor];
 
-            EntryCount = 0;
+            Count = 0;
 
             for (var i = 0; i < oldInfo.Length; i++)
             {
@@ -618,6 +639,7 @@ namespace Faster
                 EmplaceNew(entry.Key, entry.Value, ref index, ref hc);
             }
         }
+
         private static uint NextPow2(uint c)
         {
             c--;
@@ -643,5 +665,6 @@ namespace Faster
         }
 
         #endregion
+
     }
 }
