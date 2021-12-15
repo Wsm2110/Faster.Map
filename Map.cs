@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Faster.Core;
@@ -27,7 +27,7 @@ namespace Faster
         /// <value>
         /// The entry count.
         /// </value>
-        public uint EntryCount { get; private set; }
+        public uint Count { get; private set; }
 
         /// <summary>
         /// Gets the size of the map
@@ -87,7 +87,7 @@ namespace Faster
         [MethodImpl(256)]
         public bool Emplace(TKey key, TValue value)
         {
-            if ((double)EntryCount / _maxlookups > _loadFactor || EntryCount >= _maxlookups)
+            if ((double)Count / _maxlookups > _loadFactor || Count >= _maxlookups)
             {
                 Resize();
             }
@@ -228,7 +228,7 @@ namespace Faster
                     //update info
                     --info.Offset;
                     _info[index] = info;
-                    --EntryCount;
+                    --Count;
 
                     break;
                 }
@@ -249,7 +249,7 @@ namespace Faster
                     //update info
                     --info.Offset;
                     _info[index] = info;
-                    --EntryCount;
+                    --Count;
 
                     break;
                 }
@@ -353,7 +353,7 @@ namespace Faster
                 }
             }
         }
-        
+
         /// <summary>
         /// Gets all keys stored in this hashmap
         /// </summary>
@@ -367,6 +367,26 @@ namespace Faster
                 {
                     yield return _entries[index].Key;
                 }
+            }
+        }
+
+        /// <summary>
+        /// Copies entries from one map to another
+        /// </summary>
+        /// <param name="map">The map.</param>
+        public void CopyTo(Map<TKey, TValue> map)
+        {
+            for (var i = 0; i < map.Count; i++)
+            {
+                var info = map._info[i];
+                if (info.IsEmpty())
+                {
+                    continue;
+                }
+
+                var entry = map._entries[i];
+             
+                EmplaceInternal(entry.Key, entry.Value);
             }
         }
 
@@ -428,7 +448,7 @@ namespace Faster
                 _entries[index].Key = hashcode;
 
                 _info[index] = infoByte;
-                ++EntryCount;
+                ++Count;
                 return true;
             }
 
@@ -454,7 +474,7 @@ namespace Faster
                     _info[index - psl].Offset = psl;
                     _info[index] = insertableInfo;
                     _entries[index] = insertableEntry;
-                    ++EntryCount;
+                    ++Count;
                     return true;
                 }
 
@@ -477,7 +497,7 @@ namespace Faster
                 }
             }
         }
-        
+
         ///// <summary>
         ///// Find if key exists in the map
         ///// </summary>
@@ -532,7 +552,7 @@ namespace Faster
             x.Psl = y.Psl;
             y.Psl = tmp.Psl;
         }
-        
+
         /// <summary>
         /// Swaps the specified x.
         /// </summary>
@@ -606,7 +626,7 @@ namespace Faster
             _entries = new Entry<TValue>[_maxlookups + _pslLimitor];
             _info = new InfoByte[_maxlookups + _pslLimitor];
 
-            EntryCount = 0;
+            Count = 0;
 
             for (var i = 0; i < oldInfo.Length; i++)
             {
@@ -621,6 +641,32 @@ namespace Faster
                 EmplaceNew(entry.Value, ref index, entry.Key);
             }
         }
+
+        /// <summary>
+        /// Inserts the specified value.
+        /// </summary>
+        /// <param name="key">The key.</param>
+        /// <param name="value">The value.</param>
+        /// <returns></returns>
+        [MethodImpl(256)]
+        private bool EmplaceInternal(int key, TValue value)
+        {
+            if ((double)Count / _maxlookups > _loadFactor || Count >= _maxlookups)
+            {
+                Resize();
+            }
+           
+            uint index = (uint)key * _multiplier >> _shift;
+
+            // validate if the key is unique
+            if (KeyExists(index, key))
+            {
+                return false;
+            }
+
+            return EmplaceNew(value, ref index, key);
+        }
+
         /// <summary>
         /// calculates next power of 2
         /// </summary>
