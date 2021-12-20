@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace Faster.Core
@@ -9,10 +9,15 @@ namespace Faster.Core
     {
         private byte _offset;
 
+
         public byte Offset
         {
             get => (byte)(_offset & 0x7F); // 127 // first (0 - 6) 7 bits
-            set => _offset = value |= 1 << 7;
+            set
+            {
+                var b = SetBit(value); //set 7th bit to indicate this struct is not empty
+                _offset = b;
+            }
         }
 
         private byte _psl;
@@ -43,9 +48,19 @@ namespace Faster.Core
             b |= 1 << 7;
             return b;
         }
- 
+
+
         /// <summary>
-        /// Determines whether this instance is empty.
+        /// are there entries hashes to this index
+        /// </summary>
+        /// <returns></returns>
+        public bool NotMapped()
+        {
+            return (_offset & (1 << 7)) == 0;
+        }
+
+        /// <summary>
+        /// Determines whether this Entry is empty.
         /// </summary>
         /// <returns>
         ///   <c>true</c> if this instance is empty; otherwise, <c>false</c>.
@@ -54,6 +69,5 @@ namespace Faster.Core
         {
             return (_psl & (1 << 7)) == 0;
         }
-
     }
 }
