@@ -116,29 +116,25 @@ namespace Faster
         {
             var hashcode = key.GetHashCode();
             uint index = (uint)hashcode * _multiplier >> _shift;
-
+            
             var info = _info[index];
-            if (info.IsEmpty())
+            if (info.NotMapped())
             {
                 value = default;
                 return false;
             }
 
+
             int offset = (int)index + info.Offset;
 
             for (; offset >= index; offset -= 2)
             {
-                //unroll loop twice, 3x didnt add anything 
+                //unroll loop twice
                 var entry = _entries[offset];
                 if (entry.Key == hashcode)
                 {
                     value = entry.Value;
                     return true;
-                }
-
-                if (offset == 0)
-                {
-                    break;
                 }
 
                 entry = _entries[offset - 1]; //1
@@ -161,9 +157,9 @@ namespace Faster
         {
             var hashcode = key.GetHashCode();
             uint index = (uint)hashcode * _multiplier >> _shift;
-
+          
             var info = _info[index];
-            if (info.IsEmpty())
+            if (info.NotMapped())
             {
                 return false;
             }
@@ -205,12 +201,11 @@ namespace Faster
             uint index = hashcode * _multiplier >> _shift;
 
             var info = _info[index];
-            if (info.IsEmpty())
+            if (info.NotMapped())
             {
-                //key not found 
                 return false;
             }
-
+            
             int idx = -1;
 
             //delete entry
@@ -268,7 +263,7 @@ namespace Faster
             {
                 info = _info[idx + 1];
 
-                if (info.IsEmpty())
+                if (info.NotMapped())
                 {
                     return true;
                 }
@@ -308,7 +303,7 @@ namespace Faster
             uint index = (uint)hashcode * _multiplier >> _shift;
 
             var info = _info[index];
-            if (info.IsEmpty())
+            if (info.NotMapped())
             {
                 //slot is  empty
                 return false;
@@ -348,7 +343,7 @@ namespace Faster
             for (var index = 0; index < _info.Length; ++index)
             {
                 var info = _info[index];
-                if (!info.IsEmpty())
+                if (!info.NotMapped())
                 {
                     yield return _entries[index].Value;
                 }
@@ -364,7 +359,7 @@ namespace Faster
             for (var index = 0; index < _info.Length; ++index)
             {
                 var info = _info[index];
-                if (!info.IsEmpty())
+                if (!info.NotMapped())
                 {
                     yield return _entries[index].Key;
                 }
@@ -380,13 +375,13 @@ namespace Faster
             for (var i = 0; i < map.Count; i++)
             {
                 var info = map._info[i];
-                if (info.IsEmpty())
+                if (info.NotMapped())
                 {
                     continue;
                 }
 
                 var entry = map._entries[i];
-             
+
                 EmplaceInternal(entry.Key, entry.Value);
             }
         }
@@ -439,7 +434,7 @@ namespace Faster
         private bool EmplaceNew(TValue value, ref uint index, int hashcode)
         {
             _info[index].Offset = 0;
-
+            
             var infoByte = _info[index];
             if (infoByte.IsEmpty())
             {
@@ -468,7 +463,7 @@ namespace Faster
             for (; ; ++psl, ++index)
             {
                 infoByte = _info[index];
-                if (infoByte.IsEmpty())
+                if (infoByte.NotMapped())
                 {
                     insertableInfo.Psl = psl;
                     //calculate the offset from it's original position
@@ -509,7 +504,7 @@ namespace Faster
         private bool KeyExists(uint index, int hashcode)
         {
             var info = _info[index];
-            if (info.IsEmpty())
+            if (info.NotMapped())
             {
                 //slot is empty
                 return false;
@@ -632,7 +627,7 @@ namespace Faster
             for (var i = 0; i < oldInfo.Length; i++)
             {
                 var info = oldInfo[i];
-                if (info.IsEmpty())
+                if (info.NotMapped())
                 {
                     continue;
                 }
@@ -656,7 +651,7 @@ namespace Faster
             {
                 Resize();
             }
-           
+
             uint index = (uint)key * _multiplier >> _shift;
 
             // validate if the key is unique
