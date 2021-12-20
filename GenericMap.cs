@@ -118,7 +118,7 @@ namespace Faster
             uint index = (uint)hashcode >> _shift;
 
             var info = _info[index];
-            if (info.IsEmpty())
+            if (info.NotMapped())
             {
                 value = default;
                 return false;
@@ -163,7 +163,7 @@ namespace Faster
             var partialKey = (byte)(hashcode & 0xFF16);
 
             var info = _info[index];
-            if (info.IsEmpty())
+            if (info.NotMapped())
             {
                 return false;
             }
@@ -209,7 +209,7 @@ namespace Faster
             var partialKey = (byte)(hashcode & 0xFF16);
 
             var info = _info[index];
-            if (info.IsEmpty())
+            if (info.NotMapped())
             {
                 //key not found 
                 return false;
@@ -272,7 +272,7 @@ namespace Faster
             {
                 info = _info[idx + 1];
 
-                if (info.IsEmpty())
+                if (info.NotMapped())
                 {
                     return true;
                 }
@@ -318,7 +318,7 @@ namespace Faster
             var partialKey = (byte)(hashcode & 0xFF16);
 
             var info = _info[index];
-            if (info.IsEmpty())
+            if (info.NotMapped())
             {
                 //slot is  empty
                 return false;
@@ -358,7 +358,7 @@ namespace Faster
             for (var index = 0; index < _info.Length; ++index)
             {
                 var info = _info[index];
-                if (!info.IsEmpty())
+                if (!info.NotMapped())
                 {
                     yield return _entries[index].Value;
                 }
@@ -374,7 +374,7 @@ namespace Faster
             for (var index = 0; index < _info.Length; ++index)
             {
                 var info = _info[index];
-                if (!info.IsEmpty())
+                if (!info.NotMapped())
                 {
                     yield return _entries[index].Key;
                 }
@@ -424,12 +424,12 @@ namespace Faster
             for (var i = 0; i < map.Count; i++)
             {
                 var info = map._info[i];
-                if (info.IsEmpty())
+                if (info.NotMapped())
                 {
                     continue;
                 }
 
-                var entry = map._entries[i];             
+                var entry = map._entries[i];
                 Emplace(entry.Key, entry.Value);
             }
         }
@@ -524,7 +524,7 @@ namespace Faster
         private bool KeyExists(uint index, TKey key, int hashcode)
         {
             var info = _info[index];
-            if (info.IsEmpty())
+            if (info.NotMapped())
             {
                 //slot is  empty
                 return false;
@@ -628,7 +628,7 @@ namespace Faster
             for (var i = 0; i < oldInfo.Length; i++)
             {
                 var info = oldInfo[i];
-                if (info.IsEmpty())
+                if (info.NotMapped())
                 {
                     continue;
                 }
