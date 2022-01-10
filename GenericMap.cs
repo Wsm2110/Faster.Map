@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using Faster.Core;
+using Faster.Map.Core;
 
-namespace Faster
+namespace Faster.Map
 {
     /// <summary>
     ///
@@ -41,7 +41,6 @@ namespace Faster
 
         private InfoByte[] _info;
         private GenericEntry<TKey, TValue>[] _entries;
-
         private uint _maxlookups;
         private readonly double _loadFactor;
         private const uint _multiplier = 0x9E3779B9; // 2654435769; 
@@ -87,25 +86,21 @@ namespace Faster
         [MethodImpl(256)]
         public bool Emplace(TKey key, TValue value)
         {
-            if ((double)Count / _maxlookups > _loadFactor || Count >= _maxlookups)
+            if ((double)Count / _maxlookups > _loadFactor)
             {
                 Resize();
             }
 
-            int hashcode = key.GetHashCode();
-            uint index = (uint)hashcode >> _shift;
-
-            //  validate if the key is unique
-            if (KeyExists(index, key, hashcode))
+            if (KeyExists(key, out var index))
             {
                 return false;
             }
 
-            return EmplaceNew(key, value, ref index, ref hashcode);
+            return EmplaceNew(key, value, ref index);
         }
 
         /// <summary>
-        /// Gets the value with the corresponding key
+        /// Gets the value with Lthe corresponding key
         /// </summary>
         /// <param name="key">The key.</param>
         /// <param name="value">The value.</param>
@@ -114,8 +109,8 @@ namespace Faster
         public bool Get(TKey key, out TValue value)
         {
             var hashcode = key.GetHashCode();
+            uint index = (uint)hashcode * _multiplier >> _shift;
             var partialKey = (byte)(hashcode & 0xFF16);
-            uint index = (uint)hashcode >> _shift;
 
             var info = _info[index];
             if (info.NotMapped())
@@ -125,23 +120,19 @@ namespace Faster
             }
 
             int offset = (int)index + info.Offset;
-            for (; offset >= index; offset = -2)
+
+            for (; offset >= index; offset -= 2)
             {
-                // unroll loop twice, 3x didnt add anything
+                //unroll loop twice adds a performance boost, 3 x didnt do much..
                 var entry = _entries[offset];
-                if (entry.Hashcode == partialKey && _cmp.Equals(entry.Key, key))
+                if (entry.Hashcode == partialKey && _cmp.Equals(key, entry.Key))
                 {
                     value = entry.Value;
                     return true;
                 }
 
-                if (offset == 0)
-                {
-                    break;
-                }
-
-                entry = _entries[offset - 1]; //1
-                if (entry.Hashcode == partialKey && _cmp.Equals(entry.Key, key))
+                entry = _entries[offset - 1]; 
+                if (entry.Hashcode == partialKey && _cmp.Equals(key, entry.Key))
                 {
                     value = entry.Value;
                     return true;
@@ -173,10 +164,9 @@ namespace Faster
             for (; offset >= index; offset -= 2)
             {
                 var entry = _entries[offset];
-                if (entry.Hashcode == partialKey && _cmp.Equals(entry.Key, key))
+                if (entry.Hashcode == partialKey && _cmp.Equals(key, entry.Key))
                 {
-                    entry.Value = value;
-                    _entries[offset] = entry;
+                    _entries[offset].Value = value;
                     return true;
                 }
 
@@ -186,17 +176,15 @@ namespace Faster
                 }
 
                 entry = _entries[offset - 1];
-                if (entry.Hashcode == partialKey && _cmp.Equals(entry.Key, key))
+                if (entry.Hashcode == partialKey && _cmp.Equals(key, entry.Key))
                 {
-                    entry.Value = value;
-                    _entries[offset] = entry;
+                    _entries[offset].Value = value;
                     return true;
                 }
             }
 
             return default;
         }
-
 
         ///// <summary>
         ///// Removes the current entry using a backshift removal
@@ -211,7 +199,6 @@ namespace Faster
             var info = _info[index];
             if (info.NotMapped())
             {
-                //key not found 
                 return false;
             }
 
@@ -223,7 +210,7 @@ namespace Faster
             for (; offset >= index; offset -= 2)
             {
                 var entry = _entries[offset];
-                if (entry.Hashcode == partialKey && _cmp.Equals(entry.Key, key))
+                if (entry.Hashcode == partialKey && _cmp.Equals(key, entry.Key))
                 {
                     //romove entry from list
                     psl = _info[offset].Psl;
@@ -244,7 +231,7 @@ namespace Faster
                 }
 
                 entry = _entries[offset - 1];
-                if (entry.Hashcode == partialKey && _cmp.Equals(entry.Key, key))
+                if (entry.Hashcode == partialKey && _cmp.Equals(key, entry.Key))
                 {
                     //romove entry from list
                     psl = _info[offset - 1].Psl;
@@ -271,8 +258,7 @@ namespace Faster
             for (; idx < bounds; ++idx)
             {
                 info = _info[idx + 1];
-
-                if (info.NotMapped())
+                if (info.IsEmpty())
                 {
                     return true;
                 }
@@ -303,24 +289,16 @@ namespace Faster
             return false;
         }
 
-        /// <summary>
-        /// Determines whether the specified key contains key.
-        /// </summary>
-        /// <param name="key">The key.</param>
-        /// <returns>
-        ///   <c>true</c> if the specified key contains key; otherwise, <c>false</c>.
-        /// </returns>
         [MethodImpl(256)]
         public bool ContainsKey(TKey key)
         {
-            var hashcode = key.GetHashCode();
+            int hashcode = key.GetHashCode();
             uint index = (uint)hashcode * _multiplier >> _shift;
-            var partialKey = (byte)(hashcode & 0xFF16);
+            byte partialKey = (byte)(hashcode & 0xFF16);
 
             var info = _info[index];
             if (info.NotMapped())
             {
-                //slot is  empty
                 return false;
             }
 
@@ -329,7 +307,7 @@ namespace Faster
             for (; offset >= index; offset -= 2)
             {
                 var entry = _entries[offset];
-                if (entry.Hashcode == partialKey && _cmp.Equals(entry.Key, key))
+                if (entry.Hashcode == partialKey && _cmp.Equals(key, entry.Key))
                 {
                     return true;
                 }
@@ -340,7 +318,7 @@ namespace Faster
                 }
 
                 entry = _entries[offset - 1];
-                if (entry.Hashcode == partialKey && _cmp.Equals(entry.Key, key))
+                if (entry.Hashcode == partialKey && _cmp.Equals(key, entry.Key))
                 {
                     return true;
                 }
@@ -353,14 +331,17 @@ namespace Faster
         /// Gets all values stored in this hashmap
         /// </summary>
         /// <returns></returns>
-        public IEnumerable<TValue> Values()
+        public IEnumerable<TValue> Values
         {
-            for (var index = 0; index < _info.Length; ++index)
+            get
             {
-                var info = _info[index];
-                if (!info.NotMapped())
+                for (var index = 0; index < _info.Length; ++index)
                 {
-                    yield return _entries[index].Value;
+                    var info = _info[index];
+                    if (!info.IsEmpty())
+                    {
+                        yield return _entries[index].Value;
+                    }
                 }
             }
         }
@@ -369,15 +350,38 @@ namespace Faster
         /// Gets all keys stored in this hashmap
         /// </summary>
         /// <returns></returns>
-        public IEnumerable<TKey> Keys()
+        public IEnumerable<TKey> Keys
         {
-            for (var index = 0; index < _info.Length; ++index)
+            get
             {
-                var info = _info[index];
-                if (!info.NotMapped())
+                for (var index = 0; index < _info.Length; ++index)
                 {
-                    yield return _entries[index].Key;
+                    var info = _info[index];
+                    if (!info.IsEmpty())
+                    {
+                        yield return _entries[index].Key;
+                    }
                 }
+            }
+        }
+
+        /// <summary>
+        /// Copies entries from one map to another
+        /// </summary>
+        /// <param name="map">The map.</param>
+        public void Copy(GenericMap<TKey, TValue> map)
+        {
+            for (var i = 0; i < map._entries.Length; i++)
+            {
+                var info = map._info[i];
+                if (info.IsEmpty())
+                {
+                    continue;
+                }
+
+                var entry = map._entries[i];
+
+                EmplaceInternal(entry.Key, entry.Value);
             }
         }
 
@@ -414,26 +418,6 @@ namespace Faster
             }
         }
 
-
-        /// <summary>
-        /// Copies entries from one map to another
-        /// </summary>
-        /// <param name="map">The map.</param>
-        public void CopyTo(GenericMap<TKey, TValue> map)
-        {
-            for (var i = 0; i < map.Count; i++)
-            {
-                var info = map._info[i];
-                if (info.NotMapped())
-                {
-                    continue;
-                }
-
-                var entry = map._entries[i];
-                Emplace(entry.Key, entry.Value);
-            }
-        }
-
         #endregion
 
         #region Private Methods
@@ -441,113 +425,109 @@ namespace Faster
         /// <summary>
         /// Emplaces a new entry without checking for key existence
         /// </summary>
-        /// <param name="key">The key.</param>
         /// <param name="value">The value.</param>
+        /// <param name="key">The value.</param>
         /// <param name="index">The index.</param>
-        /// <param name="hashcode">The hashcode.</param>
         /// <returns></returns>
         [MethodImpl(256)]
-        private bool EmplaceNew(TKey key, TValue value, ref uint index, ref int hashcode)
+        private bool EmplaceNew(TKey key, TValue value, ref uint index)
         {
-            _info[index].Offset = 0;
+            _info[index].Offset |= 1 << 7; // map index;
 
             var infoByte = _info[index];
             if (infoByte.IsEmpty())
             {
                 infoByte.Psl = 0;
-
-                _entries[index].Hashcode = (byte)(hashcode & 0xFF16);
+                _info[index] = infoByte;
                 _entries[index].Value = value;
                 _entries[index].Key = key;
-
-                _info[index] = infoByte;
                 ++Count;
                 return true;
             }
 
-            InfoByte insertableInfo = default;
-            GenericEntry<TKey, TValue> insertableEntry = default;
-
             byte psl = 1;
-            ++index;
 
-            insertableEntry.Value = value;
-            insertableEntry.Key = key;
-            insertableEntry.Hashcode = (byte)(hashcode & 0xFF16);
+            if (infoByte.Offset != 0)
+            {
+                index += (uint)infoByte.Offset + 1;
+                psl += infoByte.Offset;
+            }
+            else
+            {
+                ++index;
+            }
 
-            insertableInfo.Offset = 0;
-            insertableInfo.Psl = 0; // set not empty
+            InfoByte info = default;
+            info.Psl = 0; // set not empty
+
+            GenericEntry<TKey, TValue> entry = default;
+            entry.Value = value;
+            entry.Key = key;
 
             for (; ; ++psl, ++index)
             {
                 infoByte = _info[index];
                 if (infoByte.IsEmpty())
                 {
-                    insertableInfo.Psl = psl;
-                    //calculate the offset from it's original position
-                    _info[index - psl].Offset = psl;
-                    _info[index] = insertableInfo;
-                    _entries[index] = insertableEntry;
+                    info.Psl = psl;
+                    _info[index - psl].Offset = psl;    //calculate the offset from it's original position
+                    _info[index] = info;
+                    _entries[index] = entry;
                     ++Count;
                     return true;
                 }
 
                 if (psl > infoByte.Psl)
                 {
-                    insertableInfo.Psl = psl;
-                    swap(ref insertableInfo, ref _info[index]);
-                    swap(ref insertableEntry, ref _entries[index]);
+                    info.Psl = psl;
+                    swap(ref info, ref _info[index]);
+                    swap(ref entry, ref _entries[index]);
 
-                    //calculate the offset from it's original position
-                    _info[index - psl].Offset = psl;
-                    psl = insertableInfo.Psl;
+                    _info[index - psl].Offset = psl;  //calculate the offset from it's original position
+                    psl = info.Psl;
                 }
 
                 if (psl == _pslLimitor)
                 {
                     Resize();
-                    var hc = insertableEntry.Key.GetHashCode();
-                    var idx = (uint)hc * _multiplier >> _shift;
-                    EmplaceNew(insertableEntry.Key, insertableEntry.Value, ref idx, ref hc);
+                    var idx = (uint)entry.Key.GetHashCode() * _multiplier >> _shift;
+                    EmplaceNew(entry.Key, entry.Value, ref idx);
+                    return true;
                 }
             }
         }
 
-        // <summary>
-        // Find if key exists in the map
-        // </summary>
-        // <param name = "index" > The index.</param>
-        // <param name = "key" > The key.</param>
-        // <param name = "hashcode" > The hashcode.</param>
-        // <returns></returns>
+
         [MethodImpl(256)]
-        private bool KeyExists(uint index, TKey key, int hashcode)
+        private bool KeyExists(TKey key, out uint idx)
         {
-            var info = _info[index];
+            var hashcode = key.GetHashCode();
+            idx = (uint)hashcode * _multiplier >> _shift;
+            var partialKey = (byte)(hashcode & 0xFF16);
+
+            var info = _info[idx];
             if (info.NotMapped())
             {
                 //slot is  empty
                 return false;
             }
 
-            var partialKey = (byte)(hashcode & 0xFF16);
-            int offset = (int)index + info.Offset;
-
-            for (; offset >= index; offset -= 2)
+            int offset = (int)idx + info.Offset;
+            for (; offset >= idx; offset -= 2)
             {
                 var entry = _entries[offset];
-                if (entry.Hashcode == partialKey && _cmp.Equals(key, entry.Key))
+                if (entry.Key.GetHashCode() == partialKey && _cmp.Equals(key, entry.Key))
                 {
                     return true;
                 }
 
                 if (offset == 0)
                 {
-                    return false;
+                    break;
                 }
 
                 entry = _entries[offset - 1];
-                if (entry.Hashcode == partialKey && _cmp.Equals(key, entry.Key))
+                if (entry.Key.GetHashCode() == partialKey && _cmp.Equals(key, entry.Key))
                 {
                     return true;
                 }
@@ -556,6 +536,12 @@ namespace Faster
             return false;
         }
 
+
+        /// <summary>
+        /// Swaps the specified x.
+        /// </summary>
+        /// <param name="x">The x.</param>
+        /// <param name="y">The y.</param>
         private void swap(ref InfoByte x, ref InfoByte y)
         {
             var tmp = x;
@@ -564,6 +550,11 @@ namespace Faster
             y.Psl = tmp.Psl;
         }
 
+        /// <summary>
+        /// Swaps the specified x.
+        /// </summary>
+        /// <param name="x">The x.</param>
+        /// <param name="y">The y.</param>
         private void swap(ref GenericEntry<TKey, TValue> x, ref GenericEntry<TKey, TValue> y)
         {
             var tmp = x;
@@ -572,40 +563,49 @@ namespace Faster
             y = tmp;
         }
 
+        /// <summary>
+        /// PSLs the limit.
+        /// </summary>
+        /// <param name="size">The size.</param>
+        /// <returns></returns>
+        [MethodImpl(256)]
         private uint PslLimit(uint size)
         {
             switch (size)
             {
-                case 16: return 5;
+                case 16: return 6;
                 case 32: return 8;
-                case 64: return 10;
-                case 128: return 12;
-                case 256: return 16;
-                case 512: return 20;
-                case 1024: return 22;
-                case 2048: return 26;
-                case 4096: return 32;
-                case 8192: return 36;
-                case 16384: return 40;
-                case 32768: return 44;
-                case 65536: return 48;
-                case 131072: return 52;
-                case 262144: return 56;
-                case 524288: return 60;
-                case 1048576: return 66;
-                case 2097152: return 70;
-                case 4194304: return 74;
-                case 8388608: return 78;
-                case 16777216: return 82;
-                case 33554432: return 86;
-                case 67108864: return 90;
-                case 134217728: return 94;
-                case 268435456: return 98;
-                case 536870912: return 102;
+                case 64: return 12;
+                case 128: return 16;
+                case 256: return 20;
+                case 512: return 24;
+                case 1024: return 32;
+                case 2048: return 36;
+                case 4096: return 40;
+                case 8192: return 50;
+                case 16384: return 60;
+                case 32768: return 65;
+                case 65536: return 70;
+                case 131072: return 75;
+                case 262144: return 80;
+                case 524288: return 85;
+                case 1048576: return 90;
+                case 2097152: return 94;
+                case 4194304: return 98;
+                case 8388608: return 102;
+                case 16777216: return 104;
+                case 33554432: return 108;
+                case 67108864: return 112;
+                case 134217728: return 116;
+                case 268435456: return 120;
+                case 536870912: return 124;
                 default: return 10;
             }
         }
 
+        /// <summary>
+        /// Resizes this instance.
+        /// </summary>
         [MethodImpl(256)]
         private void Resize()
         {
@@ -628,18 +628,42 @@ namespace Faster
             for (var i = 0; i < oldInfo.Length; i++)
             {
                 var info = oldInfo[i];
-                if (info.NotMapped())
+                if (info.IsEmpty())
                 {
                     continue;
                 }
 
                 var entry = oldEntries[i];
-                var hc = entry.Key.GetHashCode();
-                uint index = (uint)hc * _multiplier >> _shift;
-                EmplaceNew(entry.Key, entry.Value, ref index, ref hc);
+                uint index = (uint)entry.Key.GetHashCode() * _multiplier >> _shift;
+                EmplaceNew(entry.Key, entry.Value, ref index);
             }
         }
 
+        /// <summary>
+        /// Inserts the specified value.
+        /// </summary>
+        /// <param name="key">The key.</param>
+        /// <param name="value">The value.</param>
+        /// <returns></returns>
+        [MethodImpl(256)]
+        private void EmplaceInternal(TKey key, TValue value)
+        {
+            if ((double)Count / _maxlookups > _loadFactor)
+            {
+                Resize();
+            }
+
+            uint index = (uint)key.GetHashCode() * _multiplier >> _shift;
+            EmplaceNew(key, value, ref index);
+        }
+
+        /// <summary>
+        /// calculates next power of 2
+        /// </summary>
+        /// <param name="c">The c.</param>
+        /// <returns></returns>
+        ///
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static uint NextPow2(uint c)
         {
             c--;
