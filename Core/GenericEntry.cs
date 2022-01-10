@@ -1,7 +1,7 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 
-namespace Faster.Core
+namespace Faster.Map.Core
 {
     [DebuggerDisplay("key {Key} - value {Value}")]
     [StructLayout(LayoutKind.Sequential, Pack = 2)]
