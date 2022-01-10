@@ -1,14 +1,14 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
-namespace Faster.Core
+namespace Faster.Map.Core
 {
-    [StructLayout(LayoutKind.Sequential, Pack = 2)]
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
     [DebuggerDisplay("offset  {Offset} psl - {Psl}")]
     public struct InfoByte
     {
         private byte _offset;
-
+        
 
         public byte Offset
         {
@@ -48,8 +48,7 @@ namespace Faster.Core
             b |= 1 << 7;
             return b;
         }
-
-
+        
         /// <summary>
         /// are there entries hashes to this index
         /// </summary>
@@ -69,5 +68,6 @@ namespace Faster.Core
         {
             return (_psl & (1 << 7)) == 0;
         }
+
     }
 }
