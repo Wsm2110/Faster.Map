@@ -1,11 +1,11 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace Faster.Map.Core
 {
-    [DebuggerDisplay("key {Key} - value {Value}")]
-    [StructLayout(LayoutKind.Sequential, Pack = 2)]
-    public struct GenericEntry<TKey, TValue>
+    [DebuggerDisplay("Key {Key} - value {Value} ")]
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public struct FastEntry<TKey, TValue>
     {
         /// <summary>
         /// Gets or sets the key.
@@ -14,6 +14,7 @@ namespace Faster.Map.Core
         /// The key.
         /// </value>
         public TKey Key { get; set; }
+
         /// <summary>
         /// Gets or sets the value.
         /// </summary>
@@ -21,14 +22,5 @@ namespace Faster.Map.Core
         /// The value.
         /// </value>
         public TValue Value { get; set; }
-
-        /// <summary>
-        /// Gets or sets the hashcode.
-        /// </summary>
-        /// <value>
-        /// The hashcode.
-        /// </value>
-        public byte Hashcode { get; set; }
-
     }
 }

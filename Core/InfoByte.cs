@@ -1,25 +1,12 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace Faster.Map.Core
 {
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    [DebuggerDisplay("offset  {Offset} psl - {Psl}")]
+    [DebuggerDisplay("psl - {Psl}")]
     public struct InfoByte
     {
-        private byte _offset;
-        
-
-        public byte Offset
-        {
-            get => (byte)(_offset & 0x7F); // 127 // first (0 - 6) 7 bits
-            set
-            {
-                var b = SetBit(value); //set 7th bit to indicate this struct is not empty
-                _offset = b;
-            }
-        }
-
         private byte _psl;
 
         /// <summary>
@@ -49,15 +36,6 @@ namespace Faster.Map.Core
             return b;
         }
         
-        /// <summary>
-        /// are there entries hashes to this index
-        /// </summary>
-        /// <returns></returns>
-        public bool NotMapped()
-        {
-            return (_offset & (1 << 7)) == 0;
-        }
-
         /// <summary>
         /// Determines whether this Entry is empty.
         /// </summary>

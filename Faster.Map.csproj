@@ -80,11 +80,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="GenericMap.cs" />
-    <Compile Include="Core\GenericEntry.cs" />
-    <Compile Include="Map.cs" />
     <Compile Include="Core\Entry.cs" />
+    <Compile Include="Core\FastEntry.cs" />
     <Compile Include="Core\InfoByte.cs" />
+    <Compile Include="FastMap.cs" />
+    <Compile Include="Map.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup />

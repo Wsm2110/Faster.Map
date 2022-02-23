@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Faster.Map.Core;
@@ -6,20 +6,18 @@ using Faster.Map.Core;
 namespace Faster.Map
 {
     /// <summary>
-    ///   This hashmap is heavily optimized to be used with numerical keys 
-    ///   And is alot faster than GneericMap which allows all sorts of keys :)
-    /// 
+    ///
     /// This hashmap uses the following
     /// - Open addressing
     /// - Uses linear probing
     /// - Robing hood hash
     /// - Upper limit on the probe sequence lenght(psl) which is Log2(size)
-    /// - Calculates offset from original index
+    /// - calculates offset from original index
     /// - fibonacci hashing
     /// </summary>
-    public class Map<TKey, TValue> where TKey : unmanaged, IComparable, IEquatable<TKey>
+    public class Map<TKey, TValue>
     {
-        #region properties
+        #region Properties
 
         /// <summary>
         /// Gets or sets how many elements are stored in the map
@@ -37,6 +35,21 @@ namespace Faster.Map
         /// </value>
         public uint Size => (uint)_entries.Length;
 
+        /// <summary>
+        /// Gets all keys stored in this hashmap
+        /// </summary>
+        /// <returns></returns>
+        public IEnumerable<TKey> Keys => KeyEnumerator();
+
+        /// <summary>
+        /// Gets the stored values.
+        /// </summary>
+        /// <value>
+        /// The values.
+        /// </value>
+        public IEnumerable<TValue> Values => ValueEnumerator();
+
+
         #endregion
 
         #region Fields
@@ -45,9 +58,10 @@ namespace Faster.Map
         private Entry<TKey, TValue>[] _entries;
         private uint _maxlookups;
         private readonly double _loadFactor;
-        private const uint _multiplier = 0x9E3779B9; // 2654435769; 
+        private const uint Multiplier = 0x9E3779B9; //2654435769;
         private int _shift = 32;
-        private uint _pslLimitor;
+        private byte _maxProbeSequenceLength;
+        private readonly IEqualityComparer<TKey> _cmp;
 
         #endregion
 
@@ -58,18 +72,22 @@ namespace Faster.Map
         /// </summary>
         /// <param name="length">The length.</param>
         /// <param name="loadFactor">The load factor.</param>
-        public Map(uint length = 16, double loadFactor = 0.95d)
+        /// <param name="cmp">The CMP.</param>
+        public Map(uint length = 16, double loadFactor = 0.5d, IEqualityComparer<TKey> cmp = null)
         {
             //default length is 16
             _maxlookups = length == 0 ? 16 : length;
             _loadFactor = loadFactor;
 
             var size = NextPow2(_maxlookups);
-            _pslLimitor = PslLimit(size);
+            _maxProbeSequenceLength = loadFactor <= 0.5 ? Log2(size) : PslLimit(size);
 
-            _shift = _shift - (int)Log2(_maxlookups) + 1;
-            _entries = new Entry<TKey, TValue>[size + _pslLimitor];
-            _info = new InfoByte[size + _pslLimitor];
+            _cmp = cmp ?? EqualityComparer<TKey>.Default;
+
+            _shift = _shift - Log2(_maxlookups) + 1;
+
+            _entries = new Entry<TKey, TValue>[size + _maxProbeSequenceLength + 1];
+            _info = new InfoByte[size + _maxProbeSequenceLength + 1];
         }
 
         #endregion
@@ -90,12 +108,39 @@ namespace Faster.Map
                 Resize();
             }
 
-            if (KeyExists(key, out var index))
+            var hashcode = key.GetHashCode();
+            uint index = (uint)hashcode * Multiplier >> _shift;
+
+            var initialIndex = index;
+
+            //Check if key exists
+            var maxDistance = index + _maxProbeSequenceLength;
+            for (; index < maxDistance; index += 2)
             {
-                return false;
+                var info = _info[index];
+                if (info.IsEmpty())
+                {
+                    //slot is empty - key noy found
+                    break;
+                }
+
+                var entry = _entries[index];
+                if (entry.Hashcode == hashcode && _cmp.Equals(key, entry.Key))
+                {
+                    return false;
+                }
+
+                if (entry.Next == hashcode)
+                {
+                    entry = _entries[index + 1];
+                    if (_cmp.Equals(key, entry.Key))
+                    {
+                        return false;
+                    }
+                }
             }
 
-            return EmplaceNew(key, value, ref index);
+            return EmplaceNew(key, value, ref hashcode, ref initialIndex);
         }
 
         /// <summary>
@@ -107,33 +152,35 @@ namespace Faster.Map
         [MethodImpl(256)]
         public bool Get(TKey key, out TValue value)
         {
-            var hashcode = key.GetHashCode();
-            uint index = (uint)hashcode * _multiplier >> _shift;
+            int hashcode = key.GetHashCode();
+            uint index = (uint)hashcode * Multiplier >> _shift;
 
             var info = _info[index];
-            if (info.NotMapped())
+            if (info.IsEmpty())
             {
+                //Dont unnecessary iterate over the entries
                 value = default;
                 return false;
             }
 
-            int offset = (int)index + info.Offset;
-
-            for (; offset >= index; offset -= 2)
+            uint maxDistance = index + _maxProbeSequenceLength;
+            for (; index < maxDistance; index +=2)
             {
-                //unroll loop twice
-                var entry = _entries[offset];
-                if (entry.Key.GetHashCode() == hashcode)
+                var entry = _entries[index];
+                if (entry.Hashcode == hashcode && _cmp.Equals(key, entry.Key))
                 {
                     value = entry.Value;
                     return true;
                 }
 
-                entry = _entries[offset - 1]; //1
-                if (entry.Key.GetHashCode() == hashcode)
+                if (entry.Next == hashcode)
                 {
-                    value = entry.Value;
-                    return true;
+                    var next = _entries[index + 1];
+                    if (_cmp.Equals(key, next.Key))
+                    {
+                        value = next.Value;
+                        return true;
+                    }
                 }
             }
 
@@ -148,218 +195,182 @@ namespace Faster.Map
         public bool Update(TKey key, TValue value)
         {
             var hashcode = key.GetHashCode();
-            uint index = (uint)hashcode * _multiplier >> _shift;
-
+            uint index = (uint)hashcode * Multiplier >> _shift;
+            
             var info = _info[index];
-            if (info.NotMapped())
+            if (info.IsEmpty())
             {
+                //Dont unnecessary iterate over the entries
                 return false;
             }
 
-            int offset = (int)index + info.Offset;
+            var maxDistance = index + _maxProbeSequenceLength;
 
-            for (; offset >= index; offset -= 2)
+            for (; index < maxDistance; index += 2)
             {
-                var entry = _entries[offset];
-                if (entry.Key.GetHashCode() == hashcode)
+                var entry = _entries[index];
+                if (entry.Hashcode == hashcode && _cmp.Equals(key, entry.Key))
                 {
-                    _entries[offset].Value = value;
+                    _entries[index].Value = value;
                     return true;
                 }
 
-                if (offset == 0)
+                if (entry.Next == hashcode)
                 {
-                    break;
-                }
-
-                entry = _entries[offset - 1];
-                if (entry.Key.GetHashCode() == hashcode)
-                {
-                    _entries[offset].Value = value;
-                    return true;
+                    var next = _entries[index + 1];
+                    if (_cmp.Equals(key, next.Key))
+                    {
+                        _entries[index + 1].Value = value;
+                        return true;
+                    }
                 }
             }
 
-            return default;
+            return false;
         }
 
-        ///// <summary>
-        ///// Removes the current entry using a backshift removal
-        ///// </summary>
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="key"></param>
+        /// <returns></returns>
         [MethodImpl(256)]
         public bool Remove(TKey key)
         {
-            uint hashcode = (uint)key.GetHashCode();
-            uint index = hashcode * _multiplier >> _shift;
+            int hashcode = key.GetHashCode();
+            uint index = (uint)hashcode * Multiplier >> _shift;
 
             var info = _info[index];
-            if (info.NotMapped())
+            if (info.IsEmpty())
             {
+                //Dont unnecessary iterate over the entries
                 return false;
             }
 
-            int idx = -1;
+
+            int foundAtIndex = -1;
 
             //delete entry
-            int offset = (int)index + info.Offset;
-            byte psl = 0;
-            for (; offset >= index; offset -= 2)
+            var maxDistance = index + _maxProbeSequenceLength;
+
+            for (; index < maxDistance; index += 2)
             {
-                var entry = _entries[offset];
-                if (entry.Key.GetHashCode() == hashcode)
+                var entry = _entries[index];
+                if (entry.Hashcode == hashcode && _cmp.Equals(key, entry.Key))
                 {
-                    //romove entry from list
-                    psl = _info[offset].Psl;
-                    _entries[offset] = default;
-                    idx = offset;
+                    foundAtIndex = (int)index;
+                    //remove entry from list
+                    _entries[index] = default;
 
-                    //update info
-                    --info.Offset;
-                    _info[index] = info;
+                    //remove next from previous entry
+                    if (index > 0)
+                    {
+                        _entries[index - 1].Next = default;
+                    }
+
+                    _info[index] = default;
                     --Count;
-
                     break;
                 }
 
-                if (offset == 0)
+                if (entry.Next == hashcode)
                 {
-                    break;
-                }
+                    foundAtIndex = (int)index + 1;
+                    var next = _entries[foundAtIndex];
+                    if (_cmp.Equals(key, next.Key))
+                    {
+                        _entries[foundAtIndex] = default;
+                       
+                        if (index > 0)
+                        {
+                            _entries[index].Next = default;
+                        }
 
-                entry = _entries[offset - 1];
-                if (entry.Key.GetHashCode() == hashcode)
-                {
-                    //romove entry from list
-                    psl = _info[offset - 1].Psl;
-                    _entries[offset - 1] = default;
-                    idx = offset - 1;
-
-                    //update info
-                    --info.Offset;
-                    _info[index] = info;
-                    --Count;
-
-                    break;
+                        _info[foundAtIndex] = default;
+                        --Count;
+                        break;
+                    }
                 }
             }
 
-            if (idx == -1)
+            if (foundAtIndex == -1)
             {
-                //abort removal
                 return false;
             }
 
-            var bounds = _maxlookups + _pslLimitor;
-
-            for (; idx < bounds; ++idx)
+            for (; ; ++foundAtIndex)
             {
-                info = _info[idx + 1];
-
-                if (info.IsEmpty())
+                var next = _info[foundAtIndex + 1];
+                if (next.IsEmpty())
                 {
-                    return true;
+                    break;
                 }
 
-                if (info.Psl == 0)
+                if (next.Psl <= 0)
                 {
-                    return true;
+                    break;
                 }
 
-                if (info.Psl >= psl)
+                if (next.Psl > 0)
                 {
                     //decrease psl
-                    --info.Psl;
+                    --next.Psl;
+                    Swap(ref _entries[foundAtIndex + 1], ref _entries[foundAtIndex]);
+                    Swap(ref next, ref _info[foundAtIndex]);
 
-                    swap(ref info, ref _info[idx]);
-                    swap(ref _entries[idx + 1], ref _entries[idx]);
+                    if (foundAtIndex > 0)
+                    {
+                        _entries[foundAtIndex - 1].Next = _entries[foundAtIndex].Hashcode;
+                    }
 
-                    //clear entry
-                    info = default;
-                    _info[idx + 1] = info;
-                }
-                else
-                {
-                    return true;
+                    _entries[foundAtIndex + 1] = default;
+                    _info[foundAtIndex + 1] = default;
                 }
             }
 
-            return false;
+            return true;
         }
 
+        /// <summary>
+        /// Determines whether the specified key contains key.
+        /// </summary>
+        /// <param name="key">The key.</param>
+        /// <returns>
+        ///   <c>true</c> if the specified key contains key; otherwise, <c>false</c>.
+        /// </returns>
         [MethodImpl(256)]
         public bool ContainsKey(TKey key)
         {
-            var hashcode = key.GetHashCode();
-            uint index = (uint)hashcode * _multiplier >> _shift;
+            int hashcode = key.GetHashCode();
+            uint index = (uint)hashcode * Multiplier >> _shift;
 
             var info = _info[index];
-            if (info.NotMapped())
+            if (info.IsEmpty())
             {
-                //slot is  empty
+                //Dont unnecessary iterate over the entries
                 return false;
             }
 
-            int offset = (int)index + info.Offset;
-
-            for (; offset >= index; offset -= 2)
+            var maxDistance = index + _maxProbeSequenceLength;
+            for (; index < maxDistance; index += 2)
             {
-                var entry = _entries[offset];
-                if (entry.Key.GetHashCode() == hashcode)
+                var entry = _entries[index];
+                if (entry.Hashcode == hashcode && _cmp.Equals(key, entry.Key))
                 {
                     return true;
                 }
 
-                if (offset == 0)
+                if (entry.Next == hashcode)
                 {
-                    break;
-                }
-
-                entry = _entries[offset - 1];
-                if (entry.Key.GetHashCode() == hashcode)
-                {
-                    return true;
+                    entry = _entries[index + 1];
+                    if (_cmp.Equals(entry.Key, key))
+                    {
+                        return true;
+                    }
                 }
             }
 
             return false;
-        }
-
-        /// <summary>
-        /// Gets all values stored in this hashmap
-        /// </summary>
-        /// <returns></returns>
-        public IEnumerable<TValue> Values
-        {
-            get
-            {
-                for (var index = 0; index < _info.Length; ++index)
-                {
-                    var info = _info[index];
-                    if (!info.IsEmpty())
-                    {
-                        yield return _entries[index].Value;
-                    }
-                }
-            }
-        }
-
-        /// <summary>
-        /// Gets all keys stored in this hashmap
-        /// </summary>
-        /// <returns></returns>
-        public IEnumerable<TKey> Keys
-        {
-            get
-            {
-                for (var index = 0; index < _info.Length; ++index)
-                {
-                    var info = _info[index];
-                    if (!info.IsEmpty())
-                    {
-                        yield return _entries[index].Key;
-                    }
-                }
-            }
         }
 
         /// <summary>
@@ -377,16 +388,33 @@ namespace Faster.Map
                 }
 
                 var entry = map._entries[i];
-
-                EmplaceInternal(entry.Key, entry.Value);
+                Emplace(entry.Key, entry.Value);
             }
         }
 
         /// <summary>
-        /// Gets or sets the <see cref="TValue"/> with the specified key.
+        /// Clears this instance.
+        /// </summary>
+        public void Clear()
+        {
+            for (var i = 0; i < _entries.Length; i++)
+            {
+                var info = _info[i];
+                if (info.IsEmpty())
+                {
+                    continue;
+                }
+
+                _entries[i] = default;
+                _info[i] = default;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the  with the specified key.
         /// </summary>
         /// <value>
-        /// The <see cref="TValue"/>.
+        /// The 
         /// </value>
         /// <param name="key">The key.</param>
         /// <returns></returns>
@@ -415,6 +443,34 @@ namespace Faster.Map
             }
         }
 
+
+#if DEBUG
+
+        /// <summary>
+        /// Locates the specified key.
+        /// </summary>
+        /// <param name="key">The key.</param>
+        /// <returns></returns>
+        public int Locate(TKey key)
+        {
+            for (int i = 0; i < _entries.Length; i++)
+            {
+                var info = _info[i];
+                if (info.IsEmpty())
+                {
+                    continue;
+                }
+
+                var entry = _entries[i];
+                if (entry.Hashcode == key.GetHashCode() && _cmp.Equals(key, entry.Key))
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
+#endif
+
         #endregion
 
         #region Private Methods
@@ -422,127 +478,69 @@ namespace Faster.Map
         /// <summary>
         /// Emplaces a new entry without checking for key existence
         /// </summary>
-        /// <param name="value">The value.</param>
         /// <param name="key">The value.</param>
+        /// <param name="value">The value.</param>
+        /// <param name="hashcode">The hashcode.</param>
         /// <param name="index">The index.</param>
         /// <returns></returns>
         [MethodImpl(256)]
-        private bool EmplaceNew(TKey key, TValue value, ref uint index)
+        private bool EmplaceNew(TKey key, TValue value, ref int hashcode, ref uint index)
         {
-            _info[index].Offset |= 1 << 7; // map index;
+            Entry<TKey, TValue> insertableEntry = default;
 
-            var infoByte = _info[index];
-            if (infoByte.IsEmpty())
+            insertableEntry.Key = key;
+            insertableEntry.Value = value;
+            insertableEntry.Hashcode = hashcode;
+
+            InfoByte insertInfoByte = default;
+            insertInfoByte.Psl = 0;
+
+            for (; ; ++insertInfoByte.Psl, ++index)
             {
-                infoByte.Psl = 0;
-                _info[index] = infoByte;
-                _entries[index].Value = value;
-                _entries[index].Key = key;
-                ++Count;
-                return true;
-            }
-
-            byte psl = 1;
-
-            if (infoByte.Offset != 0)
-            {
-                index += (uint)infoByte.Offset + 1;
-                psl += infoByte.Offset;
-            }
-            else
-            {
-                ++index;
-            }
-
-            InfoByte info = default;
-            info.Psl = 0; // set not empty
-
-            Entry<TKey, TValue> entry = default;
-            entry.Value = value;
-            entry.Key = key;
-
-            for (; ; ++psl, ++index)
-            {
-                infoByte = _info[index];
-                if (infoByte.IsEmpty())
+                var info = _info[index];
+                if (info.IsEmpty())
                 {
-                    info.Psl = psl;
-                    _info[index - psl].Offset = psl;    //calculate the offset from it's original position
-                    _info[index] = info;
-                    _entries[index] = entry;
+                    _info[index] = insertInfoByte;
+                    if (index > 0)
+                    {
+                        _entries[index - 1].Next = insertableEntry.Hashcode;
+                    }
+
+                    Merge(insertableEntry, ref _entries[index]);
+
                     ++Count;
                     return true;
                 }
 
-                if (psl > infoByte.Psl)
+                if (insertInfoByte.Psl > info.Psl)
                 {
-                    info.Psl = psl;
-                    swap(ref info, ref _info[index]);
-                    swap(ref entry, ref _entries[index]);
+                    insertableEntry.Next = _entries[index + 1].Hashcode;
 
-                    _info[index - psl].Offset = psl;  //calculate the offset from it's original position
-                    psl = info.Psl;
+                    Swap(ref insertableEntry, ref _entries[index]);
+                    Swap(ref insertInfoByte, ref _info[index]);
+
+                    _entries[index - 1].Next = _entries[index].Hashcode;
+
+                    continue;
                 }
 
-                if (psl == _pslLimitor)
+                if (insertInfoByte.Psl == _maxProbeSequenceLength)
                 {
                     Resize();
 
-                    var idx = (uint)entry.Key.GetHashCode() * _multiplier >> _shift;
-                    EmplaceNew(entry.Key, entry.Value, ref idx);
+                    var hc = insertableEntry.Hashcode;
+                    uint idx = (uint)hc * Multiplier >> _shift;
+                    EmplaceNew(insertableEntry.Key, insertableEntry.Value, ref hc, ref idx);
                     return true;
                 }
             }
         }
-        
-        [MethodImpl(256)]
-        private bool KeyExists(TKey key, out uint idx)
-        {
-            var hashcode = key.GetHashCode();
-            idx = (uint)hashcode * _multiplier >> _shift;
 
-            var info = _info[idx];
-            if (info.NotMapped())
-            {
-                //slot is  empty
-                return false;
-            }
-
-            int offset = (int)idx + info.Offset;
-            for (; offset >= idx; offset -= 2)
-            {
-                var entry = _entries[offset];
-                if (entry.Key.GetHashCode() == hashcode)
-                {
-                    return true;
-                }
-
-                if (offset == 0)
-                {
-                    break;
-                }
-
-                entry = _entries[offset - 1];
-                if (entry.Key.GetHashCode() == hashcode)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-        
-        /// <summary>
-        /// Swaps the specified x.
-        /// </summary>
-        /// <param name="x">The x.</param>
-        /// <param name="y">The y.</param>
-        private void swap(ref InfoByte x, ref InfoByte y)
+        private void Merge(Entry<TKey, TValue> x, ref Entry<TKey, TValue> y)
         {
             var tmp = x;
-
-            x.Psl = y.Psl;
-            y.Psl = tmp.Psl;
+            tmp.Next = y.Next;
+            y = tmp;
         }
 
         /// <summary>
@@ -550,7 +548,7 @@ namespace Faster.Map
         /// </summary>
         /// <param name="x">The x.</param>
         /// <param name="y">The y.</param>
-        private void swap(ref Entry<TKey, TValue> x, ref Entry<TKey, TValue> y)
+        private void Swap(ref Entry<TKey, TValue> x, ref Entry<TKey, TValue> y)
         {
             var tmp = x;
 
@@ -559,12 +557,26 @@ namespace Faster.Map
         }
 
         /// <summary>
+        /// Swaps the specified x.
+        /// </summary>
+        /// <param name="x">The x.</param>
+        /// <param name="y">The y.</param>
+        private void Swap(ref InfoByte x, ref InfoByte y)
+        {
+            var tmp = x;
+
+            x = y;
+            y = tmp;
+        }
+
+
+        /// <summary>
         /// PSLs the limit.
         /// </summary>
         /// <param name="size">The size.</param>
         /// <returns></returns>
         [MethodImpl(256)]
-        private uint PslLimit(uint size)
+        private byte PslLimit(uint size)
         {
             switch (size)
             {
@@ -610,17 +622,16 @@ namespace Faster.Map
             var oldEntries = new Entry<TKey, TValue>[_entries.Length];
             Array.Copy(_entries, oldEntries, _entries.Length);
 
-            var oldInfo = new InfoByte[_info.Length];
+            var oldInfo = new InfoByte[_entries.Length];
             Array.Copy(_info, oldInfo, _info.Length);
 
-            _pslLimitor = PslLimit(_maxlookups);
-
-            _entries = new Entry<TKey, TValue>[_maxlookups + _pslLimitor];
-            _info = new InfoByte[_maxlookups + _pslLimitor];
+            _maxProbeSequenceLength = _loadFactor <= 0.5 ? Log2(_maxlookups) : PslLimit(_maxlookups);
+            _entries = new Entry<TKey, TValue>[_maxlookups + _maxProbeSequenceLength + 1];
+            _info = new InfoByte[_maxlookups + _maxProbeSequenceLength + 1];
 
             Count = 0;
 
-            for (var i = 0; i < oldInfo.Length; i++)
+            for (var i = 0; i < oldEntries.Length; i++)
             {
                 var info = oldInfo[i];
                 if (info.IsEmpty())
@@ -629,27 +640,12 @@ namespace Faster.Map
                 }
 
                 var entry = oldEntries[i];
-                uint index = (uint)entry.Key.GetHashCode() * _multiplier >> _shift;
-                EmplaceNew(entry.Key, entry.Value, ref index);
-            }
-        }
+                entry.Next = 0;
 
-        /// <summary>
-        /// Inserts the specified value.
-        /// </summary>
-        /// <param name="key">The key.</param>
-        /// <param name="value">The value.</param>
-        /// <returns></returns>
-        [MethodImpl(256)]
-        private void EmplaceInternal(TKey key, TValue value)
-        {
-            if ((double)Count / _maxlookups > _loadFactor)
-            {
-                Resize();
+                var hashcode = entry.Hashcode;
+                uint idx = (uint)hashcode * Multiplier >> _shift;
+                EmplaceNew(entry.Key, entry.Value, ref hashcode, ref idx);
             }
-
-            uint index = (uint)key.GetHashCode() * _multiplier >> _shift;
-            EmplaceNew(key, value, ref index);
         }
 
         /// <summary>
@@ -658,7 +654,7 @@ namespace Faster.Map
         /// <param name="c">The c.</param>
         /// <returns></returns>
         ///
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(256)]
         private static uint NextPow2(uint c)
         {
             c--;
@@ -671,9 +667,9 @@ namespace Faster.Map
         }
 
         // used for set checking operations (using enumerables) that rely on counting
-        private static uint Log2(uint value)
+        private static byte Log2(uint value)
         {
-            uint c = 0;
+            byte c = 0;
             while (value > 0)
             {
                 c++;
@@ -681,6 +677,28 @@ namespace Faster.Map
             }
 
             return c;
+        }
+
+        private IEnumerable<TKey> KeyEnumerator()
+        {
+            for (var index = 0; index < _info.Length; ++index)
+            {
+                if (!_info[index].IsEmpty())
+                {
+                    yield return _entries[index].Key;
+                }
+            }
+        }
+
+        private IEnumerable<TValue> ValueEnumerator()
+        {
+            for (var index = 0; index < _info.Length; ++index)
+            {
+                if (!_info[index].IsEmpty())
+                {
+                    yield return _entries[index].Value;
+                }
+            }
         }
 
         #endregion
