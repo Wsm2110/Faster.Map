@@ -15,11 +15,12 @@ Faster is a small robinhood hashmap with minimal memory overhead and incredibly 
 
 ## How to use
 Faster.Map provides 2 hashmaps. FastMap<> which is highly optimized to be used with numerical keys. And Map<> which has no key constraints and will resolve hashcollissions. the main difference between these two maps is the use of the EqualityComparer<T>. Numerical keys dont need an EqualityComparer<T>, hence the speedboost.
-   
+  
+ ```C#
 Install nuget package Faster.Ioc.Zero to your project
 
 dotnet add package Faster.Map
-
+```
 
  ## Examples
     
