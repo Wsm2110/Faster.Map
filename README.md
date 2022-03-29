@@ -7,8 +7,7 @@ The goal of Faster is to provide the fastest dict/set that integrates into the .
    - Linear probing
    - Upper limit on the probe sequence lenght(psl) which is Log2(size)   
    - Fibonacci hashing 
-   - Calculates offset from original index, which enables us to set the loadfactor to 0.95%
-
+ 
 ## About
 
 Faster is a small robinhood hashmap with minimal memory overhead and incredibly fast runtime speed. See benchmarks, or try it out yourself. Faster.Map evolved from the fact that C# dictionaries in targetframework 4.0 are terribly slow. So i decided to create my own robinhood hashmap, turns out that this hashmap even performs better than the current dictionary written in .net5.
@@ -35,7 +34,7 @@ private FastMap<uint, uint> _map = new FastMap<uint, uint>(16);
   
  var result = _map[1];    
 ``` 
-  ### GenericMap Example
+  ### Map Example
 ```C#
 private Map<string, uint> _map = new Map<string, uint>(16);
  _map.Emplace(1, 50); 
