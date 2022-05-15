@@ -3,20 +3,15 @@ using System.Runtime.InteropServices;
 
 namespace Faster.Map.Core
 {
-    [DebuggerDisplay("hashcode  {Hashcode } - Key {Key} - value {Value} - next {Next}")]
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    public struct Entry<TKey, TValue>
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <typeparam name="TKey">The type of the key.</typeparam>
+    /// <typeparam name="TValue">The type of the value.</typeparam>
+    [DebuggerDisplay("{Key.ToString()} - {Value.ToString()} ")]
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MultiEntry<TKey, TValue>
     {
-        public int Hashcode;
-
-        /// <summary>
-        /// Gets or sets the next.
-        /// </summary>
-        /// <value>
-        /// The next.
-        /// </value>
-        public int Next;
-
         /// <summary>
         /// Gets or sets the key.
         /// </summary>

@@ -1,11 +1,15 @@
 ﻿using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace Faster.Map.Core
 {
+    /// <summary>
+    /// 
+    /// </summary>
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    [DebuggerDisplay("psl - {Psl}")]
-    public struct InfoByte
+    [DebuggerDisplay("psl - {Psl} - hashcode - {Hashcode}")]
+    public struct MetaByte
     {
         private byte _psl;
 
@@ -26,11 +30,19 @@ namespace Faster.Map.Core
         } // 0 - 255
 
         /// <summary>
+        /// Gets or sets the hashcode.
+        /// </summary>
+        /// <value>
+        /// The hashcode.
+        /// </value>
+        public int Hashcode { get; set; }
+
+        /// <summary>
         /// Sets the bit.
         /// </summary>
         /// <param name="b">The b.</param>
         /// <returns></returns>
-        public static byte SetBit(byte b)
+        private byte SetBit(byte b)
         {
             b |= 1 << 7;
             return b;
@@ -42,6 +54,7 @@ namespace Faster.Map.Core
         /// <returns>
         ///   <c>true</c> if this instance is empty; otherwise, <c>false</c>.
         /// </returns>
+        [MethodImpl(256)]
         public bool IsEmpty()
         {
             return (_psl & (1 << 7)) == 0;
