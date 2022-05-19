@@ -1,10 +1,8 @@
-﻿using Faster.Map.Core;
-using Faster.Map.Exceptions;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
-namespace Faster.Map
+namespace NL.MinDef.LandIT.Utilities.Collections.Hashmap
 {
     /// <summary>
     /// This hashmap uses the following
@@ -32,7 +30,6 @@ namespace Faster.Map
 
         private MetaByte[] _info;
         private MultiEntry<TKey, TValue>[] _entries;
-        private uint _size;
         #endregion
 
         #region Properties
@@ -46,7 +43,7 @@ namespace Faster.Map
         public uint Count { get; private set; }
 
         /// <summary>
-        /// returns all entries in a key value manner
+        /// Returns all the entries as KeyValuePair objects
         /// </summary>
         /// <value>
         /// The keys.
@@ -68,7 +65,7 @@ namespace Faster.Map
         }
 
         /// <summary>
-        /// returns all keys
+        /// Returns all available keys
         /// </summary>
         /// <value>
         /// The keys.
@@ -89,7 +86,7 @@ namespace Faster.Map
         }
 
         /// <summary>
-        /// returns all Values
+        /// Returns all available Values
         /// </summary>
         /// <value>
         /// The keys.
@@ -113,34 +110,38 @@ namespace Faster.Map
         #region Constructor
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="Map{TKey, TValue}"/> class.
+        /// Initializes a new instance of the <see cref="MultiMap{TKey,TValue}"/> class.
         /// </summary>
         public MultiMap() : this(16, 0.5d, EqualityComparer<TKey>.Default, EqualityComparer<TValue>.Default) { }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="Map{TKey, TValue}"/> class.
+        /// Initializes a new instance of the <see cref="MultiMap{TKey, TValue}"/> class.
         /// </summary>
-        /// <param name="length">The length.</param>
+        /// <param name="length">The length of the hashmap. Will always take the closest power of two</param>
         public MultiMap(uint length) : this(length, 0.5d, EqualityComparer<TKey>.Default, EqualityComparer<TValue>.Default) { }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="Map{TKey, TValue}"/> class.
+        /// Initializes a new instance of the <see cref="MultiMap{TKey, TValue}" /> class.
         /// </summary>
-        /// <param name="length">The length.</param>
-        /// <param name="loadFactor">The load factor.</param>
+        /// <param name="length">The length of the hashmap. Will always take the closest power of two</param>
+        /// <param name="loadFactor">The loadfactor determines when the hashmap will resize(default is 0.5d) i.e size 32 loadfactor 0.5 hashmap will resize at 16</param>
         public MultiMap(uint length, double loadFactor) : this(length, loadFactor, EqualityComparer<TKey>.Default, EqualityComparer<TValue>.Default) { }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="Map{TKey, TValue}" /> class.
+        /// Initializes a new instance of the <see cref="MultiMap{TKey, TValue}" /> class.
         /// </summary>
-        /// <param name="length">The length.</param>
-        /// <param name="loadFactor">The load factor.</param>
-        /// <param name="keyComparer">The key comparer.</param>
+        /// <param name="length">The length of the hashmap. Will always take the closest power of two</param>
+        /// <param name="loadFactor">The loadfactor determines when the hashmap will resize(default is 0.5d) i.e size 32 loadfactor 0.5 hashmap will resize at 16</param>
+        /// <param name="keyComparer">Used to resolve hashcollissions</param>
         public MultiMap(uint length, double loadFactor, IEqualityComparer<TKey> keyComparer) : this(length, loadFactor, keyComparer, EqualityComparer<TValue>.Default) { }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="MultiMap{TKey, TValue}"/> class.
+        /// Initializes a new instance of the <see cref="MultiMap{TKey, TValue}" /> class.
         /// </summary>
+        /// <param name="length">The length of the hashmap. Will always take the closest power of two</param>
+        /// <param name="loadFactor">The loadfactor determines when the hashmap will resize(default is 0.5d) i.e size 32 loadfactor 0.5 hashmap will resize at 16</param>
+        /// <param name="keyComparer">Used to resolve hashcollissions</param>
+        /// <param name="valueComparer">Used to retrieve a proper entry by validing if the value is the same</param>
         public MultiMap(uint length, double loadFactor, IEqualityComparer<TKey> keyComparer, IEqualityComparer<TValue> valueComparer)
         {
             //default length is 16
@@ -154,12 +155,8 @@ namespace Faster.Map
             _valueComparer = valueComparer ?? EqualityComparer<TValue>.Default;
 
             _shift = _shift - Log2(_maxlookups) + 1;
-            _size = 0;
-
-            _size = _maxlookups + _maxProbeSequenceLength;
-
-            _entries = new MultiEntry<TKey, TValue>[_size];
-            _info = new MetaByte[_size];
+            _entries = new MultiEntry<TKey, TValue>[_maxlookups + _maxProbeSequenceLength + 1];
+            _info = new MetaByte[_maxlookups + _maxProbeSequenceLength + 1];
         }
 
         #endregion
@@ -173,6 +170,7 @@ namespace Faster.Map
         /// <param name="value">The value.</param>
         /// <returns></returns>
         [MethodImpl(256)]
+#pragma warning disable S3776 // Cognitive Complexity of methods should not be too high
         public bool Emplace(TKey key, TValue value)
         {
             if ((double)Count / _maxlookups > _loadFactor)
@@ -183,7 +181,7 @@ namespace Faster.Map
             var hashcode = key.GetHashCode();
             uint index = (uint)hashcode * Multiplier >> _shift;
 
-            if (KeyValueExists(key, value))
+            if (ContainsKey(key, value))
             {
                 return false;
             }
@@ -215,7 +213,7 @@ namespace Faster.Map
                 if (info.Hashcode == metadata.Hashcode)
                 {
                     ++Count;
-                    //make sure same hashcodes are in line
+                    //make sure same hashcodes are next to eachother
                     StartSwapping(index, ref entry, ref metadata);
                     return true;
                 }
@@ -232,7 +230,7 @@ namespace Faster.Map
                 {
                     if (metadata.Psl == 127)
                     {
-                        throw new MultiMapException("Only 127 values can be stored with 1 unique key");
+                        throw new MultiMapException("Only 127 values can be stored with 1 unique key. Since psl is a byte and we use 1 bit the indicate if this struct is empty, it leaves us with 127, hence the max entries stored with the same key is 127");
                     }
 
                     Resize();
@@ -242,6 +240,7 @@ namespace Faster.Map
                 }
             }
         }
+#pragma warning restore S3776 // Cognitive Complexity of methods should not be too high
 
         /// <summary>
         /// Swap all entries until there is an empty entry
@@ -251,10 +250,8 @@ namespace Faster.Map
         /// <param name="data">The data.</param>
         private void StartSwapping(uint index, ref MultiEntry<TKey, TValue> entry, ref MetaByte data)
         {
-
         Start:
 
-         
             if (data.IsEmpty())
             {
                 return;
@@ -268,12 +265,11 @@ namespace Faster.Map
                 EmplaceInternal(ref entry, ref data);
                 return;
             }
-            
+
             if (_currentProbeSequenceLength < data.Psl)
             {
                 _currentProbeSequenceLength = data.Psl;
             }
-
 
             //swap lower with upper
             Swap(ref entry, ref _entries[index + 1]);
@@ -281,7 +277,9 @@ namespace Faster.Map
 
             ++index;
 
+#pragma warning disable S907 // "goto" statement should not be used
             goto Start;
+#pragma warning restore S907 // "goto" statement should not be used
         }
 
         /// <summary>
@@ -321,7 +319,9 @@ namespace Faster.Map
                             return true;
                         }
 
+#pragma warning disable S907 // "goto" statement should not be used
                         goto Next;
+#pragma warning restore S907 // "goto" statement should not be used
                     }
 
                     if (exit == 1)
@@ -372,7 +372,9 @@ namespace Faster.Map
                         yield return entry.Value;
                     }
 
+#pragma warning disable S907 // "goto" statement should not be used
                     goto Next;
+#pragma warning restore S907 // "goto" statement should not be used
                 }
 
                 if (exit == 1)
@@ -386,6 +388,59 @@ namespace Faster.Map
         }
 
         /// <summary>
+        /// Locate the entry by using a key-value, update the entry by using a delegate
+        /// </summary>
+        /// <param name="key">The key.</param>
+        /// <param name="oldValue">The old value.</param>
+        /// <param name="newValue">Update old value by invoking delegate</param>
+        /// <returns></returns>
+        [MethodImpl(256)]
+        public bool Update(TKey key, TValue oldValue, Func<TValue, TValue> newValue)
+        {
+            int hashcode = key.GetHashCode();
+            uint index = (uint)hashcode * Multiplier >> _shift;
+
+            var info = _info[index];
+            if (info.IsEmpty())
+            {
+                return false;
+            }
+
+            var maxDistance = index + _currentProbeSequenceLength;
+            byte exit = 0;
+
+            do
+            {
+                if (hashcode == info.Hashcode)
+                {
+                    exit = 1;
+                    var entry = _entries[index];
+                    if (_keyComparer.Equals(entry.Key, key) && _valueComparer.Equals(oldValue, entry.Value))
+                    {
+                        entry.Value = newValue(entry.Value);
+                        _entries[index] = entry;
+                        return true;
+                    }
+
+#pragma warning disable S907 // "goto" statement should not be used
+                    goto Next;
+#pragma warning restore S907 // "goto" statement should not be used
+                }
+
+                if (exit == 1)
+                {
+                    return false;
+                }
+
+            Next:
+                info = _info[++index];
+
+            } while (index <= maxDistance && !info.IsEmpty());
+
+            return false;
+        }
+
+        /// <summary>
         /// Swap old value with new value
         /// </summary>
         /// <param name="key">The key.</param>
@@ -393,7 +448,7 @@ namespace Faster.Map
         /// <param name="newValue">The new value.</param>
         /// <returns></returns>
         [MethodImpl(256)]
-        public bool Update(TKey key, TValue oldValue, TValue newValue)
+        public bool Swap(TKey key, TValue oldValue, TValue newValue)
         {
             int hashcode = key.GetHashCode();
             uint index = (uint)hashcode * Multiplier >> _shift;
@@ -420,7 +475,9 @@ namespace Faster.Map
                         return true;
                     }
 
+#pragma warning disable S907 // "goto" statement should not be used
                     goto Next;
+#pragma warning restore S907 // "goto" statement should not be used
                 }
 
                 if (exit == 1)
@@ -470,7 +527,9 @@ namespace Faster.Map
                         return true;
                     }
 
+#pragma warning disable S907 // "goto" statement should not be used
                     goto Next;
+#pragma warning restore S907 // "goto" statement should not be used
                 }
 
                 if (exit == 1)
@@ -533,9 +592,8 @@ namespace Faster.Map
 
             return removed == 1;
         }
-
         /// <summary>
-        /// Determines whether the specified key contains key.
+        /// Determines whether the specified key is already inserted in the map
         /// </summary>
         /// <param name="key">The key.</param>
         /// <returns>
@@ -566,7 +624,61 @@ namespace Faster.Map
                         return true;
                     }
 
+#pragma warning disable S907 // "goto" statement should not be used
                     goto Next;
+#pragma warning restore S907 // "goto" statement should not be used
+                }
+
+                if (exit == 1)
+                {
+                    return false;
+                }
+
+            Next:
+                info = _info[++index];
+
+            } while (index <= maxDistance && !info.IsEmpty());
+
+            return false;
+        }
+
+        /// <summary>
+        /// Determines whether the specified key and value exists
+        /// </summary>
+        /// <param name="key">The key.</param>
+        /// <param name="value">The value.</param>
+        /// <returns>
+        ///   <c>true</c> if the specified key contains key; otherwise, <c>false</c>.
+        /// </returns>
+        [MethodImpl(256)]
+        public bool ContainsKey(TKey key, TValue value)
+        {
+            int hashcode = key.GetHashCode();
+            uint index = (uint)hashcode * Multiplier >> _shift;
+
+            var info = _info[index];
+            if (info.IsEmpty())
+            {
+                return false;
+            }
+
+            var maxDistance = index + _currentProbeSequenceLength;
+
+            byte exit = 0;
+            do
+            {
+                if (hashcode == info.Hashcode)
+                {
+                    exit = 1;
+                    var entry = _entries[index];
+                    if (_keyComparer.Equals(entry.Key, key) && _valueComparer.Equals(entry.Value, value))
+                    {
+                        return true;
+                    }
+
+#pragma warning disable S907 // "goto" statement should not be used
+                    goto Next;
+#pragma warning restore S907 // "goto" statement should not be used
                 }
 
                 if (exit == 1)
@@ -608,24 +720,24 @@ namespace Faster.Map
         }
 
         ///// <summary>
-        ///// Copies entries from one map to another
+        ///// Copies all entries from a different multimap
         ///// </summary>
         ///// <param name="valueMap">The map.</param>
         /// <summary>
         /// Copies the specified fast map.
         /// </summary>
-        /// <param name="fastMap">The fast map.</param>
-        public void Copy(MultiMap<TKey, TValue> fastMap)
+        /// <param name="multimap">The multimap.</param>
+        public void Copy(MultiMap<TKey, TValue> multimap)
         {
-            for (var i = 0; i < fastMap._entries.Length; ++i)
+            for (var i = 0; i < multimap._entries.Length; ++i)
             {
-                var info = fastMap._info[i];
+                var info = multimap._info[i];
                 if (info.IsEmpty())
                 {
                     continue;
                 }
 
-                var entry = fastMap._entries[i];
+                var entry = multimap._entries[i];
                 Emplace(entry.Key, entry.Value);
             }
         }
@@ -639,8 +751,9 @@ namespace Faster.Map
             {
                 _entries[i] = default;
                 _info[i] = default;
-                --Count;
             }
+
+            Count = 0;
         }
 
         #endregion
@@ -648,7 +761,7 @@ namespace Faster.Map
         #region Private Methods
 
         /// <summary>
-        /// Shifts the remove.
+        /// Remove an entry by using a backshift removal
         /// </summary>
         /// <param name="index">The index.</param>
         [MethodImpl(256)]
@@ -680,49 +793,9 @@ namespace Faster.Map
 
             shifted = true;
 
+#pragma warning disable S907 // "goto" statement should not be used
             goto Start;
-        }
-
-        [MethodImpl(256)]
-        private bool KeyValueExists(TKey key, TValue value)
-        {
-            int hashcode = key.GetHashCode();
-            uint index = (uint)hashcode * Multiplier >> _shift;
-
-            var info = _info[index];
-            if (info.IsEmpty())
-            {
-                return false;
-            }
-
-            var maxDistance = index + _currentProbeSequenceLength;
-            byte exit = 0;
-
-            do
-            {
-                if (hashcode == info.Hashcode)
-                {
-                    exit = 1;
-                    var entry = _entries[index];
-                    if (_keyComparer.Equals(entry.Key, key) && _valueComparer.Equals(entry.Value, value))
-                    {
-                        return true;
-                    }
-
-                    goto Next;
-                }
-
-                if (exit == 1)
-                {
-                    return false;
-                }
-
-            Next:
-                info = _info[++index];
-
-            } while (index <= maxDistance && !info.IsEmpty());
-
-            return false;
+#pragma warning restore S907 // "goto" statement should not be used
         }
 
         /// <summary>
@@ -777,10 +850,8 @@ namespace Faster.Map
             var oldInfo = new MetaByte[_entries.Length];
             Array.Copy(_info, oldInfo, _info.Length);
 
-            _size = _maxlookups + _maxProbeSequenceLength;
-
-            _entries = new MultiEntry<TKey, TValue>[_size];
-            _info = new MetaByte[_size];
+            _entries = new MultiEntry<TKey, TValue>[_maxlookups + _maxProbeSequenceLength + 1];
+            _info = new MetaByte[_maxlookups + _maxProbeSequenceLength + 1];
 
             Count = 0;
 
@@ -858,7 +929,7 @@ namespace Faster.Map
         }
 
         /// <summary>
-        /// Swaps the specified x.
+        /// Swaps the content of the specified values
         /// </summary>
         /// <param name="x">The x.</param>
         /// <param name="y">The y.</param>
@@ -871,7 +942,7 @@ namespace Faster.Map
         }
 
         /// <summary>
-        /// Swaps the specified x.
+        /// Swaps the content of the specified values
         /// </summary>
         /// <param name="x">The x.</param>
         /// <param name="y">The y.</param>
