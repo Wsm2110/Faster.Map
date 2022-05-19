@@ -3,6 +3,9 @@ using System.Runtime.InteropServices;
 
 namespace Faster.Map.Core
 {
+    /// <summary>
+    /// Infobyte stores psl
+    /// </summary>
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     [DebuggerDisplay("psl - {Psl}")]
     public struct InfoByte
@@ -35,7 +38,7 @@ namespace Faster.Map.Core
             b |= 1 << 7;
             return b;
         }
-        
+
         /// <summary>
         /// Determines whether this Entry is empty.
         /// </summary>

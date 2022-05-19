@@ -3,6 +3,11 @@ using System.Runtime.InteropServices;
 
 namespace Faster.Map.Core
 {
+    /// <summary>
+    /// Value type to store entries in fastmap
+    /// </summary>
+    /// <typeparam name="TKey">The type of the key.</typeparam>
+    /// <typeparam name="TValue">The type of the value.</typeparam>
     [DebuggerDisplay("Key {Key} - value {Value} ")]
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public struct FastEntry<TKey, TValue>

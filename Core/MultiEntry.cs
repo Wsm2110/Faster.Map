@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 namespace Faster.Map.Core
 {
     /// <summary>
-    /// 
+    /// Storing a key and value(max (16 bytes)) without padding
     /// </summary>
     /// <typeparam name="TKey">The type of the key.</typeparam>
     /// <typeparam name="TValue">The type of the value.</typeparam>

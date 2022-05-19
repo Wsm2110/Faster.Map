@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 namespace Faster.Map.Core
 {
     /// <summary>
-    /// 
+    /// Stores entry metadata(hashcode and probe sequence length)
     /// </summary>
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     [DebuggerDisplay("psl - {Psl} - hashcode - {Hashcode}")]
@@ -14,7 +14,7 @@ namespace Faster.Map.Core
         private byte _psl;
 
         /// <summary>
-        /// Gets or sets the PSL.
+        /// Gets or sets the PSL (probe sequence length)
         /// </summary>
         /// <value>
         /// The PSL.
