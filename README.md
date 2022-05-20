@@ -12,6 +12,13 @@ The goal of Faster is to provide the fastest dict/set that integrates into the .
 
 Faster is a small robinhood hashmap with minimal memory overhead and incredibly fast runtime speed. See benchmarks, or try it out yourself. Faster.Map evolved from the fact that C# dictionaries in targetframework 4.0 are terribly slow. So i decided to create my own robinhood hashmap, turns out that this hashmap even performs better than the current dictionary written in .net5.
 
+## Get Started
+
+1. Install nuget package Faster.Map to your project.
+```
+dotnet add package Faster.Map
+```
+
 ## How to use
 Faster.Map provides 3 unique hashmaps:
 1. FastMap<Tkey, TValue> is a hashmap  which is highly optimized to be used with numerical keys.
