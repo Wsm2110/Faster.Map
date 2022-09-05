@@ -1,4 +1,4 @@
-# Faster.Map - A collection of Robinhood hashmaps (FastMap, Map, MultiMap)
+# Faster.Map - A collection of Robin hood hashmaps (FastMap, Map, MultiMap)
 
 The goal of Faster is to provide the fastest dict/set that integrates into the .net scientific ecosystem.
 
