@@ -244,15 +244,7 @@ namespace Faster.Map
             int hashcode = key.GetHashCode();
             uint index = (uint)hashcode * Multiplier >> _shift;
 
-            var info = _info[index];
-            if (info.IsEmpty())
-            {
-                //Don't iterate over the entries if unnecessary
-                value = default;
-                return false;
-            }
-
-            uint maxDistance = index + _maxProbeSequenceLength;
+            uint maxDistance = index + _currentProbeSequenceLength;
             for (; index < maxDistance; index += 2)
             {
                 var entry = _entries[index];
@@ -293,7 +285,7 @@ namespace Faster.Map
                 return false;
             }
 
-            var maxDistance = index + _maxProbeSequenceLength;
+            var maxDistance = index + _currentProbeSequenceLength;
 
             for (; index < maxDistance; index += 2)
             {
@@ -337,7 +329,7 @@ namespace Faster.Map
                 return false;
             }
 
-            var maxDistance = index + _maxProbeSequenceLength;
+            var maxDistance = index + _currentProbeSequenceLength;
             for (; index < maxDistance; index += 2)
             {
                 var entry = _entries[index];
@@ -403,7 +395,7 @@ namespace Faster.Map
                 return false;
             }
 
-            var maxDistance = index + _maxProbeSequenceLength;
+            var maxDistance = index + _currentProbeSequenceLength;
             for (; index < maxDistance; index += 2)
             {
                 var entry = _entries[index];
