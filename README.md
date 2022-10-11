@@ -41,7 +41,7 @@ private Map<uint, uint> _map = new Map<uint, uint>(16);
 ``` 
   ### MultiMap Example
 ```C#
-private MultiMap<uin,t uint> _multimap = new Map<uint, uint>(16);
+private MultiMap<uint, uint> _multimap = new Map<uint, uint>(16);
  _multimap.Emplace(1, 50); 
  _multimap.Remove(24, 24);
  _multimap.RemoveAll(1);
