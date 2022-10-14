@@ -10,9 +10,9 @@ namespace Faster.Map
     /// - Open addressing
     /// - Uses linear probing
     /// - Robinhood hashmap
-    /// - Upper limit on the probe sequence lenght(psl) which is Log2(size)   
-    /// - fibonacci hashing
-    /// - only usable with valuetype keys
+    /// - Upper limit on the probe sequence lenght(psl) which is Log2(size)
+    /// - Fibonacci hashing
+    /// - Only usable with valuetype keys
     /// </summary>
     /// <typeparam name="TKey">The type of the key.</typeparam>
     /// <typeparam name="TValue">The type of the value.</typeparam>
@@ -107,7 +107,7 @@ namespace Faster.Map
         private FastEntry<TKey, TValue>[] _entries;
         private uint _maxlookups;
         private readonly double _loadFactor;
-        private const uint Multiplier = 0x9E3779B9; //2654435769;
+        private const uint GoldenRatio = 0x9E3779B9; //2654435769;
         private int _shift = 32;
         private byte _maxProbeSequenceLength;
         private byte _currentProbeSequenceLength;
@@ -119,7 +119,7 @@ namespace Faster.Map
         /// <summary>
         /// Initializes a new instance of the <see cref="Map{TKey,TValue}"/> class.
         /// </summary>
-        public FastMap() : this(16, 0.5d) { }
+        public FastMap() : this(8, 0.5d) { }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Map{TKey, TValue}"/> class.
@@ -135,7 +135,7 @@ namespace Faster.Map
         public FastMap(uint length, double loadFactor)
         {
             //default length is 16
-            _maxlookups = length == 0 ? 16 : length;
+            _maxlookups = length == 0 ? 8 : length;
             _loadFactor = loadFactor;
 
             var size = NextPow2(_maxlookups);
@@ -151,7 +151,7 @@ namespace Faster.Map
         #region Public Methods
 
         /// <summary>
-        /// Inserts the specified value.
+        /// Inserts a value using a key.
         /// </summary>
         /// <param name="key">The key.</param>
         /// <param name="value">The value.</param>
@@ -165,19 +165,30 @@ namespace Faster.Map
             }
 
             var hashcode = key.GetHashCode();
-            uint index = (uint)hashcode * Multiplier >> _shift;
-
-            if (KeyExists(ref key))
-            {
-                return false;
-            }
-
+            uint index = (uint)hashcode * GoldenRatio >> _shift;
+            
             FastEntry<TKey, TValue> insertableFastEntry = default;
             insertableFastEntry.Value = value;
             insertableFastEntry.Key = key;
 
             InfoByte insertableInfo = default;
             insertableInfo.Psl = 0;
+            
+            var info = _info[index];
+            if (info.IsEmpty())
+            {
+                _entries[index] = insertableFastEntry;
+                _info[index] = insertableInfo;
+                ++Count;
+                return true;
+            }
+
+            ++index;
+
+            if (Contains(key))
+            {
+                return false;
+            }
 
             for (; ; ++insertableInfo.Psl, ++index)
             {
@@ -186,7 +197,7 @@ namespace Faster.Map
                     _currentProbeSequenceLength = insertableInfo.Psl;
                 }
 
-                var info = _info[index];
+                info = _info[index];
                 if (info.IsEmpty())
                 {
                     _entries[index] = insertableFastEntry;
@@ -204,6 +215,7 @@ namespace Faster.Map
 
                 if (insertableInfo.Psl == _maxProbeSequenceLength)
                 {
+                    ++Count;
                     IncreaseMaxProbeSequence();
                     Resize();
                     EmplaceInternal(ref insertableFastEntry, ref insertableInfo);
@@ -221,33 +233,43 @@ namespace Faster.Map
         [MethodImpl(256)]
         public bool Get(TKey key, out TValue value)
         {
+            //Get object identity hashcode
             var hashcode = key.GetHashCode();
-            uint index = (uint)hashcode * Multiplier >> _shift;
 
-            var info = _info[index];
-            if (info.IsEmpty())
-            {
-                //Dont unnecessary iterate over the entries
-                value = default;
-                return false;
-            }
+            // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
+            uint index = (uint)hashcode * GoldenRatio >> _shift;
 
+            //Determine max distance
             var maxDistance = index + _currentProbeSequenceLength;
+
             do
             {
+                //unrolling loop twice seems to give a minor speedboost
                 var entry = _entries[index];
+
+                //validate hashcode
                 if (hashcode == entry.Key.GetHashCode())
                 {
                     value = entry.Value;
                     return true;
                 }
 
-                ++index;
+                //increase index by 1
+                entry = _entries[++index];
 
-            } while (index <= maxDistance);
+                //validate hashcode
+                if (hashcode == entry.Key.GetHashCode())
+                {
+                    value = entry.Value;
+                    return true;
+                }
+
+                //increase index by one and validate if within bounds
+            } while (++index <= maxDistance);
+
 
             value = default;
-            return default;
+            return false;
         }
 
         /// <summary>
@@ -259,53 +281,67 @@ namespace Faster.Map
         [MethodImpl(256)]
         public bool Update(TKey key, TValue value)
         {
+            //Get object identity hashcode
             var hashcode = key.GetHashCode();
-            uint index = (uint)hashcode * Multiplier >> _shift;
 
-            var info = _info[index];
-            if (info.IsEmpty())
-            {
-                //Don't iterate over the entries if unnecessary
-                return false;
-            }
+            //Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
+            uint index = (uint)hashcode * GoldenRatio >> _shift;
 
+            //Determine max distance
             var maxDistance = index + _currentProbeSequenceLength;
+
             do
             {
+                //unrolling loop twice seems to give a minor speedboost
                 var entry = _entries[index];
+
+                //validate hashcode
                 if (hashcode == entry.Key.GetHashCode())
                 {
                     _entries[index].Value = value;
                     return true;
                 }
-            } while (++index <= maxDistance);
 
+                //increase index by 1
+                entry = _entries[++index];
+
+                //validate hashcode
+                if (hashcode == entry.Key.GetHashCode())
+                {
+                    _entries[index].Value = value;
+                    return true;
+                }
+
+                //increase index by one and validate if within bounds
+            } while (++index <= maxDistance);
+            
+            //entry not found
             return false;
         }
 
         /// <summary>
-        /// Removes the current entry using a backshift removal
+        /// Removes entry using a backshift removal
         /// </summary>
         /// <param name="key">The key.</param>
-        /// <returns></returns>
+        /// <returns>Operation succeeded yes or no</returns>
         [MethodImpl(256)]
         public bool Remove(TKey key)
         {
+            //Get ObjectIdentity hashcode
             int hashcode = key.GetHashCode();
-            uint index = (uint)hashcode * Multiplier >> _shift;
-            var info = _info[index];
-            if (info.IsEmpty())
-            {
-                // Don't iterate over the entries if unnecessary
-                return false;
-            }
 
-            //delete entry
+            //Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
+            uint index = (uint)hashcode * GoldenRatio >> _shift;
+
+            //Determine max distance
             var maxDistance = index + _currentProbeSequenceLength;
 
-            for (; index <= maxDistance; ++index)
+            do
             {
+                //unrolling loop twice seems to give a minor speedboost
                 var entry = _entries[index];
+
+                //validate hash
                 if (hashcode == entry.Key.GetHashCode())
                 {
                     //remove entry from list
@@ -315,8 +351,25 @@ namespace Faster.Map
                     ShiftRemove(index);
                     return true;
                 }
-            }
 
+                //increase index by 1
+                entry = _entries[++index];
+
+                //validate hash
+                if (hashcode == entry.Key.GetHashCode())
+                {
+                    //remove entry from list
+                    _entries[index] = default;
+                    _info[index] = default;
+                    --Count;
+                    ShiftRemove(index);
+                    return true;
+                }
+
+                //increase index by one and validate if within bounds
+            } while (++index <= maxDistance);
+
+            // No entries removed
             return false;
         }
 
@@ -328,27 +381,38 @@ namespace Faster.Map
         ///   <c>true</c> if the specified key contains key; otherwise, <c>false</c>.
         /// </returns>
         [MethodImpl(256)]
-        public bool ContainsKey(TKey key)
+        public bool Contains(TKey key)
         {
+            //Get ObjectIdentity hashcode
             int hashcode = key.GetHashCode();
-            uint index = (uint)hashcode * Multiplier >> _shift;
 
-            var info = _info[index];
-            if (info.IsEmpty())
-            {
-                //Don't iterate over the entries if unnecessary
-                return false;
-            }
+            //Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
+            uint index = (uint)hashcode * GoldenRatio >> _shift;
 
+            //Determine max distance
             var maxDistance = index + _currentProbeSequenceLength;
+
             do
             {
+                //unrolling loop twice seems to give a minor speedboost
                 var entry = _entries[index];
+
+                //validate hash
                 if (hashcode == entry.Key.GetHashCode())
                 {
                     return true;
                 }
 
+                //increase index by 1
+                entry = _entries[++index];
+
+                //validate hash
+                if (hashcode == entry.Key.GetHashCode())
+                {
+                    return true;
+                }
+
+                //increase index by one and validate if within bounds
             } while (++index <= maxDistance);
 
 
@@ -359,6 +423,7 @@ namespace Faster.Map
         /// Copies all entries from source to target
         /// </summary>
         /// <param name="fastMap">The fast map.</param>
+        [MethodImpl(256)]
         public void Copy(FastMap<TKey, TValue> fastMap)
         {
             for (var i = 0; i < fastMap._entries.Length; i++)
@@ -379,6 +444,7 @@ namespace Faster.Map
         /// </summary>
         /// <param name="key">The key.</param>
         /// <returns></returns>
+        [MethodImpl(256)]
         public int IndexOf(TKey key)
         {
             var hashcode = key.GetHashCode();
@@ -396,11 +462,12 @@ namespace Faster.Map
                 }
             }
 
+            //Return -1 which indicates not found
             return -1;
         }
 
         /// <summary>
-        /// Clears this instance.
+        /// Set default state of all entries
         /// </summary>
         public void Clear()
         {
@@ -450,39 +517,30 @@ namespace Faster.Map
 
         #region Private Methods
 
-        [MethodImpl(256)]
-        private bool KeyExists(ref TKey key)
-        {
-            return Get(key, out _);
-        }
-
         /// <summary>
-        /// Shift remove will shift all entries forward until there is an empty entry
+        /// Shift remove will shift all entries backwards until there is an empty entry
         /// </summary>
         /// <param name="index">The index.</param>
+        [MethodImpl(256)]
         private void ShiftRemove(uint index)
         {
-        Start:
-
+            //Get next entry
             var next = _info[index + 1];
-            if (next.IsEmpty())
+
+            while (!next.IsEmpty() && next.Psl != 0)
             {
-                return;
+                //swap upper entry with lower
+                Swap(ref _entries[index + 1], ref _entries[index]);
+
+                //decrease psl by 1
+                _info[index + 1].Psl--;
+
+                //swap upper info with lower
+                Swap(ref _info[index + 1], ref _info[index]);
+
+                //increase index by one
+                next = _info[++index];
             }
-
-            if (next.Psl == 0)
-            {
-                return;
-            }
-
-            Swap(ref _entries[index + 1], ref _entries[index]);
-            _info[index + 1].Psl--;
-            Swap(ref _info[index + 1], ref _info[index]);
-
-            ++index;
-#pragma warning disable S907 // "goto" statement should not be used
-            goto Start;
-#pragma warning restore S907 // "goto" statement should not be used
         }
 
         /// <summary>
@@ -494,7 +552,17 @@ namespace Faster.Map
         private void EmplaceInternal(ref FastEntry<TKey, TValue> entry, ref InfoByte meta)
         {
             var hashcode = entry.Key.GetHashCode();
-            uint index = (uint)hashcode * Multiplier >> _shift;
+            uint index = (uint)hashcode * GoldenRatio >> _shift;
+
+            var info = _info[index];
+            if (info.IsEmpty())
+            {
+                _entries[index] = entry;
+                _info[index] = meta;
+                return;
+            }
+
+            ++index;
 
             meta.Psl = 0;
 
@@ -505,12 +573,11 @@ namespace Faster.Map
                     _currentProbeSequenceLength = meta.Psl;
                 }
 
-                var info = _info[index];
+                info = _info[index];
                 if (info.IsEmpty())
                 {
                     _entries[index] = entry;
                     _info[index] = meta;
-                    ++Count;
                     return;
                 }
 
@@ -550,6 +617,7 @@ namespace Faster.Map
         /// </summary>
         /// <param name="x">The x.</param>
         /// <param name="y">The y.</param>
+        [MethodImpl(256)]
         private void Swap(ref FastEntry<TKey, TValue> x, ref FastEntry<TKey, TValue> y)
         {
             var tmp = x;
@@ -562,52 +630,51 @@ namespace Faster.Map
         /// </summary>
         /// <param name="x">The x.</param>
         /// <param name="y">The y.</param>
+        [MethodImpl(256)]
         private void Swap(ref InfoByte x, ref InfoByte y)
         {
             var tmp = x;
-
             x = y;
             y = tmp;
         }
 
         /// <summary>
-        /// Returns a power of two probe sequence length
+        /// Returns a power of two probe sequence lengthzz
         /// </summary>
         /// <param name="size">The size.</param>
         /// <returns></returns>
         [MethodImpl(256)]
 #pragma warning disable S1541 // Methods and properties should not be too complex
         private byte PslLimit(uint size)
-
         {
             switch (size)
             {
-                case 16: return 6;
-                case 32: return 8;
-                case 64: return 12;
-                case 128: return 16;
-                case 256: return 20;
-                case 512: return 24;
-                case 1024: return 32;
-                case 2048: return 36;
-                case 4096: return 40;
-                case 8192: return 50;
-                case 16384: return 60;
-                case 32768: return 65;
-                case 65536: return 70;
-                case 131072: return 75;
-                case 262144: return 80;
-                case 524288: return 85;
-                case 1048576: return 90;
-                case 2097152: return 94;
-                case 4194304: return 98;
-                case 8388608: return 102;
-                case 16777216: return 104;
-                case 33554432: return 108;
-                case 67108864: return 112;
-                case 134217728: return 116;
-                case 268435456: return 120;
-                case 536870912: return 124;
+                case 16: return 4;
+                case 32: return 5;
+                case 64: return 6;
+                case 128: return 7;
+                case 256: return 8;
+                case 512: return 9;
+                case 1024: return 12;
+                case 2048: return 15;
+                case 4096: return 20;
+                case 8192: return 25;
+                case 16384: return 30;
+                case 32768: return 35;
+                case 65536: return 40;
+                case 131072: return 45;
+                case 262144: return 50;
+                case 524288: return 55;
+                case 1048576: return 60;
+                case 2097152: return 65;
+                case 4194304: return 70;
+                case 8388608: return 75;
+                case 16777216: return 80;
+                case 33554432: return 85;
+                case 67108864: return 90;
+                case 134217728: return 95;
+                case 268435456: return 100;
+                case 536870912: return 105;
                 default: return 10;
             }
         }
@@ -630,9 +697,7 @@ namespace Faster.Map
 
             _entries = new FastEntry<TKey, TValue>[_maxlookups + _maxProbeSequenceLength + 1];
             _info = new InfoByte[_maxlookups + _maxProbeSequenceLength + 1];
-
-            Count = 0;
-
+            
             for (var i = 0; i < oldEntries.Length; i++)
             {
                 var info = oldInfo[i];
