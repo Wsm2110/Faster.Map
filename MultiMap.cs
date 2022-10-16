@@ -1,15 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using Faster.Map.Core;
 
-namespace NL.MinDef.LandIT.Utilities.Collections.Hashmap
+namespace Faster.Map
 {
     /// <summary>
     /// This hashmap uses the following
     /// - Open addressing
     /// - Uses linear probing
     /// - Robing hood hash
-    /// - Upper limit on the probe sequence lenght(psl) which is Log2(size) 
+    /// - Upper limit on the probe sequence lenght(psl) which is Log2(size)
+    /// - Keeps track of the current probe count used
     /// - Multiple values can be inserted with the same key, minor drawback is that only 127 values can be added with the same key
     /// - fibonacci hashing
     /// </summary>
@@ -21,15 +23,15 @@ namespace NL.MinDef.LandIT.Utilities.Collections.Hashmap
 
         private uint _maxlookups;
         private readonly double _loadFactor;
-        private const uint Multiplier = 0x9E3779B9; //2654435769;
+        private const uint GoldenRatio = 0x9E3779B9; //2654435769;
         private int _shift = 32;
         private byte _maxProbeSequenceLength;
         private byte _currentProbeSequenceLength;
-        private readonly IEqualityComparer<TKey> _keyComparer;
+        private readonly IEqualityComparer<TKey> _keyCompare;
         private readonly IEqualityComparer<TValue> _valueComparer;
 
-        private MetaByte[] _info;
-        private MultiEntry<TKey, TValue>[] _entries;
+        private InfoByte[] _info;
+        private Entry<TKey, TValue>[] _entries;
         #endregion
 
         #region Properties
@@ -40,7 +42,7 @@ namespace NL.MinDef.LandIT.Utilities.Collections.Hashmap
         /// <value>
         /// The entry count.
         /// </value>
-        public uint Count { get; private set; }
+        public int Count { get; private set; }
 
         /// <summary>
         /// Returns all the entries as KeyValuePair objects
@@ -149,14 +151,14 @@ namespace NL.MinDef.LandIT.Utilities.Collections.Hashmap
             _loadFactor = loadFactor;
 
             var size = NextPow2(_maxlookups);
-            _maxProbeSequenceLength = length < 127 ? Log2(size) : (byte)127;
+            _maxProbeSequenceLength = loadFactor <= 0.5 ? Log2(size) : (byte)127;
 
-            _keyComparer = keyComparer ?? EqualityComparer<TKey>.Default;
+            _keyCompare = keyComparer ?? EqualityComparer<TKey>.Default;
             _valueComparer = valueComparer ?? EqualityComparer<TValue>.Default;
 
             _shift = _shift - Log2(_maxlookups) + 1;
-            _entries = new MultiEntry<TKey, TValue>[_maxlookups + _maxProbeSequenceLength + 1];
-            _info = new MetaByte[_maxlookups + _maxProbeSequenceLength + 1];
+            _entries = new Entry<TKey, TValue>[_maxlookups + _maxProbeSequenceLength + 1];
+            _info = new InfoByte[_maxlookups + _maxProbeSequenceLength + 1];
         }
 
         #endregion
@@ -170,77 +172,83 @@ namespace NL.MinDef.LandIT.Utilities.Collections.Hashmap
         /// <param name="value">The value.</param>
         /// <returns></returns>
         [MethodImpl(256)]
-#pragma warning disable S3776 // Cognitive Complexity of methods should not be too high
         public bool Emplace(TKey key, TValue value)
         {
+            //Resize if loadfactor is reached
             if ((double)Count / _maxlookups > _loadFactor)
             {
                 Resize();
             }
 
+            //Get object identity hashcode
             var hashcode = key.GetHashCode();
-            uint index = (uint)hashcode * Multiplier >> _shift;
 
-            if (ContainsKey(key, value))
+            // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
+            uint index = (uint)hashcode * GoldenRatio >> _shift;
+
+            //check if key is unique
+            if (Contains(key, value))
             {
                 return false;
             }
 
-            MultiEntry<TKey, TValue> entry = default;
+            //create entry
+            Entry<TKey, TValue> entry = default;
             entry.Value = value;
             entry.Key = key;
+            entry.Hashcode = hashcode;
 
-            MetaByte metadata = default;
-            metadata.Psl = 0;
-            metadata.Hashcode = hashcode;
+            //Create default info byte
+            InfoByte current = default;
 
-            for (; ; ++metadata.Psl, ++index)
+            //Assign 0 to psl so it wont be seen as empty
+            current.Psl = 0;
+
+            //retrieve infobyte
+            var info = _info[index];
+
+            do
             {
-                if (_currentProbeSequenceLength < metadata.Psl)
-                {
-                    _currentProbeSequenceLength = metadata.Psl;
-                }
-
-                var info = _info[index];
+                //Empty spot, add entry
                 if (info.IsEmpty())
                 {
                     _entries[index] = entry;
-                    _info[index] = metadata;
+                    _info[index] = current;
                     ++Count;
                     return true;
                 }
 
-                if (info.Hashcode == metadata.Hashcode)
+                //Steal from the rich, give to the poor
+                if (current.Psl > info.Psl)
                 {
-                    ++Count;
-                    //make sure same hashcodes are next to eachother
-                    StartSwapping(index, ref entry, ref metadata);
-                    return true;
-                }
-
-                if (metadata.Psl > info.Psl)
-                {
-                    //steal from the rich, give to the poor
                     Swap(ref entry, ref _entries[index]);
-                    Swap(ref metadata, ref _info[index]);
+                    Swap(ref current, ref _info[index]);
                     continue;
                 }
 
-                if (metadata.Psl == _maxProbeSequenceLength)
+                //Increase _current probe sequence
+                if (_currentProbeSequenceLength < current.Psl)
                 {
-                    if (metadata.Psl == 127)
-                    {
-                        throw new MultiMapException("Only 127 values can be stored with 1 unique key. Since psl is a byte and we use 1 bit the indicate if this struct is empty, it leaves us with 127, hence the max entries stored with the same key is 127");
-                    }
+                    _currentProbeSequenceLength = current.Psl;
+                }
 
+                //max psl is reached, resize
+                if (current.Psl == _maxProbeSequenceLength)
+                {
+                    ++Count;
                     Resize();
-                    //Make sure after a resize to insert the current entry
-                    EmplaceInternal(ref entry, ref metadata);
+                    EmplaceInternal(entry, current);
                     return true;
                 }
-            }
+
+                //increase index
+                info = _info[++index];
+
+                //increase probe sequence length
+                ++current.Psl;
+
+            } while (true);
         }
-#pragma warning restore S3776 // Cognitive Complexity of methods should not be too high
 
         /// <summary>
         /// Swap all entries until there is an empty entry
@@ -248,39 +256,39 @@ namespace NL.MinDef.LandIT.Utilities.Collections.Hashmap
         /// <param name="index">The index.</param>
         /// <param name="entry">The entry.</param>
         /// <param name="data">The data.</param>
-        private void StartSwapping(uint index, ref MultiEntry<TKey, TValue> entry, ref MetaByte data)
-        {
-        Start:
+        //        private void StartSwapping(uint index, ref MultiEntry<TKey, TValue> entry, ref MetaByte data)
+        //        {
+        //        Start:
 
-            if (data.IsEmpty())
-            {
-                return;
-            }
+        //            if (data.IsEmpty())
+        //            {
+        //                return;
+        //            }
 
-            ++data.Psl;
+        //            ++data.Psl;
 
-            if (index == _maxlookups)
-            {
-                Resize();
-                EmplaceInternal(ref entry, ref data);
-                return;
-            }
+        //            if (index == _maxlookups)
+        //            {
+        //                Resize();
+        //                EmplaceInternal(entry, data);
+        //                return;
+        //            }
 
-            if (_currentProbeSequenceLength < data.Psl)
-            {
-                _currentProbeSequenceLength = data.Psl;
-            }
+        //            if (_currentProbeSequenceLength < data.Psl)
+        //            {
+        //                _currentProbeSequenceLength = data.Psl;
+        //            }
 
-            //swap lower with upper
-            Swap(ref entry, ref _entries[index + 1]);
-            Swap(ref data, ref _info[index + 1]);
+        //            //swap lower with upper
+        //            Swap(ref entry, ref _entries[index + 1]);
+        //            Swap(ref data, ref _info[index + 1]);
 
-            ++index;
+        //            ++index;
 
-#pragma warning disable S907 // "goto" statement should not be used
-            goto Start;
-#pragma warning restore S907 // "goto" statement should not be used
-        }
+        //#pragma warning disable S907 // "goto" statement should not be used
+        //            goto Start;
+        //#pragma warning restore S907 // "goto" statement should not be used
+        //        }
 
         /// <summary>
         /// Gets the first entry matching the specified key.
@@ -290,56 +298,45 @@ namespace NL.MinDef.LandIT.Utilities.Collections.Hashmap
         /// <param name="value">The value.</param>
         /// <returns></returns>
         [MethodImpl(256)]
-        public unsafe bool Get(TKey key, out TValue value)
+        public bool Get(TKey key, out TValue value)
         {
-            int hashcode = key.GetHashCode();
-            uint index = (uint)hashcode * Multiplier >> _shift;
+            //Get object identity hashcode
+            var hashcode = key.GetHashCode();
 
-            fixed (MetaByte* ptr = &_info[index])
+            // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
+            uint index = (uint)hashcode * GoldenRatio >> _shift;
+
+            //Determine max distance
+            var maxDistance = index + _currentProbeSequenceLength;
+
+            do
             {
-                MetaByte* p = ptr;
+                //unrolling loop twice seems to give a minor speedboost
+                var entry = _entries[index];
 
-                if (p->IsEmpty())
+                //validate hashcode
+                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key))
                 {
-                    value = default;
-                    return false;
+                    value = entry.Value;
+                    return true;
                 }
 
-                var maxDistance = index + _currentProbeSequenceLength;
-                byte exit = 0;
-                do
+                //increase index by 1
+                entry = _entries[++index];
+
+                //validate hashcode
+                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key))
                 {
-                    var entry = _entries[index];
-                    if (p->Hashcode == hashcode)
-                    {
-                        exit = 1;
-                        if (_keyComparer.Equals(entry.Key, key))
-                        {
-                            value = entry.Value;
-                            return true;
-                        }
+                    value = entry.Value;
+                    return true;
+                }
 
-#pragma warning disable S907 // "goto" statement should not be used
-                        goto Next;
-#pragma warning restore S907 // "goto" statement should not be used
-                    }
-
-                    if (exit == 1)
-                    {
-                        value = default;
-                        return true;
-                    }
-
-                Next:
-                    ++index;
-                    ++p;
-
-                    //127 is the max allowed probe sequence length
-                } while (index <= maxDistance && !p->IsEmpty());
-            }
-
+                //increase index by one and validate if within bounds
+            } while (++index <= maxDistance);
 
             value = default;
+
+            //not found
             return false;
         }
 
@@ -350,41 +347,37 @@ namespace NL.MinDef.LandIT.Utilities.Collections.Hashmap
         /// <returns></returns>
         public IEnumerable<TValue> GetAll(TKey key)
         {
-            int hashcode = key.GetHashCode();
-            uint index = (uint)hashcode * Multiplier >> _shift;
+            //Get object identity hashcode
+            var hashcode = key.GetHashCode();
 
-            var info = _info[index];
-            if (info.IsEmpty())
-            {
-                yield break;
-            }
+            // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
+            uint index = (uint)hashcode * GoldenRatio >> _shift;
 
+            //Determine max distance
             var maxDistance = index + _currentProbeSequenceLength;
-            byte exit = 0;
+
             do
             {
-                if (hashcode == info.Hashcode)
-                {
-                    exit = 1;
-                    var entry = _entries[index];
-                    if (_keyComparer.Equals(entry.Key, key))
-                    {
-                        yield return entry.Value;
-                    }
+                //unrolling loop twice seems to give a minor speedboost
+                var entry = _entries[index];
 
-#pragma warning disable S907 // "goto" statement should not be used
-                    goto Next;
-#pragma warning restore S907 // "goto" statement should not be used
+                //validate hashcode
+                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key))
+                {
+                    yield return entry.Value;
                 }
 
-                if (exit == 1)
+                //increase index by 1
+                entry = _entries[++index];
+
+                //validate hashcode
+                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key))
                 {
-                    yield break;
+                    yield return entry.Value;
                 }
 
-            Next:
-                info = _info[++index];
-            } while (index <= maxDistance && !info.IsEmpty());
+                //increase index by one and validate if within bounds
+            } while (++index <= maxDistance);
         }
 
         /// <summary>
@@ -397,99 +390,41 @@ namespace NL.MinDef.LandIT.Utilities.Collections.Hashmap
         [MethodImpl(256)]
         public bool Update(TKey key, TValue oldValue, Func<TValue, TValue> newValue)
         {
-            int hashcode = key.GetHashCode();
-            uint index = (uint)hashcode * Multiplier >> _shift;
+            //Get object identity hashcode
+            var hashcode = key.GetHashCode();
 
-            var info = _info[index];
-            if (info.IsEmpty())
-            {
-                return false;
-            }
+            //Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
+            uint index = (uint)hashcode * GoldenRatio >> _shift;
 
+            //Determine max distance
             var maxDistance = index + _currentProbeSequenceLength;
-            byte exit = 0;
 
             do
             {
-                if (hashcode == info.Hashcode)
-                {
-                    exit = 1;
-                    var entry = _entries[index];
-                    if (_keyComparer.Equals(entry.Key, key) && _valueComparer.Equals(oldValue, entry.Value))
-                    {
-                        entry.Value = newValue(entry.Value);
-                        _entries[index] = entry;
-                        return true;
-                    }
+                //unrolling loop twice seems to give a minor speedboost
+                var entry = _entries[index];
 
-#pragma warning disable S907 // "goto" statement should not be used
-                    goto Next;
-#pragma warning restore S907 // "goto" statement should not be used
+                //validate hashcode
+                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key) && _valueComparer.Equals(oldValue, entry.Value))
+                {
+                    _entries[index].Value = newValue(entry.Value);
+                    return true;
                 }
 
-                if (exit == 1)
+                //increase index by 1
+                entry = _entries[++index];
+
+                //validate hashcode
+                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key) && _valueComparer.Equals(oldValue, entry.Value))
                 {
-                    return false;
+                    _entries[index].Value = newValue(entry.Value);
+                    return true;
                 }
 
-            Next:
-                info = _info[++index];
+                //increase index by one and validate if within bounds
+            } while (++index <= maxDistance);
 
-            } while (index <= maxDistance && !info.IsEmpty());
-
-            return false;
-        }
-
-        /// <summary>
-        /// Swap old value with new value
-        /// </summary>
-        /// <param name="key">The key.</param>
-        /// <param name="oldValue">The old value.</param>
-        /// <param name="newValue">The new value.</param>
-        /// <returns></returns>
-        [MethodImpl(256)]
-        public bool Swap(TKey key, TValue oldValue, TValue newValue)
-        {
-            int hashcode = key.GetHashCode();
-            uint index = (uint)hashcode * Multiplier >> _shift;
-
-            var info = _info[index];
-            if (info.IsEmpty())
-            {
-                return false;
-            }
-
-            var maxDistance = index + _currentProbeSequenceLength;
-            byte exit = 0;
-
-            do
-            {
-                if (hashcode == info.Hashcode)
-                {
-                    exit = 1;
-                    var entry = _entries[index];
-                    if (_keyComparer.Equals(entry.Key, key) && _valueComparer.Equals(oldValue, entry.Value))
-                    {
-                        entry.Value = newValue;
-                        _entries[index] = entry;
-                        return true;
-                    }
-
-#pragma warning disable S907 // "goto" statement should not be used
-                    goto Next;
-#pragma warning restore S907 // "goto" statement should not be used
-                }
-
-                if (exit == 1)
-                {
-                    return false;
-                }
-
-            Next:
-                info = _info[++index];
-
-            } while (index <= maxDistance && !info.IsEmpty());
-
+            //entry not found
             return false;
         }
 
@@ -501,97 +436,52 @@ namespace NL.MinDef.LandIT.Utilities.Collections.Hashmap
         /// <returns></returns>
         public bool Remove(TKey key, TValue value)
         {
+            //Get ObjectIdentity hashcode
             int hashcode = key.GetHashCode();
-            uint index = (uint)hashcode * Multiplier >> _shift;
 
-            var info = _info[index];
-            if (info.IsEmpty())
-            {
-                return false;
-            }
+            //Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
+            uint index = (uint)hashcode * GoldenRatio >> _shift;
 
-            uint maxDistance = index + _currentProbeSequenceLength;
-            byte exit = 0;
-            do
-            {
-                if (hashcode == info.Hashcode)
-                {
-                    exit = 1;
-                    var entry = _entries[index];
-                    if (_keyComparer.Equals(entry.Key, key) && _valueComparer.Equals(entry.Value, value))
-                    {
-                        _entries[index] = default; // clear entry
-                        _info[index] = default; //clear metadata
-                        --Count;
-                        ShiftRemove(index);
-                        return true;
-                    }
-
-#pragma warning disable S907 // "goto" statement should not be used
-                    goto Next;
-#pragma warning restore S907 // "goto" statement should not be used
-                }
-
-                if (exit == 1)
-                {
-                    return false;
-                }
-
-            Next:
-                info = _info[++index];
-            } while (index <= maxDistance && !info.IsEmpty());
-
-            return false;
-        }
-
-        /// <summary>
-        /// Removes all entries matching key.
-        /// </summary>
-        /// <param name="key">The key.</param>
-        /// <returns></returns>
-        public bool RemoveAll(TKey key)
-        {
-            int hashcode = key.GetHashCode();
-            uint index = (uint)hashcode * Multiplier >> _shift;
-
-            var info = _info[index];
-            if (info.IsEmpty())
-            {
-                return true;
-            }
-
-            byte removed = 0;
+            //Determine max distance
             var maxDistance = index + _currentProbeSequenceLength;
 
             do
             {
-                if (hashcode == info.Hashcode)
+                //unrolling loop twice seems to give a minor speedboost
+                var entry = _entries[index];
+
+                //validate hash en compare keys
+                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key) && _valueComparer.Equals(value, entry.Value))
                 {
-                    var entry = _entries[index];
-                    if (_keyComparer.Equals(entry.Key, key))
-                    {
-                        removed = 1;
-                        _entries[index] = default;
-                        _info[index] = default;
-                        --Count;
-
-                        if (ShiftRemove(index))
-                        {
-                            info = _info[index];
-                            --maxDistance;
-                            continue;
-                        }
-
-                        break;
-                    }
+                    //remove entry from list
+                    _entries[index] = default;
+                    _info[index] = default;
+                    --Count;
+                    ShiftRemove(index);
+                    return true;
                 }
 
-                info = _info[++index];
+                //increase index by 1
+                entry = _entries[++index];
 
-            } while (index <= maxDistance && !info.IsEmpty());
+                //validate hash and compare keys
+                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key) && _valueComparer.Equals(value, entry.Value))
+                {
+                    //remove entry from list
+                    _entries[index] = default;
+                    _info[index] = default;
+                    --Count;
+                    ShiftRemove(index);
+                    return true;
+                }
 
-            return removed == 1;
+                //increase index by one and validate if within bounds
+            } while (++index <= maxDistance);
+
+            // No entries removed
+            return false;
         }
+
         /// <summary>
         /// Determines whether the specified key is already inserted in the map
         /// </summary>
@@ -600,45 +490,49 @@ namespace NL.MinDef.LandIT.Utilities.Collections.Hashmap
         ///   <c>true</c> if the specified key contains key; otherwise, <c>false</c>.
         /// </returns>
         [MethodImpl(256)]
-        public bool ContainsKey(TKey key)
+        public bool Contains(TKey key, TValue value)
         {
+            //Get ObjectIdentity hashcode
             int hashcode = key.GetHashCode();
-            uint index = (uint)hashcode * Multiplier >> _shift;
 
+            //Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
+            uint index = (uint)hashcode * GoldenRatio >> _shift;
+
+            //backout early
             var info = _info[index];
             if (info.IsEmpty())
             {
+                //Dont unnecessary iterate over the entries
                 return false;
             }
 
+            //Determine max distance
             var maxDistance = index + _currentProbeSequenceLength;
 
-            byte exit = 0;
             do
             {
-                if (hashcode == info.Hashcode)
-                {
-                    exit = 1;
-                    if (_keyComparer.Equals(_entries[index].Key, key))
-                    {
-                        return true;
-                    }
+                //unrolling loop twice seems to give a minor speedboost
+                var entry = _entries[index];
 
-#pragma warning disable S907 // "goto" statement should not be used
-                    goto Next;
-#pragma warning restore S907 // "goto" statement should not be used
+                //validate hash
+                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key) && _valueComparer.Equals(value, entry.Value))
+                {
+                    return true;
                 }
 
-                if (exit == 1)
+                //increase index by 1
+                entry = _entries[++index];
+
+                //validate hash
+                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key))
                 {
-                    return false;
+                    return true;
                 }
 
-            Next:
-                info = _info[++index];
+                //increase index by one and validate if within bounds
+            } while (++index <= maxDistance);
 
-            } while (index <= maxDistance && !info.IsEmpty());
-
+            //not found
             return false;
         }
 
@@ -646,51 +540,54 @@ namespace NL.MinDef.LandIT.Utilities.Collections.Hashmap
         /// Determines whether the specified key and value exists
         /// </summary>
         /// <param name="key">The key.</param>
-        /// <param name="value">The value.</param>
+       
         /// <returns>
         ///   <c>true</c> if the specified key contains key; otherwise, <c>false</c>.
         /// </returns>
         [MethodImpl(256)]
-        public bool ContainsKey(TKey key, TValue value)
+        public bool Contains(TKey key)
         {
+            //Get ObjectIdentity hashcode
             int hashcode = key.GetHashCode();
-            uint index = (uint)hashcode * Multiplier >> _shift;
 
+            //Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
+            uint index = (uint)hashcode * GoldenRatio >> _shift;
+
+            //backout early
             var info = _info[index];
             if (info.IsEmpty())
             {
+                //Dont unnecessary iterate over the entries
                 return false;
             }
 
+            //Determine max distance
             var maxDistance = index + _currentProbeSequenceLength;
 
-            byte exit = 0;
             do
             {
-                if (hashcode == info.Hashcode)
-                {
-                    exit = 1;
-                    var entry = _entries[index];
-                    if (_keyComparer.Equals(entry.Key, key) && _valueComparer.Equals(entry.Value, value))
-                    {
-                        return true;
-                    }
+                //unrolling loop twice seems to give a minor speedboost
+                var entry = _entries[index];
 
-#pragma warning disable S907 // "goto" statement should not be used
-                    goto Next;
-#pragma warning restore S907 // "goto" statement should not be used
+                //validate hash
+                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key))
+                {
+                    return true;
                 }
 
-                if (exit == 1)
+                //increase index by 1
+                entry = _entries[++index];
+
+                //validate hash
+                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key))
                 {
-                    return false;
+                    return true;
                 }
 
-            Next:
-                info = _info[++index];
+                //increase index by one and validate if within bounds
+            } while (++index <= maxDistance);
 
-            } while (index <= maxDistance && !info.IsEmpty());
-
+            //not found
             return false;
         }
 
@@ -710,7 +607,8 @@ namespace NL.MinDef.LandIT.Utilities.Collections.Hashmap
                     continue;
                 }
 
-                if (info.Hashcode == hashcode && _keyComparer.Equals(key, _entries[i].Key))
+                var entry = _entries[i];
+                if (entry.Hashcode == hashcode && _keyCompare.Equals(key, entry.Key))
                 {
                     return i;
                 }
@@ -765,37 +663,25 @@ namespace NL.MinDef.LandIT.Utilities.Collections.Hashmap
         /// </summary>
         /// <param name="index">The index.</param>
         [MethodImpl(256)]
-        private bool ShiftRemove(uint index)
+        private void ShiftRemove(uint index)
         {
-            bool shifted = false;
+            //Get next entry
+            var next = _info[++index];
 
-        Start:
-
-            var metaByte = _info[index + 1];
-            if (metaByte.IsEmpty())
+            while (!next.IsEmpty() && next.Psl != 0)
             {
-                return shifted;
+                //swap upper entry with lower
+                Swap(ref _entries[index], ref _entries[index - 1]);
+
+                //decrease next psl by 1
+                _info[index].Psl--;
+
+                //swap upper info with lower
+                Swap(ref _info[index], ref _info[index - 1]);
+
+                //increase index by one
+                next = _info[++index];
             }
-
-            if (metaByte.Psl == 0)
-            {
-                return shifted;
-            }
-
-            //swap upper with lower
-            Swap(ref _entries[index + 1], ref _entries[index]);
-
-            _info[index + 1].Psl--;
-
-            Swap(ref _info[index + 1], ref _info[index]);
-
-            ++index;
-
-            shifted = true;
-
-#pragma warning disable S907 // "goto" statement should not be used
-            goto Start;
-#pragma warning restore S907 // "goto" statement should not be used
         }
 
         /// <summary>
@@ -842,16 +728,16 @@ namespace NL.MinDef.LandIT.Utilities.Collections.Hashmap
         {
             _shift--;
             _maxlookups = NextPow2(_maxlookups + 1);
-            _maxProbeSequenceLength = _maxlookups < 127 ? Log2(_maxlookups) : (byte)127;
-
-            var oldEntries = new MultiEntry<TKey, TValue>[_entries.Length];
+            _maxProbeSequenceLength = _loadFactor <= 0.5 ? Log2(_maxlookups) : PslLimit(_maxlookups);
+            
+            var oldEntries = new Entry<TKey, TValue>[_entries.Length];
             Array.Copy(_entries, oldEntries, _entries.Length);
 
-            var oldInfo = new MetaByte[_entries.Length];
+            var oldInfo = new InfoByte[_entries.Length];
             Array.Copy(_info, oldInfo, _info.Length);
 
-            _entries = new MultiEntry<TKey, TValue>[_maxlookups + _maxProbeSequenceLength + 1];
-            _info = new MetaByte[_maxlookups + _maxProbeSequenceLength + 1];
+            _entries = new Entry<TKey, TValue>[_maxlookups + _maxProbeSequenceLength + 1];
+            _info = new InfoByte[_maxlookups + _maxProbeSequenceLength + 1];
 
             Count = 0;
 
@@ -863,69 +749,100 @@ namespace NL.MinDef.LandIT.Utilities.Collections.Hashmap
                     continue;
                 }
 
-                EmplaceInternal(ref oldEntries[i], ref info);
+                EmplaceInternal(oldEntries[i], info);
             }
         }
+
+        /// <summary>
+        /// PSLs the limit.
+        /// </summary>
+        /// <param name="size">The size.</param>
+        /// <returns></returns>
+        [MethodImpl(256)]
+        private byte PslLimit(uint size)
+        {
+            switch (size)
+            {
+                case 16: return 6;
+                case 32: return 8;
+                case 64: return 12;
+                case 128: return 16;
+                case 256: return 20;
+                case 512: return 24;
+                case 1024: return 32;
+                case 2048: return 36;
+                case 4096: return 40;
+                case 8192: return 50;
+                case 16384: return 60;
+                case 32768: return 65;
+                case 65536: return 70;
+                case 131072: return 75;
+                case 262144: return 80;
+                case 524288: return 85;
+                case 1048576: return 90;
+                case 2097152: return 94;
+                case 4194304: return 98;
+                case 8388608: return 102;
+                case 16777216: return 104;
+                case 33554432: return 108;
+                case 67108864: return 112;
+                case 134217728: return 116;
+                case 268435456: return 120;
+                case 536870912: return 124;
+                default: return 10;
+            }
+        }
+
 
         /// <summary>
         /// Emplaces a new entry without checking for key existence
         /// </summary>
         /// <param name="entry">The entry.</param>
-        /// <param name="metadata">The metadata.</param>
+        /// <param name="current">The metadata.</param>
         /// <returns></returns>
         [MethodImpl(256)]
-        private void EmplaceInternal(ref MultiEntry<TKey, TValue> entry, ref MetaByte metadata)
+        private void EmplaceInternal(Entry<TKey, TValue> entry, InfoByte current)
         {
-            // Calculate index
-            uint index = (uint)metadata.Hashcode * Multiplier >> _shift;
+            uint index = (uint)entry.Hashcode * GoldenRatio >> _shift;
+            current.Psl = 0;
 
-            // Reset psl
-            metadata.Psl = 0;
+            var info = _info[index];
 
-            for (; ; ++metadata.Psl, ++index)
+            do
             {
-                if (_currentProbeSequenceLength < metadata.Psl)
-                {
-                    _currentProbeSequenceLength = metadata.Psl;
-                }
-
-                var info = _info[index];
                 if (info.IsEmpty())
                 {
                     _entries[index] = entry;
-                    _info[index] = metadata;
-                    ++Count;
+                    _info[index] = current;
                     return;
                 }
 
-                if (info.Hashcode == metadata.Hashcode)
-                {
-                    ++Count;
-                    //make sure same hashcodes are in line
-                    StartSwapping(index, ref entry, ref metadata);
-                    return;
-                }
-
-                if (metadata.Psl > info.Psl)
+                if (current.Psl > info.Psl)
                 {
                     Swap(ref entry, ref _entries[index]);
-                    Swap(ref metadata, ref _info[index]);
+                    Swap(ref current, ref _info[index]);
                     continue;
                 }
 
-                if (metadata.Psl == _maxProbeSequenceLength)
+                if (_currentProbeSequenceLength < current.Psl)
                 {
-                    if (metadata.Psl == 127)
-                    {
-                        throw new MultiMapException("Only 127 values can be stored with 1 unique key");
-                    }
+                    _currentProbeSequenceLength = current.Psl;
+                }
 
+                if (current.Psl == _maxProbeSequenceLength)
+                {
                     Resize();
-                    //Make sure after a resize to insert the current entry
-                    EmplaceInternal(ref entry, ref metadata);
+                    EmplaceInternal(entry, current);
                     return;
                 }
-            }
+
+                //increase index
+                info = _info[++index];
+
+                //increase probe sequence length
+                ++current.Psl;
+
+            } while (true);
         }
 
         /// <summary>
@@ -933,7 +850,7 @@ namespace NL.MinDef.LandIT.Utilities.Collections.Hashmap
         /// </summary>
         /// <param name="x">The x.</param>
         /// <param name="y">The y.</param>
-        private void Swap(ref MultiEntry<TKey, TValue> x, ref MultiEntry<TKey, TValue> y)
+        private void Swap(ref Entry<TKey, TValue> x, ref Entry<TKey, TValue> y)
         {
             var tmp = x;
 
@@ -946,7 +863,7 @@ namespace NL.MinDef.LandIT.Utilities.Collections.Hashmap
         /// </summary>
         /// <param name="x">The x.</param>
         /// <param name="y">The y.</param>
-        private void Swap(ref MetaByte x, ref MetaByte y)
+        private void Swap(ref InfoByte x, ref InfoByte y)
         {
             var tmp = x;
 
