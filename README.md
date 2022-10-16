@@ -79,11 +79,10 @@ private MultiMap<uint, uint> _multimap = new Map<uint, uint>(16);
 | MultiMap |  28.85 ms | 0.828 ms | 1.728 ms |
 
 ### Removing a million keys
-|        Method |     Mean |    Error |   StdDev |
-|-------------- |---------:|---------:|---------:|
-| DictionarySlim | 30.91 ms | 0.612 ms | 1.645 ms |
-| Dictionary | 42.84 ms | 1.062 ms | 3.098 ms |
-| FastMap | 14.61 ms | 0.289 ms | 0.646 ms |
-| Map | 23.10 ms | 0.452 ms | 1.253 ms |
-| MultiMap | 23.31 ms | 0.466 ms | 1.344 ms |
-
+|           Method |      Mean |     Error |    StdDev |
+|----------------- |----------:|----------:|----------:|
+|  DictionarySlim |  5.777 ms | 0.1150 ms | 0.1985 ms |
+|  Dictionary |  6.729 ms | 0.1328 ms | 0.2996 ms |
+|   FastMap | 22.278 ms | 0.5384 ms | 1.5873 ms |
+|   RemoveMap | 45.786 ms | 0.9587 ms | 2.7814 ms |
+|   MultiMap | 47.494 ms | 1.8617 ms | 3.1276 ms |
