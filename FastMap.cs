@@ -6,13 +6,15 @@ using Faster.Map.Core;
 namespace Faster.Map
 {
     /// <summary>
-    /// This hashmap is heavily optimized to be used with numerical keys and  uses the following
+    /// This hashmap uses the following
     /// - Open addressing
     /// - Uses linear probing
-    /// - Robinhood hashmap
+    /// - Robinghood hashing
     /// - Upper limit on the probe sequence lenght(psl) which is Log2(size)
-    /// - Fibonacci hashing
-    /// - Only usable with valuetype keys
+    /// - Keeps track of the currentProbeCount which makes sure we can back out early eventhough the maxprobcount exceeds the cpc
+    /// - loadfactor can easily be increased to 0.9 while maintaining an incredible speed
+    /// - use numerical values as keys
+    /// - fibonacci hashing
     /// </summary>
     /// <typeparam name="TKey">The type of the key.</typeparam>
     /// <typeparam name="TValue">The type of the value.</typeparam>
@@ -117,12 +119,12 @@ namespace Faster.Map
         #region Constructor
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="Map{TKey,TValue}"/> class.
+        /// Initializes a new instance of the <see cref="FastMap{TKey,TValue}"/> class.
         /// </summary>
         public FastMap() : this(8, 0.5d) { }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="Map{TKey, TValue}"/> class.
+        /// Initializes a new instance of the <see cref="FastMap{TKey, TValue}"/> class.
         /// </summary>
         /// <param name="length">The length of the hashmap. Will always take the closest power of two</param>
         public FastMap(uint length) : this(length, 0.5d) { }
@@ -177,7 +179,7 @@ namespace Faster.Map
                 return false;
             }
 
-            //create entry
+            //Create entry
             FastEntry<TKey, TValue> fastEntry = default;
             fastEntry.Value = value;
             fastEntry.Key = key;
@@ -266,7 +268,7 @@ namespace Faster.Map
                 }
 
                 //increase index by 1
-                entry = _entries[++index];
+                entry = _entries[index+1];
 
                 //validate hashcode
                 if (hashcode == entry.Key.GetHashCode())
@@ -274,9 +276,10 @@ namespace Faster.Map
                     value = entry.Value;
                     return true;
                 }
-
+                
+                index += 2;
                 //increase index by one and validate if within bounds
-            } while (++index <= maxDistance);
+            } while (index <= maxDistance);
 
 
             value = default;

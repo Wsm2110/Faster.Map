@@ -2,38 +2,20 @@
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Faster.Map.Core;
-
 namespace Faster.Map
 {
     /// <summary>
     /// This hashmap uses the following
     /// - Open addressing
     /// - Uses linear probing
-    /// - Robing hood hash
+    /// - Robinghood hashing
     /// - Upper limit on the probe sequence lenght(psl) which is Log2(size)
-    /// - Keeps track of the current probe count used
-    /// - Multiple values can be inserted with the same key, minor drawback is that only 127 values can be added with the same key
+    /// - Keeps track of the currentProbeCount which makes sure we can back out early eventhough the maxprobcount exceeds the cpc
+    /// - loadfactor can easily be increased to 0.9 while maintaining an incredible speed
     /// - fibonacci hashing
     /// </summary>
-    /// <typeparam name="TKey">The type of the key.</typeparam>
-    /// <typeparam name="TValue">The type of the value.</typeparam>
-    public class MultiMap<TKey, TValue>
+    public class DenseMap<TKey, TValue>
     {
-        #region Fields
-
-        private uint _maxlookups;
-        private readonly double _loadFactor;
-        private const uint GoldenRatio = 0x9E3779B9; //2654435769;
-        private int _shift = 32;
-        private byte _maxProbeSequenceLength;
-        private byte _currentProbeSequenceLength;
-        private readonly IEqualityComparer<TKey> _keyCompare;
-        private readonly IEqualityComparer<TValue> _valueComparer;
-
-        private InfoByte[] _info;
-        private Entry<TKey, TValue>[] _entries;
-        #endregion
-
         #region Properties
 
         /// <summary>
@@ -45,10 +27,18 @@ namespace Faster.Map
         public int Count { get; private set; }
 
         /// <summary>
+        /// Gets the size of the map
+        /// </summary>
+        /// <value>
+        /// The size.
+        /// </value>
+        public uint Size => (uint)_entries.Length;
+
+        /// <summary>
         /// Returns all the entries as KeyValuePair objects
         /// </summary>
         /// <value>
-        /// The keys.
+        /// The entries.
         /// </value>
         public IEnumerable<KeyValuePair<TKey, TValue>> Entries
         {
@@ -67,7 +57,7 @@ namespace Faster.Map
         }
 
         /// <summary>
-        /// Returns all available keys
+        /// Returns all keys
         /// </summary>
         /// <value>
         /// The keys.
@@ -88,7 +78,7 @@ namespace Faster.Map
         }
 
         /// <summary>
-        /// Returns all available Values
+        /// Returns all Values
         /// </summary>
         /// <value>
         /// The keys.
@@ -109,64 +99,69 @@ namespace Faster.Map
 
         #endregion
 
+        #region Fields
+
+        private InfoByte[] _info;
+        private Entry<TKey, TValue>[] _entries;
+        private uint _maxlookups;
+        private readonly double _loadFactor;
+        private const uint GoldenRatio = 0x9E3779B9; //2654435769;
+        private int _shift = 32;
+        private byte _maxProbeSequenceLength;
+        private byte _currentProbeSequenceLength;
+        private readonly IEqualityComparer<TKey> _keyCompare;
+
+        #endregion
+
         #region Constructor
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="MultiMap{TKey,TValue}"/> class.
+        /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class.
         /// </summary>
-        public MultiMap() : this(16, 0.5d, EqualityComparer<TKey>.Default, EqualityComparer<TValue>.Default) { }
+        public DenseMap() : this(8, 0.5d, EqualityComparer<TKey>.Default) { }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="MultiMap{TKey, TValue}"/> class.
-        /// </summary>
-        /// <param name="length">The length of the hashmap. Will always take the closest power of two</param>
-        public MultiMap(uint length) : this(length, 0.5d, EqualityComparer<TKey>.Default, EqualityComparer<TValue>.Default) { }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="MultiMap{TKey, TValue}" /> class.
+        /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class.
         /// </summary>
         /// <param name="length">The length of the hashmap. Will always take the closest power of two</param>
-        /// <param name="loadFactor">The loadfactor determines when the hashmap will resize(default is 0.5d) i.e size 32 loadfactor 0.5 hashmap will resize at 16</param>
-        public MultiMap(uint length, double loadFactor) : this(length, loadFactor, EqualityComparer<TKey>.Default, EqualityComparer<TValue>.Default) { }
+        public DenseMap(uint length) : this(length, 0.5d, EqualityComparer<TKey>.Default) { }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="MultiMap{TKey, TValue}" /> class.
+        /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class.
         /// </summary>
         /// <param name="length">The length of the hashmap. Will always take the closest power of two</param>
         /// <param name="loadFactor">The loadfactor determines when the hashmap will resize(default is 0.5d) i.e size 32 loadfactor 0.5 hashmap will resize at 16</param>
-        /// <param name="keyComparer">Used to resolve hashcollissions</param>
-        public MultiMap(uint length, double loadFactor, IEqualityComparer<TKey> keyComparer) : this(length, loadFactor, keyComparer, EqualityComparer<TValue>.Default) { }
+        public DenseMap(uint length, double loadFactor) : this(length, loadFactor, EqualityComparer<TKey>.Default) { }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="MultiMap{TKey, TValue}" /> class.
+        /// Initializes a new instance of class.
         /// </summary>
         /// <param name="length">The length of the hashmap. Will always take the closest power of two</param>
         /// <param name="loadFactor">The loadfactor determines when the hashmap will resize(default is 0.5d) i.e size 32 loadfactor 0.5 hashmap will resize at 16</param>
-        /// <param name="keyComparer">Used to resolve hashcollissions</param>
-        /// <param name="valueComparer">Used to retrieve a proper entry by validing if the value is the same</param>
-        public MultiMap(uint length, double loadFactor, IEqualityComparer<TKey> keyComparer, IEqualityComparer<TValue> valueComparer)
+        /// <param name="keyComparer">Used to compare keys to resolve hashcollisions</param>
+        public DenseMap(uint length, double loadFactor, IEqualityComparer<TKey> keyComparer)
         {
-            //default length is 16
+            //default length is 8
             _maxlookups = length;
             _loadFactor = loadFactor;
 
             var size = NextPow2(_maxlookups);
-            _maxProbeSequenceLength = Log2(size);
+            _maxProbeSequenceLength = loadFactor <= 0.5 ? Log2(size) : PslLimit(size);
 
             _keyCompare = keyComparer ?? EqualityComparer<TKey>.Default;
-            _valueComparer = valueComparer ?? EqualityComparer<TValue>.Default;
 
             _shift = _shift - Log2(_maxlookups) + 1;
-            _entries = new Entry<TKey, TValue>[_maxlookups + _maxProbeSequenceLength + 1];
-            _info = new InfoByte[_maxlookups + _maxProbeSequenceLength + 1];
+
+            _entries = new Entry<TKey, TValue>[size + _maxProbeSequenceLength + 1];
+            _info = new InfoByte[size + _maxProbeSequenceLength + 1];
         }
 
         #endregion
 
-        #region Methods
+        #region Public Methods
 
         /// <summary>
-        /// Inserts the value.
+        /// Inserts the specified value.
         /// </summary>
         /// <param name="key">The key.</param>
         /// <param name="value">The value.</param>
@@ -187,7 +182,7 @@ namespace Faster.Map
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
             //check if key is unique
-            if (Contains(key, value))
+            if (ContainsKey(hashcode, index, key))
             {
                 return false;
             }
@@ -236,7 +231,7 @@ namespace Faster.Map
                 if (current.Psl == _maxProbeSequenceLength)
                 {
                     ++Count;
-                    IncreaseMaxProbeSequence();
+                    Resize();
                     EmplaceInternal(entry, current);
                     return true;
                 }
@@ -251,8 +246,7 @@ namespace Faster.Map
         }
 
         /// <summary>
-        /// Gets the first entry matching the specified key.
-        /// If the same key is used for multiple entries we return the first entry matching the given criteria
+        /// Gets the value with the corresponding key
         /// </summary>
         /// <param name="key">The key.</param>
         /// <param name="value">The value.</param>
@@ -301,54 +295,10 @@ namespace Faster.Map
         }
 
         /// <summary>
-        /// Get all entries matching the key
+        ///Updates the value of a specific key
         /// </summary>
-        /// <param name="key">The key.</param>
-        /// <returns></returns>
-        public IEnumerable<TValue> GetAll(TKey key)
-        {
-            //Get object identity hashcode
-            var hashcode = key.GetHashCode();
-
-            // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
-            uint index = (uint)hashcode * GoldenRatio >> _shift;
-
-            //Determine max distance
-            var maxDistance = index + _currentProbeSequenceLength;
-
-            do
-            {
-                //unrolling loop twice seems to give a minor speedboost
-                var entry = _entries[index];
-
-                //validate hashcode
-                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key))
-                {
-                    yield return entry.Value;
-                }
-
-                //increase index by 1
-                entry = _entries[++index];
-
-                //validate hashcode
-                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key))
-                {
-                    yield return entry.Value;
-                }
-
-                //increase index by one and validate if within bounds
-            } while (++index <= maxDistance);
-        }
-
-        /// <summary>
-        /// Locate the entry by using a key-value, update the entry by using a delegate
-        /// </summary>
-        /// <param name="key">The key.</param>
-        /// <param name="oldValue">The old value.</param>
-        /// <param name="newValue">Update old value by invoking delegate</param>
-        /// <returns></returns>
         [MethodImpl(256)]
-        public bool Update(TKey key, TValue oldValue, Func<TValue, TValue> newValue)
+        public bool Update(TKey key, TValue value)
         {
             //Get object identity hashcode
             var hashcode = key.GetHashCode();
@@ -365,9 +315,9 @@ namespace Faster.Map
                 var entry = _entries[index];
 
                 //validate hashcode
-                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key) && _valueComparer.Equals(oldValue, entry.Value))
+                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key))
                 {
-                    _entries[index].Value = newValue(entry.Value);
+                    _entries[index].Value = value;
                     return true;
                 }
 
@@ -375,9 +325,9 @@ namespace Faster.Map
                 entry = _entries[++index];
 
                 //validate hashcode
-                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key) && _valueComparer.Equals(oldValue, entry.Value))
+                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key))
                 {
-                    _entries[index].Value = newValue(entry.Value);
+                    _entries[index].Value = value;
                     return true;
                 }
 
@@ -389,12 +339,12 @@ namespace Faster.Map
         }
 
         /// <summary>
-        /// Removes entry using key and value
+        ///  Remove entry with a backshift removal
         /// </summary>
-        /// <param name="key">The key.</param>
-        /// <param name="value">The value.</param>
+        /// <param name="key"></param>
         /// <returns></returns>
-        public bool Remove(TKey key, TValue value)
+        [MethodImpl(256)]
+        public bool Remove(TKey key)
         {
             //Get ObjectIdentity hashcode
             int hashcode = key.GetHashCode();
@@ -411,7 +361,7 @@ namespace Faster.Map
                 var entry = _entries[index];
 
                 //validate hash en compare keys
-                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key) && _valueComparer.Equals(value, entry.Value))
+                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key))
                 {
                     //remove entry from list
                     _entries[index] = default;
@@ -425,7 +375,7 @@ namespace Faster.Map
                 entry = _entries[++index];
 
                 //validate hash and compare keys
-                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key) && _valueComparer.Equals(value, entry.Value))
+                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key))
                 {
                     //remove entry from list
                     _entries[index] = default;
@@ -443,64 +393,9 @@ namespace Faster.Map
         }
 
         /// <summary>
-        /// Determines whether the specified key is already inserted in the map
+        /// Determines whether the specified key contains key.
         /// </summary>
         /// <param name="key">The key.</param>
-        /// <returns>
-        ///   <c>true</c> if the specified key contains key; otherwise, <c>false</c>.
-        /// </returns>
-        [MethodImpl(256)]
-        public bool Contains(TKey key, TValue value)
-        {
-            //Get ObjectIdentity hashcode
-            int hashcode = key.GetHashCode();
-
-            //Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
-            uint index = (uint)hashcode * GoldenRatio >> _shift;
-
-            //backout early
-            var info = _info[index];
-            if (info.IsEmpty())
-            {
-                //Dont unnecessary iterate over the entries
-                return false;
-            }
-
-            //Determine max distance
-            var maxDistance = index + _currentProbeSequenceLength;
-
-            do
-            {
-                //unrolling loop twice seems to give a minor speedboost
-                var entry = _entries[index];
-
-                //validate hash
-                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key) && _valueComparer.Equals(value, entry.Value))
-                {
-                    return true;
-                }
-
-                //increase index by 1
-                entry = _entries[++index];
-
-                //validate hash
-                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key) && _valueComparer.Equals(value, entry.Value))
-                {
-                    return true;
-                }
-
-                //increase index by one and validate if within bounds
-            } while (++index <= maxDistance);
-
-            //not found
-            return false;
-        }
-
-        /// <summary>
-        /// Determines whether the specified key and value exists
-        /// </summary>
-        /// <param name="key">The key.</param>
-       
         /// <returns>
         ///   <c>true</c> if the specified key contains key; otherwise, <c>false</c>.
         /// </returns>
@@ -552,50 +447,20 @@ namespace Faster.Map
         }
 
         /// <summary>
-        /// Locates the specified key.
+        /// Copies entries from one map to another
         /// </summary>
-        /// <param name="key">The key.</param>
-        /// <returns></returns>
-        public int IndexOf(TKey key)
+        /// <param name="denseMap">The map.</param>
+        public void Copy(DenseMap<TKey, TValue> denseMap)
         {
-            var hashcode = key.GetHashCode();
-            for (int i = 0; i < _entries.Length; i++)
+            for (var i = 0; i < denseMap._entries.Length; ++i)
             {
-                var info = _info[i];
+                var info = denseMap._info[i];
                 if (info.IsEmpty())
                 {
                     continue;
                 }
 
-                var entry = _entries[i];
-                if (entry.Hashcode == hashcode && _keyCompare.Equals(key, entry.Key))
-                {
-                    return i;
-                }
-            }
-
-            return -1;
-        }
-
-        ///// <summary>
-        ///// Copies all entries from a different multimap
-        ///// </summary>
-        ///// <param name="valueMap">The map.</param>
-        /// <summary>
-        /// Copies the specified fast map.
-        /// </summary>
-        /// <param name="multimap">The multimap.</param>
-        public void Copy(MultiMap<TKey, TValue> multimap)
-        {
-            for (var i = 0; i < multimap._entries.Length; ++i)
-            {
-                var info = multimap._info[i];
-                if (info.IsEmpty())
-                {
-                    continue;
-                }
-
-                var entry = multimap._entries[i];
+                var entry = denseMap._entries[i];
                 Emplace(entry.Key, entry.Value);
             }
         }
@@ -614,20 +479,155 @@ namespace Faster.Map
             Count = 0;
         }
 
+        /// <summary>
+        /// Gets or sets the value by using a Tkey
+        /// </summary>
+        /// <value>
+        /// The 
+        /// </value>
+        /// <param name="key">The key.</param>
+        /// <returns></returns>
+        /// <exception cref="KeyNotFoundException">
+        /// Unable to find entry - {key.GetType().FullName} key - {key.GetHashCode()}
+        /// or
+        /// Unable to find entry - {key.GetType().FullName} key - {key.GetHashCode()}
+        /// </exception>
+        public TValue this[TKey key]
+        {
+            get
+            {
+                if (Get(key, out var result))
+                {
+                    return result;
+                }
+
+                throw new KeyNotFoundException($"Unable to find entry - {key.GetType().FullName} key - {key.GetHashCode()}");
+            }
+            set
+            {
+                if (!Update(key, value))
+                {
+                    throw new KeyNotFoundException($"Unable to find entry - {key.GetType().FullName} key - {key.GetHashCode()}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Returns an index of the specified key.
+        /// </summary>
+        /// <param name="key">The key.</param>
+        /// <returns></returns>
+        public int IndexOf(TKey key)
+        {
+            for (int i = 0; i < _entries.Length; i++)
+            {
+                var info = _info[i];
+                if (info.IsEmpty())
+                {
+                    continue;
+                }
+
+                var entry = _entries[i];
+                if (entry.Hashcode == key.GetHashCode() && _keyCompare.Equals(key, entry.Key))
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
         #endregion
 
         #region Private Methods
 
-        /// <summary>
-        /// Remove an entry by using a backshift removal
-        /// </summary>
-        /// <param name="index">The index.</param>
         [MethodImpl(256)]
+        private bool ContainsKey(int hashcode, uint index, TKey key)
+        {
+            //Determine max distance
+            var maxDistance = index + _currentProbeSequenceLength;
+
+            do
+            {
+                //unrolling loop twice seems to give a minor speedboost
+                var entry = _entries[index];
+
+                //validate hash
+                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key))
+                {
+                    return true;
+                }
+
+                //increase index by 1
+                entry = _entries[++index];
+
+                //validate hash
+                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key))
+                {
+                    return true;
+                }
+
+                //increase index by one and validate if within bounds
+            } while (++index <= maxDistance);
+
+
+            return false;
+        }
+
+        /// <summary>
+        /// Emplaces a new entry without checking for key existence. Keys have already been checked and are unique
+        /// </summary>
+        /// <param name="entry">The entry.</param>
+        /// <param name="current">The current.</param>
+        [MethodImpl(256)]
+        private void EmplaceInternal(Entry<TKey, TValue> entry, InfoByte current)
+        {
+            uint index = (uint)entry.Hashcode * GoldenRatio >> _shift;
+            current.Psl = 0;
+
+            var info = _info[index];
+
+            do
+            {
+                if (info.IsEmpty())
+                {
+                    _entries[index] = entry;
+                    _info[index] = current;
+                    return;
+                }
+
+                if (current.Psl > info.Psl)
+                {
+                    Swap(ref entry, ref _entries[index]);
+                    Swap(ref current, ref _info[index]);
+                    continue;
+                }
+
+                if (_currentProbeSequenceLength < current.Psl)
+                {
+                    _currentProbeSequenceLength = current.Psl;
+                }
+
+                if (current.Psl == _maxProbeSequenceLength)
+                {
+                    Resize();
+                    EmplaceInternal(entry, current);
+                    return;
+                }
+
+                //increase index
+                info = _info[++index];
+
+                //increase probe sequence length
+                ++current.Psl;
+
+            } while (true);
+        }
+
         private void ShiftRemove(uint index)
         {
             //Get next entry
             var next = _info[++index];
-
+            
             while (!next.IsEmpty() && next.Psl != 0)
             {
                 //swap upper entry with lower
@@ -645,90 +645,29 @@ namespace Faster.Map
         }
 
         /// <summary>
-        /// calculates next power of 2
+        /// Swaps the specified x.
         /// </summary>
-        /// <param name="c">The c.</param>
-        /// <returns></returns>
-        ///
-        [MethodImpl(256)]
-        private static uint NextPow2(uint c)
+        /// <param name="x">The x.</param>
+        /// <param name="y">The y.</param>
+        private void Swap(ref Entry<TKey, TValue> x, ref Entry<TKey, TValue> y)
         {
-            c--;
-            c |= c >> 1;
-            c |= c >> 2;
-            c |= c >> 4;
-            c |= c >> 8;
-            c |= c >> 16;
-            ++c;
-            return c;
+            var tmp = x;
+
+            x = y;
+            y = tmp;
         }
 
         /// <summary>
-        /// Used for set checking operations (using enumerables) that rely on counting
+        /// Swaps the specified x.
         /// </summary>
-        /// <param name="value">The value.</param>
-        /// <returns></returns>
-        private static byte Log2(uint value)
+        /// <param name="x">The x.</param>
+        /// <param name="y">The y.</param>
+        private void Swap(ref InfoByte x, ref InfoByte y)
         {
-            byte c = 0;
-            while (value > 0)
-            {
-                c++;
-                value >>= 1;
-            }
+            var tmp = x;
 
-            return c;
-        }
-
-        /// <summary>
-        /// Resizes this instance.
-        /// </summary>
-        [MethodImpl(256)]
-        private void Resize()
-        {
-            _shift--;
-            _maxlookups = NextPow2(_maxlookups + 1);
-            _maxProbeSequenceLength = Log2(_maxlookups);
-
-            var oldEntries = new Entry<TKey, TValue>[_entries.Length];
-            Array.Copy(_entries, oldEntries, _entries.Length);
-
-            var oldInfo = new InfoByte[_entries.Length];
-            Array.Copy(_info, oldInfo, _info.Length);
-
-            _entries = new Entry<TKey, TValue>[_maxlookups + _maxProbeSequenceLength + 1];
-            _info = new InfoByte[_maxlookups + _maxProbeSequenceLength + 1];
-
-            Count = 0;
-
-            for (var i = 0; i < oldEntries.Length; i++)
-            {
-                var info = oldInfo[i];
-                if (info.IsEmpty())
-                {
-                    continue;
-                }
-
-                EmplaceInternal(oldEntries[i], info);
-            }
-        }
-
-        /// <summary>
-        /// Resizes this instance.
-        /// </summary>
-        [MethodImpl(256)]
-        private void IncreaseMaxProbeSequence()
-        {
-            _maxProbeSequenceLength += 2;
-
-            var oldEntries = new Entry<TKey, TValue>[_entries.Length + 2];
-            Array.Copy(_entries, oldEntries, _entries.Length);
-
-            var olfInfo = new InfoByte[_info.Length + 2];
-            Array.Copy(_info, olfInfo, _entries.Length);
-
-            _entries = oldEntries;
-            _info = olfInfo;
+            x = y;
+            y = tmp;
         }
 
         /// <summary>
@@ -771,82 +710,68 @@ namespace Faster.Map
             }
         }
 
-
         /// <summary>
-        /// Emplaces a new entry without checking for key existence
+        /// Resizes this instance.
         /// </summary>
-        /// <param name="entry">The entry.</param>
-        /// <param name="current">The metadata.</param>
-        /// <returns></returns>
         [MethodImpl(256)]
-        private void EmplaceInternal(Entry<TKey, TValue> entry, InfoByte current)
+        private void Resize()
         {
-            uint index = (uint)entry.Hashcode * GoldenRatio >> _shift;
-            current.Psl = 0;
+            _shift--;
+            _maxlookups = NextPow2(_maxlookups + 1);
+            _maxProbeSequenceLength = _loadFactor <= 0.5 ? Log2(_maxlookups) : PslLimit(_maxlookups);
 
-            var info = _info[index];
+            var oldEntries = new Entry<TKey, TValue>[_entries.Length];
+            Array.Copy(_entries, oldEntries, _entries.Length);
 
-            do
+            var oldInfo = new InfoByte[_entries.Length];
+            Array.Copy(_info, oldInfo, _info.Length);
+
+            _entries = new Entry<TKey, TValue>[_maxlookups + _maxProbeSequenceLength + 1];
+            _info = new InfoByte[_maxlookups + _maxProbeSequenceLength + 1];
+
+            for (var i = 0; i < oldEntries.Length; i++)
             {
+                var info = oldInfo[i];
                 if (info.IsEmpty())
                 {
-                    _entries[index] = entry;
-                    _info[index] = current;
-                    return;
-                }
-
-                if (current.Psl > info.Psl)
-                {
-                    Swap(ref entry, ref _entries[index]);
-                    Swap(ref current, ref _info[index]);
                     continue;
                 }
 
-                if (_currentProbeSequenceLength < current.Psl)
-                {
-                    _currentProbeSequenceLength = current.Psl;
-                }
+                var entry = oldEntries[i];
 
-                if (current.Psl == _maxProbeSequenceLength)
-                {
-                    IncreaseMaxProbeSequence();
-                    EmplaceInternal(entry, current);
-                    return;
-                }
-
-                //increase index
-                info = _info[++index];
-
-                //increase probe sequence length
-                ++current.Psl;
-
-            } while (true);
+                EmplaceInternal(entry, info);
+            }
         }
 
         /// <summary>
-        /// Swaps the content of the specified values
+        /// calculates next power of 2
         /// </summary>
-        /// <param name="x">The x.</param>
-        /// <param name="y">The y.</param>
-        private void Swap(ref Entry<TKey, TValue> x, ref Entry<TKey, TValue> y)
+        /// <param name="c">The c.</param>
+        /// <returns></returns>
+        ///
+        [MethodImpl(256)]
+        private static uint NextPow2(uint c)
         {
-            var tmp = x;
-
-            x = y;
-            y = tmp;
+            c--;
+            c |= c >> 1;
+            c |= c >> 2;
+            c |= c >> 4;
+            c |= c >> 8;
+            c |= c >> 16;
+            return ++c;
         }
 
-        /// <summary>
-        /// Swaps the content of the specified values
-        /// </summary>
-        /// <param name="x">The x.</param>
-        /// <param name="y">The y.</param>
-        private void Swap(ref InfoByte x, ref InfoByte y)
+        // used for set checking operations (using enumerables) that rely on counting
+        private static byte Log2(uint value)
         {
-            var tmp = x;
+            byte c = 0;
+            while (value > 0)
+            {
+                c++;
+                value >>= 1;
+            }
 
-            x = y;
-            y = tmp;
+            return c;
         }
 
         #endregion
