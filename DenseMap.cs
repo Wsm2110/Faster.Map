@@ -204,6 +204,12 @@ namespace Faster.Map
 
             do
             {
+                //Increase _current probe sequence
+                if (_currentProbeSequenceLength < current.Psl)
+                {
+                    _currentProbeSequenceLength = current.Psl;
+                }
+
                 //Empty spot, add entry
                 if (info.IsEmpty())
                 {
@@ -219,12 +225,6 @@ namespace Faster.Map
                     Swap(ref entry, ref _entries[index]);
                     Swap(ref current, ref _info[index]);
                     continue;
-                }
-
-                //Increase _current probe sequence
-                if (_currentProbeSequenceLength < current.Psl)
-                {
-                    _currentProbeSequenceLength = current.Psl;
                 }
 
                 //max psl is reached, resize
