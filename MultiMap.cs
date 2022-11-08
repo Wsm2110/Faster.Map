@@ -236,7 +236,7 @@ namespace Faster.Map
                 if (current.Psl == _maxProbeSequenceLength)
                 {
                     ++Count;
-                    IncreaseMaxProbeSequence();
+                    Resize();
                     EmplaceInternal(entry, current);
                     return true;
                 }
@@ -500,7 +500,7 @@ namespace Faster.Map
         /// Determines whether the specified key and value exists
         /// </summary>
         /// <param name="key">The key.</param>
-       
+
         /// <returns>
         ///   <c>true</c> if the specified key contains key; otherwise, <c>false</c>.
         /// </returns>
@@ -809,7 +809,7 @@ namespace Faster.Map
 
                 if (current.Psl == _maxProbeSequenceLength)
                 {
-                    IncreaseMaxProbeSequence();
+                    Resize();
                     EmplaceInternal(entry, current);
                     return;
                 }
