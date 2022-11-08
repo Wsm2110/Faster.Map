@@ -8,22 +8,14 @@ namespace Faster.Map.Core
     /// </summary>
     /// <typeparam name="TKey">The type of the key.</typeparam>
     /// <typeparam name="TValue">The type of the value.</typeparam>
-    [DebuggerDisplay("hashcode  {Hashcode } - Key {Key} - value {Value} - next {Next}")]
+    [DebuggerDisplay("hashcode  {Hashcode }")]
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public struct Entry<TKey, TValue>
     {
         /// <summary>
         /// The hashcode
         /// </summary>
-        public int Hashcode;
-
-        /// <summary>
-        /// Gets or sets the next.
-        /// </summary>
-        /// <value>
-        /// The next.
-        /// </value>
-        public int Next;
+        public int Hashcode { get; set; }
 
         /// <summary>
         /// Gets or sets the key.
@@ -31,7 +23,7 @@ namespace Faster.Map.Core
         /// <value>
         /// The key.
         /// </value>
-        public TKey Key;
+        public TKey Key { get; set; }
 
         /// <summary>
         /// Gets or sets the value.
@@ -39,7 +31,7 @@ namespace Faster.Map.Core
         /// <value>
         /// The value.
         /// </value>
-        public TValue Value;
+        public TValue Value { get; set; }
 
     }
 }
