@@ -13,3 +13,4 @@
 *.nupkg
 *.exe
 Faster.Map.nuspec
+/.vs/Faster.Map
