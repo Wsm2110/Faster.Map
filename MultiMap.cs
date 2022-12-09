@@ -1,7 +1,7 @@
-﻿using System;
+﻿using Faster.Map.Core;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using Faster.Map.Core;
+using System;
 
 namespace Faster.Map
 {
@@ -475,7 +475,7 @@ namespace Faster.Map
                 var entry = _entries[index];
 
                 //validate hash
-                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key) && _valueComparer.Equals(value, entry.Value))
+                if (hashcode == entry.Hashcode &&  _valueComparer.Equals(value, entry.Value))
                 {
                     return true;
                 }
@@ -484,7 +484,7 @@ namespace Faster.Map
                 entry = _entries[++index];
 
                 //validate hash
-                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key) && _valueComparer.Equals(value, entry.Value))
+                if (hashcode == entry.Hashcode && _valueComparer.Equals(value, entry.Value))
                 {
                     return true;
                 }
@@ -699,8 +699,6 @@ namespace Faster.Map
             _entries = new Entry<TKey, TValue>[_maxlookups + _maxProbeSequenceLength + 1];
             _info = new InfoByte[_maxlookups + _maxProbeSequenceLength + 1];
 
-            Count = 0;
-
             for (var i = 0; i < oldEntries.Length; i++)
             {
                 var info = oldInfo[i];
@@ -788,6 +786,11 @@ namespace Faster.Map
 
             do
             {
+                if (_currentProbeSequenceLength < current.Psl)
+                {
+                    _currentProbeSequenceLength = current.Psl;
+                }
+
                 if (info.IsEmpty())
                 {
                     _entries[index] = entry;
@@ -802,17 +805,6 @@ namespace Faster.Map
                     continue;
                 }
 
-                if (_currentProbeSequenceLength < current.Psl)
-                {
-                    _currentProbeSequenceLength = current.Psl;
-                }
-
-                if (current.Psl == _maxProbeSequenceLength)
-                {
-                    Resize();
-                    EmplaceInternal(entry, current);
-                    return;
-                }
 
                 //increase index
                 info = _info[++index];
