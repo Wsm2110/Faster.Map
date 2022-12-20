@@ -1,16 +1,15 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
 
-*.testlog
-*.manifest
-*.dll
-*.pdb
-/obj
-/TestResults/
-/bin/
-/Faster.Map.Benchmark/bin/
-/Faster.Map.Benchmark/obj/
-*.txt
-.vs/Faster.Map/v17/.suo
-*.nupkg
-*.exe
-Faster.Map.nuspec
-/.vs/Faster.Map
+/.vs
+/obj/Debug
+/benchmarks/Faster.Map.Benchmark/obj
+/benchmarks/Faster.Map.Benchmark/bin
+/benchmarks/Faster.Map.Concurrent.Benchmark/obj
+/benchmarks/Faster.Map.Concurrent.Benchmark/bin/Release/net6.0
+/tests/bin
+/tests/obj
+*.gitignore
+/.gitignore
+/.gitignore
