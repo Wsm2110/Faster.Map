@@ -1,0 +1,29 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <ImplicitUsings>false</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <LangVersion>Latest</LangVersion>
+    <TargetFrameworks>net48;net472;netstandard2.1;net6.0</TargetFrameworks>
+    <LangVersion>Latest</LangVersion>
+    <Authors>Wiljan Ruizendaal</Authors>
+    <PackageReleaseNotes>
+      Remove multimap from the package.
+      Made sure the currentprobseq length is set to 0
+    </PackageReleaseNotes>
+    <PackageProjectUrl>https://github.com/Wsm2110/Faster.Map</PackageProjectUrl>
+    <AssemblyVersion>3.0.4.1</AssemblyVersion>
+    <FileVersion>3.0.4.1</FileVersion>
+    <Title>Fastest .net hashmap</Title>
+    <Version>3.0.4.1</Version>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Description>incredible fast hashmap using robinghood hashing</Description>
+    <RepositoryUrl>https://github.com/Wsm2110/Faster.Map</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+
+  </PropertyGroup>
+
+
+
+</Project>
