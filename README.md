@@ -36,7 +36,10 @@ private DenseMap<uint, uint> _map = new DenseMap<uint, uint>(16);
  _map.Remove(1);
  _map.Get(1, out var result);
  _map.Update(1, 51);
-``` 
+ ``` 
+ 
+ #DenseMapSIMD
+``` C#
 private DenseMapSIMD<uint, uint> _map = new DenseMapSIMD<uint, uint>(16);
  _map.Emplace(1, 50); 
  _map.Remove(1);
@@ -54,7 +57,7 @@ private DenseMapSIMD<uint, uint> _map = new DenseMapSIMD<uint, uint>(16);
 |   DenseMapSIMD |  9.685 ms | 0.1328 ms | 0.1109 ms |
 |       DenseMap | 15.714 ms | 0.3012 ms | 0.2958 ms |
 |        FastMap | 11.608 ms | 0.1197 ms | 0.1061 ms |
-w	
+
 
 ### Adding a million keys
 |         Method |     Mean |    Error |   StdDev |
@@ -68,10 +71,10 @@ w
 ### Updating a million keys
 |           Method |     Mean |    Error |   StdDev |   Median |
 |----------------- |---------:|---------:|---------:|---------:|
-|       DictionarySlim | 30.93 ms | 1.168 ms | 3.407 ms | 29.91 ms |
-| Dictionary | 48.30 ms | 2.132 ms | 6.252 ms | 47.03 ms |
-|    FastMap | 13.62 ms | 0.272 ms | 0.511 ms | 13.60 ms |
-|        DenseMap | 22.63 ms | 0.487 ms | 1.420 ms | 22.63 ms |
+|   DictionarySlim | 30.93 ms | 1.168 ms | 3.407 ms | 29.91 ms |
+|       Dictionary | 48.30 ms | 2.132 ms | 6.252 ms | 47.03 ms |
+|          FastMap | 13.62 ms | 0.272 ms | 0.511 ms | 13.60 ms |
+|         DenseMap | 22.63 ms | 0.487 ms | 1.420 ms | 22.63 ms |
 
 ### Removing a million keys
 |         Method |      Mean |     Error |    StdDev |
@@ -79,4 +82,4 @@ w
 | SlimDictionary |  5.867 ms | 0.1152 ms | 0.2076 ms |
 |     Dictionary |  7.636 ms | 0.1703 ms | 0.4994 ms |
 |        FastMap | 21.410 ms | 0.5362 ms | 1.5297 ms |
-|           DenseMap | 37.651 ms | 0.9171 ms | 2.6752 ms |
+|       DenseMap | 37.651 ms | 0.9171 ms | 2.6752 ms |
