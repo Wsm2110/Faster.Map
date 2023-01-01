@@ -13,3 +13,4 @@
 *.gitignore
 /.gitignore
 /.gitignore
+/benchmarks/Faster.Map.Concurrent.Benchmark/bin/Debug/net7.0
