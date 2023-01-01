@@ -9,15 +9,17 @@ using Microsoft.Collections.Extensions;
 
 namespace Faster.Map.Benchmark
 {
-    //[SimpleJob(RunStrategy.Monitoring, 1, 10, 50)]
+    [MarkdownExporterAttribute.GitHub]
     public class AddBenchmark
     {
         #region Fields
-  
-        FastMap<uint, uint> _fastMap = new FastMap<uint, uint>(16, 0.5);
-        private DenseMap<uint, uint> _denseMap = new DenseMap<uint, uint>(16);
-        private Dictionary<uint, uint> dic = new Dictionary<uint, uint>();
-        private DictionarySlim<uint, uint> _slim = new DictionarySlim<uint, uint>();
+
+        //fixed size, dont want to measure resize()
+        FastMap<uint, uint> _fastMap = new FastMap<uint, uint>(2000000); // remove resizing from benchmark hence the 2000000 size
+        DenseMap<uint, uint> _dense = new DenseMap<uint, uint>(2000000);
+        DenseMapSIMD<uint, uint> _denseMap = new DenseMapSIMD<uint, uint>(1000000, 0.9);
+        private Dictionary<uint, uint> dic = new Dictionary<uint, uint>(2000000);
+        private DictionarySlim<uint, uint> _slim = new DictionarySlim<uint, uint>(1000000);
         private uint[] keys;
 
         #endregion
@@ -38,26 +40,38 @@ namespace Faster.Map.Benchmark
                 keys[index] = uint.Parse(splittedOutput[index]);
             }
 
-           // Shuffle(new Random(), keys);
+            keys = keys.Take(899999).ToArray();      
+        }
+
+        [IterationCleanup]
+        public void FinalizeBenchmark()
+        {
+            _denseMap = new DenseMapSIMD<uint, uint>(1000000, 0.90); // wont resize
+            _dense = new DenseMap<uint, uint>(2000000); 
+            dic = new Dictionary<uint, uint>(20000000);
+            _slim = new DictionarySlim<uint, uint>(1000000);
+            _fastMap = new FastMap<uint, uint>(1000000);
+
+            Shuffle(new Random(), keys);
         }
 
         #region Benchmarks
 
         [Benchmark]
-        public void DictionarySlim()
+        public void DenseMapSIMD()
         {
             foreach (var key in keys)
             {
-                _slim.GetOrAddValueRef(key);
+                _denseMap.Emplace(key, key);
             }
         }
 
         [Benchmark]
-        public void Dictionary()
+        public void DenseMap()
         {
             foreach (var key in keys)
             {
-                dic[key] = key;
+                _dense.Emplace(key, key);
             }
         }
 
@@ -71,11 +85,20 @@ namespace Faster.Map.Benchmark
         }
 
         [Benchmark]
-        public void DenseMap()
+        public void Dictionary()
         {
             foreach (var key in keys)
             {
-                _denseMap.Emplace(key, key);
+                dic[key] = key;
+            }
+        }
+
+        [Benchmark]
+        public void DictionarySlim()
+        {
+            foreach (var key in keys)
+            {
+                _slim.GetOrAddValueRef(key);
             }
         }
 

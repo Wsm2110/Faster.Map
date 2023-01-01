@@ -2,20 +2,26 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Numerics;
+using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics.X86;
+using System.Runtime.Intrinsics;
 using Faster.Map;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System.Runtime.CompilerServices;
 
 namespace Faster.UnitTest
 {
     [TestClass]
     public class DenseMapTests
     {
-
         private uint[] keys;
+
+        private byte[] _hashcodes = new byte[32];
 
         [TestInitialize]
         public void Setup()
-        {
+        {   
             var output = File.ReadAllText("Numbers.txt");
             var splittedOutput = output.Split(',');
 
@@ -26,7 +32,7 @@ namespace Faster.UnitTest
                 keys[index] = uint.Parse(splittedOutput[index]);
             }
 
-       //     Shuffle(new Random(), keys);
+            //     Shuffle(new Random(), keys);
         }
 
         private static void Shuffle<T>(Random rng, T[] a)
@@ -42,11 +48,10 @@ namespace Faster.UnitTest
 
         }
 
-
-        [TestMethod]
+           [TestMethod]
         public void AssertRetrievalFromMap()
         {
-            var densemap = new DenseMap<uint, uint>(5, 0.75);
+            var densemap = new DenseMapSIMD<uint, uint>(5, 0.75);
             densemap.Emplace(1, 100);
             densemap.Emplace(2, 200);
             densemap.Emplace(3, 300);
@@ -59,7 +64,7 @@ namespace Faster.UnitTest
         [TestMethod]
         public void AssertAddingEntriesShouldResize()
         {
-            var densemap = new DenseMap<uint, uint>(5, 0.75);
+            var densemap = new DenseMapSIMD<uint, uint>(5, 0.75);
             densemap.Emplace(1, 100);
             densemap.Emplace(2, 200);
             densemap.Emplace(3, 300);
@@ -72,7 +77,7 @@ namespace Faster.UnitTest
         [TestMethod]
         public void AssertRetrievalFromMapAfterResize()
         {
-            var densemap = new DenseMap<uint, uint>(5, 0.75);
+            var densemap = new DenseMapSIMD<uint, uint>(5, 0.75);
 
             densemap.Emplace(1, 100);
             densemap.Emplace(2, 200);
@@ -89,7 +94,7 @@ namespace Faster.UnitTest
         public void AssertUpdate()
         {
             //Assign
-            var faster = new DenseMap<ulong, ulong>(16, 0.88);
+            var faster = new DenseMapSIMD<ulong, ulong>(16, 0.88);
             faster.Emplace(454, 454);
             faster.Emplace(438, 438);
             faster.Emplace(422, 422);
@@ -109,7 +114,7 @@ namespace Faster.UnitTest
         public void AssertAddingAndRemovingSetsProperOffsetPartOne()
         {
             //assign
-            DenseMap<uint, uint> map = new DenseMap<uint, uint>(16);
+            DenseMapSIMD<uint, uint> map = new DenseMapSIMD<uint, uint>(16, 0.9);
 
             map.Emplace(202, 202); //13
             map.Emplace(131, 131); //15
@@ -121,30 +126,28 @@ namespace Faster.UnitTest
 
             //act
             map.Remove(681);
-            map.Remove(893);      
+            map.Remove(893);
         }
 
         [TestMethod]
         public void AssertbackShiftRemoval()
         {
-            var fmap = new DenseMap<uint, uint>(1000000, 0.75);
+            var fmap = new DenseMapSIMD<uint, uint>(1000000, 0.90);
 
-            foreach (var k in keys.Take(750000))
-
+            foreach (var k in keys.Take(900000))
             {
-                if (k == 1809306700) 
-                {
-                
-                }
-
-
                 if (!fmap.Emplace(k, k))
                 {
                     throw new InternalTestFailureException("Error occured while add");
                 }
             }
 
-            foreach (var k in keys.Take(750000))
+            Assert.AreEqual(900000, fmap.Count);
+
+            //find all entries from map
+
+            //var offset = 0;
+            foreach (var k in keys.Take(900000))
             {
                 if (!fmap.Get(k, out var result))
                 {
@@ -155,7 +158,9 @@ namespace Faster.UnitTest
                 }
             }
 
-            foreach (var k in keys.Take(750000))
+            //remove all entries from map
+
+            foreach (var k in keys.Take(900000))
             {
                 if (!fmap.Remove(k))
                 {
@@ -165,7 +170,22 @@ namespace Faster.UnitTest
                 }
             }
 
+
             Assert.IsTrue(fmap.Count == 0);
+
+            //map full of sentinals, try inserting again
+
+            foreach (var k in keys.Take(900000))
+            {
+                if (!fmap.Emplace(k, k))
+                {
+                    var index = fmap.IndexOf(k);
+
+                    throw new InternalTestFailureException("Error occured while removing");
+                }
+            }
+
+            Assert.AreEqual(900000, fmap.Count);
         }
     }
 }

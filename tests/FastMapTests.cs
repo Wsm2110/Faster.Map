@@ -369,7 +369,7 @@ namespace Faster.Map.Core.Tests
         [TestMethod]
         public void AssertbackShiftRemoval()
         {
-            var fmap = new FastMap<uint, uint>(16, 0.9);
+            var fmap = new FastMap<uint, uint>(1000000, 0.9);
 
             foreach (var k in keys)
             {

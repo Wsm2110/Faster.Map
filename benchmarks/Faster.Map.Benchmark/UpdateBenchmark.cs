@@ -13,11 +13,13 @@ namespace Faster.Map.Benchmark
         #region Fields
 
         FastMap<uint, uint> _fastMap = new FastMap<uint, uint>(16, 0.5);
-        private DenseMap<uint, uint> _denseMap = new DenseMap<uint, uint>(16);
+        private DenseMapSIMD<uint, uint> _denseMap = new DenseMapSIMD<uint, uint>(16);
+        private DenseMap<uint, uint> _dense = new DenseMap<uint, uint>(16);
+
         private Dictionary<uint, uint> dic = new Dictionary<uint, uint>();
         private Dictionary<uint, uint> dic2 = new Dictionary<uint, uint>();
         private DictionarySlim<uint, uint> _slim = new DictionarySlim<uint, uint>();
-
+    
 
         private uint[] keys;
         #endregion
@@ -92,11 +94,11 @@ namespace Faster.Map.Benchmark
         }
 
         [Benchmark]
-        public void UpdateMap()
+        public void UpdateDenseMap()
         {
             foreach (var key in keys)
             {
-                _denseMap.Update(key, 222);
+                _dense.Update(key, 222);
             }
         }
 

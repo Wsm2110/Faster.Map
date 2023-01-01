@@ -141,14 +141,15 @@ namespace Faster.Map
             _length = length == 0 ? 8 : length;
             _loadFactor = loadFactor;
 
-            var size = NextPow2(_length);
+           _length = NextPow2(_length);      
+
             _maxProbeSequenceLength = _loadFactor <= 0.5 ? Log2(_length) : PslLimit(_length);
 
-            _maxlengthBeforeResize = (uint)(size * loadFactor);
+            _maxlengthBeforeResize = (uint)(_length * loadFactor);
 
             _shift = _shift - Log2(_length) + 1;
-            _entries = new FastEntry<TKey, TValue>[size + _maxProbeSequenceLength + 1];
-            _info = new InfoByte[size + _maxProbeSequenceLength + 1];
+            _entries = new FastEntry<TKey, TValue>[_length + _maxProbeSequenceLength + 1];
+            _info = new InfoByte[_length + _maxProbeSequenceLength + 1];
         }
 
         #endregion
@@ -658,6 +659,7 @@ namespace Faster.Map
         {
             _shift--;
             _length = NextPow2(_length + 1);
+
             _maxProbeSequenceLength = _loadFactor <= 0.5 ? Log2(_length) : PslLimit(_length);
             _maxlengthBeforeResize = (uint)(_length * _loadFactor);
 

@@ -1,12 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
-using BenchmarkDotNet.Engines;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.Collections.Extensions;
 
 namespace Faster.Map.Benchmark
@@ -18,8 +13,8 @@ namespace Faster.Map.Benchmark
         #region Fields
 
         FastMap<uint, uint> _fastMap = new FastMap<uint, uint>(16, 0.5);
-        private DenseMap<uint, uint> _denseMap = new DenseMap<uint, uint>(16);
-        private DenseMap<uint, uint> _dense = new DenseMap<uint, uint>(16, 0.5);
+        private DenseMapSIMD<uint, uint> _denseMap = new DenseMapSIMD<uint, uint>(16);
+        private DenseMapSIMD<uint, uint> _dense = new DenseMapSIMD<uint, uint>(16, 0.5);
         private Dictionary<uint, uint> dic = new Dictionary<uint, uint>();
         private DictionarySlim<uint, uint> _slim = new DictionarySlim<uint, uint>();
 
