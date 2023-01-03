@@ -38,7 +38,7 @@ private DenseMap<uint, uint> _map = new DenseMap<uint, uint>(16);
  _map.Update(1, 51);
  ``` 
  
- #DenseMapSIMD
+ ### DenseMapSIMD
 ``` C#
 private DenseMapSIMD<uint, uint> _map = new DenseMapSIMD<uint, uint>(16);
  _map.Emplace(1, 50); 
