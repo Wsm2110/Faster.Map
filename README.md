@@ -52,34 +52,36 @@ private DenseMapSIMD<uint, uint> _map = new DenseMapSIMD<uint, uint>(16);
 ### Retrieving a million random generated keys
 |         Method |      Mean |     Error |    StdDev |
 |--------------- |----------:|----------:|----------:|
-| SlimDictionary | 19.305 ms | 0.1827 ms | 0.1620 ms |
-|     Dictionary | 23.199 ms | 0.4628 ms | 0.5144 ms |
-|   DenseMapSIMD |  9.685 ms | 0.1328 ms | 0.1109 ms |
-|       DenseMap | 15.714 ms | 0.3012 ms | 0.2958 ms |
-|        FastMap | 11.608 ms | 0.1197 ms | 0.1061 ms |
-
+| SlimDictionary | 14.041 ms | 0.1952 ms | 0.1731 ms |
+|     Dictionary | 16.712 ms | 0.3339 ms | 0.8000 ms |
+|   DenseMapSIMD |  8.151 ms | 0.1607 ms | 0.1651 ms |
+|       DenseMap | 16.126 ms | 0.1976 ms | 0.1848 ms |
+|        FastMap |  9.577 ms | 0.1660 ms | 0.1386 ms |
 
 ### Adding a million keys
 |         Method |     Mean |    Error |   StdDev |
 |--------------- |---------:|---------:|---------:|
-| DictionarySlim | 21.34 ms | 0.424 ms | 0.904 ms |
-|     Dictionary | 27.84 ms | 0.556 ms | 1.256 ms |
-|   DenseMapSIMD | 10.04 ms | 0.305 ms | 0.857 ms |
-|        FastMap | 14.88 ms | 0.292 ms | 0.437 ms |
-|       DenseMap | 26.81 ms | 0.689 ms | 2.011 ms |
+| DictionarySlim | 25.09 ms | 0.313 ms | 0.292 ms |
+| Dictionary     | 17.05 ms | 0.327 ms | 0.638 ms |
+| DenseMapSIMD   | 16.06 ms | 1.083 ms | 3.194 ms |
+| FastMap	     | 29.38 ms | 0.603 ms | 1.298 ms |
+| DenseMap       | 34.86 ms | 0.768 ms | 0.914 ms |
 
-### Updating a million keys
-|           Method |     Mean |    Error |   StdDev |   Median |
-|----------------- |---------:|---------:|---------:|---------:|
-|   DictionarySlim | 30.93 ms | 1.168 ms | 3.407 ms | 29.91 ms |
-|       Dictionary | 48.30 ms | 2.132 ms | 6.252 ms | 47.03 ms |
-|          FastMap | 13.62 ms | 0.272 ms | 0.511 ms | 13.60 ms |
-|         DenseMap | 22.63 ms | 0.487 ms | 1.420 ms | 22.63 ms |
+### Upsdating a million keys
+|         Method |     Mean |    Error |   StdDev |
+|--------------- |---------:|---------:|---------:|
+| SlimDictionary | 14.624 ms | 0.2158 ms | 0.1913 ms |
+|   Dictionary   | 19.102 ms | 0.3739 ms | 0.7023 ms |
+| DenseMapSIMD   | 13.136 ms | 0.2614 ms | 0.2445 ms |
+|      FastMap   |  9.953 ms | 0.1157 ms | 0.1082 ms |
+|     DenseMap   | 15.793 ms | 0.1122 ms | 0.0995 ms |
 
 ### Removing a million keys
 |         Method |      Mean |     Error |    StdDev |
 |--------------- |----------:|----------:|----------:|
-| SlimDictionary |  5.867 ms | 0.1152 ms | 0.2076 ms |
-|     Dictionary |  7.636 ms | 0.1703 ms | 0.4994 ms |
-|        FastMap | 21.410 ms | 0.5362 ms | 1.5297 ms |
-|       DenseMap | 37.651 ms | 0.9171 ms | 2.6752 ms |
+| SlimDictionary | 18.63 ms | 0.632 ms | 1.853 ms | 1
+|     Dictionary | 26.12 ms | 0.531 ms | 1.489 ms | 
+|        FastMap | 17.87 ms | 0.357 ms | 0.792 ms | 
+|   DenseMapSIMD | 18.77 ms | 0.357 ms | 0.334 ms | 
+|       DenseMap | 25.13 ms | 0.447 ms | 0.373 ms | 
+

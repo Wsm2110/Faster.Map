@@ -14,7 +14,7 @@ namespace Faster.Map.Benchmark
 
         FastMap<uint, uint> _fastMap = new FastMap<uint, uint>(16, 0.5);
         private DenseMapSIMD<uint, uint> _denseMap = new DenseMapSIMD<uint, uint>(16);
-        private DenseMapSIMD<uint, uint> _dense = new DenseMapSIMD<uint, uint>(16, 0.5);
+        private DenseMap<uint, uint> _dense = new DenseMap<uint, uint>(16, 0.5);
         private Dictionary<uint, uint> dic = new Dictionary<uint, uint>();
         private DictionarySlim<uint, uint> _slim = new DictionarySlim<uint, uint>();
 
@@ -24,7 +24,7 @@ namespace Faster.Map.Benchmark
         /// <summary>
         /// Generate a million Keys and shuffle them afterwards
         /// </summary>
-        [GlobalSetup]
+        [IterationSetup]
         public void Setup()
         {
             var output = File.ReadAllText("Numbers.txt");
@@ -40,13 +40,23 @@ namespace Faster.Map.Benchmark
             foreach (var key in keys)
             {
                 dic.Add(key, key);
-                _denseMap.Emplace(key, key);       
+                _denseMap.Emplace(key, key);
                 _fastMap.Emplace(key, key);
                 _dense.Emplace(key, key);
                 _slim.GetOrAddValueRef(key);
             }
 
-            Shuffle(new Random(), keys);
+            // Shuffle(new Random(), keys);
+        }
+
+        [IterationCleanup]
+        public void clear()
+        {
+            dic.Clear();
+            _denseMap.Clear();
+            _dense.Clear();
+            _fastMap.Clear();
+            _slim.Clear();
         }
 
         private static void Shuffle<T>(Random rng, T[] a)
@@ -91,7 +101,7 @@ namespace Faster.Map.Benchmark
         }
 
         [Benchmark]
-        public void Map()
+        public void DenseMapSIMD()
         {
             foreach (var key in keys)
             {
@@ -99,10 +109,16 @@ namespace Faster.Map.Benchmark
             }
         }
 
- 
+        [Benchmark]
+        public void DenseMap()
+        {
+            foreach (var key in keys)
+            {
+                _dense.Remove(key);
+            }
+        }
+
         #endregion
-
-
 
     }
 }

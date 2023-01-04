@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
 using Microsoft.Collections.Extensions;
+using Microsoft.Diagnostics.Tracing.Parsers.MicrosoftWindowsTCPIP;
 
 namespace Faster.Map.Benchmark
 {
@@ -18,7 +19,7 @@ namespace Faster.Map.Benchmark
         FastMap<uint, uint> _fastMap = new FastMap<uint, uint>(2000000); // remove resizing from benchmark hence the 2000000 size
         DenseMap<uint, uint> _dense = new DenseMap<uint, uint>(2000000);
         DenseMapSIMD<uint, uint> _denseMap = new DenseMapSIMD<uint, uint>(1000000, 0.9);
-        private Dictionary<uint, uint> dic = new Dictionary<uint, uint>(2000000);
+        private Dictionary<uint, uint> dic = new Dictionary<uint, uint>(1000000);
         private DictionarySlim<uint, uint> _slim = new DictionarySlim<uint, uint>(1000000);
         private uint[] keys;
 
@@ -27,9 +28,9 @@ namespace Faster.Map.Benchmark
         /// <summary>
         /// Generate a million Keys and shuffle them afterwards
         /// </summary>
-        [GlobalSetup]
-        public void Setup()
-        {
+        [IterationSetup]
+        public void Add()
+        {      
             var output = File.ReadAllText("Numbers.txt");
             var splittedOutput = output.Split(',');
 
@@ -40,40 +41,40 @@ namespace Faster.Map.Benchmark
                 keys[index] = uint.Parse(splittedOutput[index]);
             }
 
-            keys = keys.Take(899999).ToArray();      
+            keys = keys.Take(899999).ToArray();
+          //  Shuffle(new Random(), keys);
         }
 
         [IterationCleanup]
-        public void FinalizeBenchmark()
+        public void ResetMaps()
         {
-            _denseMap = new DenseMapSIMD<uint, uint>(1000000, 0.90); // wont resize
-            _dense = new DenseMap<uint, uint>(2000000); 
-            dic = new Dictionary<uint, uint>(20000000);
-            _slim = new DictionarySlim<uint, uint>(1000000);
-            _fastMap = new FastMap<uint, uint>(1000000);
-
-            Shuffle(new Random(), keys);
+           // _denseMap.Clear();
+            //_dense.Clear();
+          //  dic.Clear();
+           // _slim.Clear();
+            _fastMap.Clear();  
         }
 
         #region Benchmarks
 
-        [Benchmark]
-        public void DenseMapSIMD()
-        {
-            foreach (var key in keys)
-            {
-                _denseMap.Emplace(key, key);
-            }
-        }
+        //[Benchmark]
+        //public void DenseMapSIMD()
+        //{
+        //    for (int i = 0; i < keys.Length; i++)
+        //    {
+        //        uint key = keys[i];
+        //        _denseMap.Emplace(key, key);
+        //    }
+        //}
 
-        [Benchmark]
-        public void DenseMap()
-        {
-            foreach (var key in keys)
-            {
-                _dense.Emplace(key, key);
-            }
-        }
+        //[Benchmark]
+        //public void DenseMap()
+        //{
+        //    foreach (var key in keys)
+        //    {
+        //        _dense.Emplace(key, key);
+        //    }
+        //}
 
         [Benchmark]
         public void FastMap()
@@ -84,23 +85,23 @@ namespace Faster.Map.Benchmark
             }
         }
 
-        [Benchmark]
-        public void Dictionary()
-        {
-            foreach (var key in keys)
-            {
-                dic[key] = key;
-            }
-        }
+        //[Benchmark]
+        //public void Dictionary()
+        //{
+        //    foreach (var key in keys)
+        //    {
+        //        dic.Add(key, key);
+        //    }
+        //}
 
-        [Benchmark]
-        public void DictionarySlim()
-        {
-            foreach (var key in keys)
-            {
-                _slim.GetOrAddValueRef(key);
-            }
-        }
+        //[Benchmark]
+        //public void DictionarySlim()
+        //{
+        //    foreach (var key in keys)
+        //    {
+        //        _slim.GetOrAddValueRef(key);
+        //    }
+        //}
 
         #endregion
 

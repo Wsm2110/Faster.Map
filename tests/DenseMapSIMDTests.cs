@@ -36,6 +36,11 @@ namespace Faster.Map.Core.Tests
 
             foreach (var k in keys.Take(900000))
             {
+                if (k == 394624864) 
+                {
+                
+                }
+
                 if (!fmap.Emplace(k, k))
                 {
                     throw new InternalTestFailureException("Error occured while add");

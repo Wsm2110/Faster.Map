@@ -53,7 +53,7 @@ namespace Faster.Map.Benchmark
                 _slim.GetOrAddValueRef(key);
             }
 
-                Shuffle(new Random(), keys);
+            //    Shuffle(new Random(), keys);
         }
             
 
@@ -75,7 +75,7 @@ namespace Faster.Map.Benchmark
         {
             foreach (var key in keys)
             {
-                _slim.TryGetValue(key, out var result);
+                _slim.GetOrAddValueRef(key);
             }
         }
 
@@ -93,7 +93,7 @@ namespace Faster.Map.Benchmark
         {
             foreach (var key in keys)
             {
-                _denseMap.Get(key, out var result);                            
+                _denseMap.Get(key, out var result);
             }
         }
 
@@ -113,6 +113,6 @@ namespace Faster.Map.Benchmark
             {
                 _fastMap.Get(key, out var result);
             }
-        } 
+        }
     }
 }

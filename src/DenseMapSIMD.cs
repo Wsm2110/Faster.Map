@@ -107,13 +107,10 @@ namespace Faster.Map
 
         private const byte _emptyBucket = 0b11111111;
         private const byte _tombstone = 0b11111110;
-        private const byte _outOfBoundsBucket = 0b10000000;
         private const byte num_jump_distances = 16;
 
         private static readonly Vector128<byte> _emptyBucketVector = Vector128.Create(_emptyBucket);
         private static readonly Vector128<byte> _deletedBucketVector = Vector128.Create(_tombstone);
-        private static readonly Vector128<byte> _endBucketVector = Vector128.Create(_outOfBoundsBucket);
-
 
         private byte[] _metadata;
         private EntrySIMD<TKey, TValue>[] _entries;
@@ -124,6 +121,7 @@ namespace Faster.Map
         private uint _maxLookupsBeforeResize;
         private readonly double _loadFactor;
         private readonly IEqualityComparer<TKey> _compare;
+        private const byte _bitmask = (1 << 7) - 1;
 
         //Probing is done by incrementing the current bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
         //So first we jump by 1 group (meaning we just continue our linear scan), then 2 groups (skipping over 1 group), then 3 groups (skipping over 2 groups), and so on.
@@ -189,15 +187,9 @@ namespace Faster.Map
 
             _entries = new EntrySIMD<TKey, TValue>[_length + 16];
 
-            //Hashing to the last slot requires 16 additional slots + 1 which is always empty so we can return safely
-            _metadata = new byte[_length + 16 + 1];
-
-            for (int i = 0; i < _metadata.Length; i++)
-            {
-                _metadata[i] = _emptyBucket;
-            }
-
-            _metadata[_metadata.Length - 1] = _outOfBoundsBucket;
+            _metadata = new byte[_length + 16];
+            //fill metadata with emptybucket info
+            Array.Fill(_metadata, _emptyBucket);
         }
 
         #endregion
@@ -209,7 +201,7 @@ namespace Faster.Map
         /// </summary>
         /// <param name="key">The key.</param>
         /// <param name="value">The value.</param>
-        /// <returns>returns if succeeded, or not</returns>
+        /// <returns>returns false if key alreadyt exists</returns>
         [MethodImpl(256)]
         public bool Emplace(TKey key, TValue value)
         {
@@ -224,9 +216,9 @@ namespace Faster.Map
 
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = (uint)hashcode * GoldenRatio >> _shift;
-                       
-            // get 7 bits frop hash
-            byte h2 = (byte)(hashcode & 0x7F);
+
+            // get 7 high bits from hashcode
+            byte h2 = (byte)(hashcode & _bitmask);
 
             //  check if key is unique
             if (ContainsKey(ref h2, index, key))
@@ -306,7 +298,7 @@ namespace Faster.Map
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
             //create vector of the bottom 7 bits
-            var left = Vector128.Create((byte)(hashcode & 0x7F));
+            var left = Vector128.Create((byte)(hashcode & _bitmask));
 
             byte distance = 0;
             uint jumpDistance = 0;
@@ -381,7 +373,7 @@ namespace Faster.Map
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
             //create vector of lower first 7 bits
-            var left = Vector128.Create((byte)(hashcode & 0x7F));
+            var left = Vector128.Create((byte)(hashcode & _bitmask));
 
             byte distance = 0;
             uint jumpDistance = 0;
@@ -409,7 +401,7 @@ namespace Faster.Map
                         return true;
                     }
 
-                    //clear bit from bytearray
+                    //clear bit
                     result &= ~(1 << offset);
                 }
 
@@ -451,8 +443,8 @@ namespace Faster.Map
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
             //get lower first 7 bits
-          
-            var left = Vector128.Create((byte)(hashcode & 0x7F));
+
+            var left = Vector128.Create((byte)(hashcode & _bitmask));
 
             byte distance = 0;
             uint jumpDistance = 0;
@@ -472,10 +464,10 @@ namespace Faster.Map
                     var offset = BitOperations.TrailingZeroCount(result);
 
                     //get index and eq
-                     var entry =  _entries[index + jumpDistance + offset];
+                    var entry = _entries[index + jumpDistance + offset];
 
                     if (_compare.Equals(entry.Key, key))
-                    {                      
+                    {
                         _entries[index + jumpDistance + offset] = default;
                         _metadata[index + jumpDistance + offset] = _tombstone;
                         --Count;
@@ -526,7 +518,7 @@ namespace Faster.Map
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
             //create vector of the bottom 7 bits
-            var left = Vector128.Create((byte)(hashcode & 0x7F));
+            var left = Vector128.Create((byte)(hashcode & _bitmask));
 
             byte distance = 0;
             uint jumpDistance = 0;
@@ -604,7 +596,8 @@ namespace Faster.Map
         public void Clear()
         {
             Array.Clear(_entries);
-            Array.Clear(_metadata);
+            Array.Fill(_metadata, _emptyBucket);
+
             Count = 0;
         }
 
@@ -650,10 +643,10 @@ namespace Faster.Map
         {
             for (int i = 0; i < _entries.Length; i++)
             {
-                //if (_distanceFromBucket[i] == _emptyBucket)
-                //{
-                //    continue;
-                //}
+                if (_metadata[i] == _emptyBucket)
+                {
+                    continue;
+                }
 
                 var entry = _entries[i];
                 if (_compare.Equals(key, entry.Key))
@@ -718,15 +711,6 @@ namespace Faster.Map
                     return false;
                 }
 
-                //search for special out of bounds byte
-                comparison = Sse2.CompareEqual(_endBucketVector, right);
-                result = Sse2.MoveMask(comparison);
-                if (result != 0)
-                {
-                    //contains special byte (out of bounds array) - break;
-                    return false;
-                }
-
                 //calculate jump distance
                 jumpDistance = 16 * jump_distances[distance];
 
@@ -785,6 +769,7 @@ namespace Faster.Map
                     _metadata[index] = h2;
                     return;
                 }
+
                 //calculate jump distance          
                 jumpDistance = 16 * jump_distances[distance];
 
@@ -818,15 +803,11 @@ namespace Faster.Map
             var oldMetadata = new byte[_metadata.Length];
             Array.Copy(_metadata, oldMetadata, _metadata.Length);
 
-            _metadata = new byte[_length + 16 + 1];
+            _metadata = new byte[_length + 16];
+
+            Array.Fill(_metadata, _emptyBucket);
+
             _entries = new EntrySIMD<TKey, TValue>[_length + 16];
-
-            for (int i = 0; i < _metadata.Length; ++i)
-            {
-                _metadata[i] = _emptyBucket;
-            }
-
-            _metadata[_metadata.Length - 1] = _outOfBoundsBucket;
 
             for (var i = 0; i < oldEntries.Length; ++i)
             {

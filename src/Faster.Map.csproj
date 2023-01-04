@@ -8,22 +8,21 @@
     <LangVersion>Latest</LangVersion>
     <Authors>Wiljan Ruizendaal</Authors>
     <PackageReleaseNotes>
-      Remove multimap from the package.
-      Made sure the currentprobseq length is set to 0
+     Add DensemapSIMD to nuget package
+     increase verssion to 4.0.0
     </PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/Wsm2110/Faster.Map</PackageProjectUrl>
-    <AssemblyVersion>3.0.4.2</AssemblyVersion>
-    <FileVersion>3.0.4.2</FileVersion>
+    <AssemblyVersion>4.0.0</AssemblyVersion>
+    <FileVersion>4.0.0</FileVersion>
     <Title>Fastest .net hashmap</Title>
-    <Version>3.0.4.2</Version>
-        <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Version>4.0.0</Version>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Description>incredible fast hashmap using robinghood hashing</Description>
     <RepositoryUrl>https://github.com/Wsm2110/Faster.Map</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>Hashmap Hashtable Dictionary Faster.map, performance</PackageTags>
-
+    <PackageTags>Hashmap Hashtable Dictionary Faster.map performance simd, robinhood hashing, swisstable, absl</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
