@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using BenchmarkDotNet.Attributes;
 using Microsoft.Collections.Extensions;
 
@@ -37,7 +38,7 @@ namespace Faster.Map.Benchmark
                 keys[index] = uint.Parse(splittedOutput[index]);
             }
 
-            foreach (var key in keys)
+            foreach (var key in keys.Take(900000))
             {
                 dic.Add(key, key);
                 _denseMap.Emplace(key, key);

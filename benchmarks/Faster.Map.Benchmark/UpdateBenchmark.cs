@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Linq.Expressions;
 using BenchmarkDotNet.Attributes;
 using Microsoft.Collections.Extensions;
@@ -14,7 +15,7 @@ namespace Faster.Map.Benchmark
         #region Fields
 
         FastMap<uint, uint> _fastMap = new FastMap<uint, uint>(16, 0.5);
-        private DenseMapSIMD<uint, uint> _denseMap = new DenseMapSIMD<uint, uint>(1000000);
+        private DenseMapSIMD<uint, uint> _denseMap = new DenseMapSIMD<uint, uint>(1000000,0.9);
         private DenseMap<uint, uint> _dense = new DenseMap<uint, uint>(16);
 
         private Dictionary<uint, uint> dic = new Dictionary<uint, uint>();    
@@ -40,7 +41,7 @@ namespace Faster.Map.Benchmark
                 keys[index] = uint.Parse(splittedOutput[index]);
             }
 
-            foreach (var key in keys)
+            foreach (var key in keys.Take(900000))
             {
                 dic.Add(key, key);
                 _denseMap.Emplace(key, key);     
@@ -70,23 +71,23 @@ namespace Faster.Map.Benchmark
 
         #region Benchmarks
 
-        [Benchmark]
-        public void UpdateSlim()
-        {
-            foreach (var key in keys)
-            {
-                _slim.GetOrAddValueRef(key) = 222;
-            }
-        }
+        //[Benchmark]
+        //public void UpdateSlim()
+        //{
+        //    foreach (var key in keys)
+        //    {
+        //        _slim.GetOrAddValueRef(key) = 222;
+        //    }
+        //}
 
-        [Benchmark]
-        public void Dictionary()
-        {
-            foreach (var key in keys)
-            {
-                dic[key] = 222;
-            }
-        }
+        //[Benchmark]
+        //public void Dictionary()
+        //{
+        //    foreach (var key in keys)
+        //    {
+        //        dic[key] = 222;
+        //    }
+        //}
 
         [Benchmark]
         public void DenseMapSIMD()
@@ -97,23 +98,23 @@ namespace Faster.Map.Benchmark
             }
         }
 
-        [Benchmark]
-        public void FastMap()
-        {
-            foreach (var key in keys)
-            {
-                _fastMap.Update(key, 222);
-            }
-        }
+        //[Benchmark]
+        //public void FastMap()
+        //{
+        //    foreach (var key in keys)
+        //    {
+        //        _fastMap.Update(key, 222);
+        //    }
+        //}
 
-        [Benchmark]
-        public void DenseMap()
-        {
-            foreach (var key in keys)
-            {
-                _dense.Update(key, 222);
-            }
-        }
+        //[Benchmark]
+        //public void DenseMap()
+        //{
+        //    foreach (var key in keys)
+        //    {
+        //        _dense.Update(key, 222);
+        //    }
+        //}
           
         #endregion
     }

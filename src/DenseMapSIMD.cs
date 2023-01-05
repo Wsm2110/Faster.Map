@@ -105,14 +105,15 @@ namespace Faster.Map
 
         #region Fields
 
-        private const byte _emptyBucket = 0b11111111;
-        private const byte _tombstone = 0b11111110;
+        private const sbyte _emptyBucket = -127;
+        private const sbyte _tombstone = -126;
+        private const sbyte _outOfBoundsBucket = -1;
         private const byte num_jump_distances = 16;
+        private static readonly Vector128<sbyte> _emptyBucketVector = Vector128.Create(_emptyBucket);
+        private static readonly Vector128<sbyte> _deletedBucketVector = Vector128.Create(_tombstone);
+        private static readonly Vector128<sbyte> _emplaceBucketVector = Vector128.Create((sbyte)-125);
 
-        private static readonly Vector128<byte> _emptyBucketVector = Vector128.Create(_emptyBucket);
-        private static readonly Vector128<byte> _deletedBucketVector = Vector128.Create(_tombstone);
-
-        private byte[] _metadata;
+        private sbyte[] _metadata;
         private EntrySIMD<TKey, TValue>[] _entries;
 
         private const uint GoldenRatio = 0x9E3779B9; //2654435769;
@@ -187,7 +188,7 @@ namespace Faster.Map
 
             _entries = new EntrySIMD<TKey, TValue>[_length + 16];
 
-            _metadata = new byte[_length + 16];
+            _metadata = new sbyte[_length + 16];
             //fill metadata with emptybucket info
             Array.Fill(_metadata, _emptyBucket);
         }
@@ -201,8 +202,8 @@ namespace Faster.Map
         /// </summary>
         /// <param name="key">The key.</param>
         /// <param name="value">The value.</param>
-        /// <returns>returns false if key alreadyt exists</returns>
-        [MethodImpl(256)]
+        /// <returns>returns false if key already exists</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Emplace(TKey key, TValue value)
         {
             //Resize if loadfactor is reached
@@ -218,65 +219,62 @@ namespace Faster.Map
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
             // get 7 high bits from hashcode
-            byte h2 = (byte)(hashcode & _bitmask);
-
-            //  check if key is unique
-            if (ContainsKey(ref h2, index, key))
-            {
-                return false;
-            }
-
-            //create entry
-            EntrySIMD<TKey, TValue> entry = default;
-            entry.Value = value;
-            entry.Key = key;
+            sbyte h2 = (sbyte)(hashcode & _bitmask);
 
             byte distance = 0;
             uint jumpDistance = 0;
 
+            var left = Vector128.Create(h2);
+
             while (true)
             {
                 var right = Vector128.LoadUnsafe(ref _metadata[index], jumpDistance);
-                var tombstones = Sse2.CompareEqual(_deletedBucketVector, right);
 
-                //check for tombstones - deleted entries
-                int result = Sse2.MoveMask(tombstones);
-                if (result != 0)
+                //compare vectors
+                var comparison = Sse2.CompareEqual(left, right);
+
+                //convert to int bitarray
+                int result = Sse2.MoveMask(comparison);
+
+                //Check if key is unique
+                while (result != 0)
                 {
-                    index += jumpDistance + (uint)BitOperations.TrailingZeroCount(result);
+                    var offset = BitOperations.TrailingZeroCount(result);
+                    if (_compare.Equals(_entries[index + jumpDistance + offset].Key, key))
+                    {
+                        return true;
+                    }
 
-                    _entries[index] = entry;
-                    _metadata[index] = h2;
-
-                    ++Count;
-                    return true;
+                    //clear bit
+                    result &= ~(1 << offset);
                 }
 
-                var _emptyBuckets = Sse2.CompareEqual(_emptyBucketVector, right);
+                var emplaceVector = Sse2.CompareGreaterThan(_emplaceBucketVector, right);
 
-                //check for empty entries
-                result = Sse2.MoveMask(_emptyBuckets);
+                //check for tombstones - deleted and empty entries
+                result = Sse2.MoveMask(emplaceVector);
+
                 if (result != 0)
                 {
                     index += jumpDistance + (uint)BitOperations.TrailingZeroCount(result);
 
-                    _entries[index] = entry;
-                    _metadata[index] = h2;
+                    ref var x = ref _entries[index];
+                    x.Key = key;
+                    x.Value = value;
 
+                    _metadata[index] = h2;
                     ++Count;
                     return true;
                 }
 
                 //calculate jump distance
                 jumpDistance = 16 * jump_distances[distance];
-
                 distance++;
 
                 if (index + jumpDistance > _length)
                 {
                     Resize();
-                    EmplaceInternal(ref entry, ref h2);
-                    ++Count;
+                    EmplaceInternal(key, value, h2);
                     return true;
                 }
             }
@@ -298,7 +296,7 @@ namespace Faster.Map
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
             //create vector of the bottom 7 bits
-            var left = Vector128.Create((byte)(hashcode & _bitmask));
+            var left = Vector128.Create((sbyte)(hashcode & _bitmask));
 
             byte distance = 0;
             uint jumpDistance = 0;
@@ -363,7 +361,7 @@ namespace Faster.Map
         /// <param name="key"></param>
         /// <param name="value"></param>
         /// <returns> returns if update succeeded or not</returns>
-        [MethodImpl(256)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Update(TKey key, TValue value)
         {
             //Get object identity hashcode
@@ -373,7 +371,7 @@ namespace Faster.Map
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
             //create vector of lower first 7 bits
-            var left = Vector128.Create((byte)(hashcode & _bitmask));
+            var left = Vector128.Create((sbyte)(hashcode & _bitmask));
 
             byte distance = 0;
             uint jumpDistance = 0;
@@ -444,7 +442,7 @@ namespace Faster.Map
 
             //get lower first 7 bits
 
-            var left = Vector128.Create((byte)(hashcode & _bitmask));
+            var left = Vector128.Create((sbyte)(hashcode & _bitmask));
 
             byte distance = 0;
             uint jumpDistance = 0;
@@ -464,12 +462,15 @@ namespace Faster.Map
                     var offset = BitOperations.TrailingZeroCount(result);
 
                     //get index and eq
-                    var entry = _entries[index + jumpDistance + offset];
+
+                    var i = index + jumpDistance + offset;
+
+                    ref var entry = ref _entries[i];
 
                     if (_compare.Equals(entry.Key, key))
                     {
-                        _entries[index + jumpDistance + offset] = default;
-                        _metadata[index + jumpDistance + offset] = _tombstone;
+                        entry = default;
+                        _metadata[i] = _tombstone;
                         --Count;
                         return true;
                     }
@@ -518,7 +519,7 @@ namespace Faster.Map
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
             //create vector of the bottom 7 bits
-            var left = Vector128.Create((byte)(hashcode & _bitmask));
+            var left = Vector128.Create((sbyte)(hashcode & _bitmask));
 
             byte distance = 0;
             uint jumpDistance = 0;
@@ -661,80 +662,18 @@ namespace Faster.Map
 
         #region Private Methods
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool ContainsKey(ref byte h2, uint index, TKey key)
-        {
-            //create vector with partial hash h2
-            var left = Vector128.Create(h2);
-
-            //default jump distance             
-            byte distance = 0;
-
-            uint jumpDistance = 0;
-
-            while (true)
-            {
-                //load metadata unsafe
-                var right = Vector128.LoadUnsafe(ref _metadata[index], jumpDistance);
-
-                //compare vectors
-                var comparison = Sse2.CompareEqual(left, right);
-
-                //convert to int bitarray
-                int result = Sse2.MoveMask(comparison);
-
-                //Could be multiple bits which are set
-                while (result != 0)
-                {
-                    //retrieve offset 
-                    var offset = BitOperations.TrailingZeroCount(result);
-
-                    //get index and eq
-                    var entry = _entries[index + jumpDistance + offset];
-
-                    if (_compare.Equals(entry.Key, key))
-                    {
-                        return true;
-                    }
-
-                    //clear bit
-                    result &= ~(1 << offset);
-                }
-
-                //search for empty buckets
-                comparison = Sse2.CompareEqual(_emptyBucketVector, right);
-                result = Sse2.MoveMask(comparison);
-
-                if (result != 0)
-                {
-                    //contains empty buckets - break;
-                    return false;
-                }
-
-                //calculate jump distance
-                jumpDistance = 16 * jump_distances[distance];
-
-                distance++;
-
-                if (index + jumpDistance > _length)
-                {
-                    return false;
-                }
-            }
-        }
-
         /// <summary>
         /// Emplaces a new entry without checking for key existence. Keys have already been checked and are unique
         /// </summary>
         /// <param name="entry">The entry.</param>
         /// <param name="current">The distance.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void EmplaceInternal(ref EntrySIMD<TKey, TValue> entry, ref byte h2)
+        private void EmplaceInternal(TKey key, TValue value, sbyte h2)
         {
             //expensive if hashcode is slow, or when it`s not cached like strings
-            var hashcode = entry.Key.GetHashCode();
+            var hashcode = key.GetHashCode();
 
-            //calculatge index by using obhect identity * fibonaci followed by a shift
+            //calculat index by using object identity * fibonaci followed by a shift
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
             byte distance = 0;
@@ -743,42 +682,34 @@ namespace Faster.Map
             while (true)
             {
                 var right = Vector128.LoadUnsafe(ref _metadata[index], jumpDistance);
-                var tombstones = Sse2.CompareEqual(_deletedBucketVector, right);
+                var emplaceVector = Sse2.CompareGreaterThan(_emplaceBucketVector, right);
 
-                //check for tombstones - deleted entries
-                int result = Sse2.MoveMask(tombstones);
+                //check for tombstones - deleted  or empty entries
+
+                int result = Sse2.MoveMask(emplaceVector);
+
                 if (result != 0)
                 {
                     index += jumpDistance + (uint)BitOperations.TrailingZeroCount(result);
 
-                    _entries[index] = entry;
+                    ref var x = ref _entries[index];
+                    x.Key = key;
+                    x.Value = value;
+
                     _metadata[index] = h2;
 
                     return;
                 }
 
-                var _emptyBuckets = Sse2.CompareEqual(_emptyBucketVector, right);
+                //calculate jump distance
 
-                //check for empty entries
-                result = Sse2.MoveMask(_emptyBuckets);
-                if (result != 0)
-                {
-                    index += jumpDistance + (uint)BitOperations.TrailingZeroCount(result);
-
-                    _entries[index] = entry;
-                    _metadata[index] = h2;
-                    return;
-                }
-
-                //calculate jump distance          
                 jumpDistance = 16 * jump_distances[distance];
-
                 distance++;
 
                 if (index + jumpDistance > _length)
                 {
                     Resize();
-                    EmplaceInternal(ref entry, ref h2);
+                    EmplaceInternal(key, value, h2);
                     return;
                 }
             }
@@ -800,10 +731,10 @@ namespace Faster.Map
             var oldEntries = new EntrySIMD<TKey, TValue>[_entries.Length];
             Array.Copy(_entries, oldEntries, _entries.Length);
 
-            var oldMetadata = new byte[_metadata.Length];
+            var oldMetadata = new sbyte[_metadata.Length];
             Array.Copy(_metadata, oldMetadata, _metadata.Length);
 
-            _metadata = new byte[_length + 16];
+            _metadata = new sbyte[_length + 16];
 
             Array.Fill(_metadata, _emptyBucket);
 
@@ -819,7 +750,7 @@ namespace Faster.Map
 
                 var entry = oldEntries[i];
 
-                EmplaceInternal(ref entry, ref m);
+                // EmplaceInternal(ref entry, ref m);
             }
         }
 

@@ -28,9 +28,9 @@ namespace Faster.Map.Benchmark
         /// <summary>
         /// Generate a million Keys and shuffle them afterwards
         /// </summary>
-        [IterationSetup]
+        [GlobalSetup]
         public void Add()
-        {      
+        {
             var output = File.ReadAllText("Numbers.txt");
             var splittedOutput = output.Split(',');
 
@@ -42,30 +42,29 @@ namespace Faster.Map.Benchmark
             }
 
             keys = keys.Take(899999).ToArray();
-          //  Shuffle(new Random(), keys);
+            //  Shuffle(new Random(), keys);
         }
 
         [IterationCleanup]
         public void ResetMaps()
         {
-           // _denseMap.Clear();
+             _denseMap.Clear();
             //_dense.Clear();
-          //  dic.Clear();
-           // _slim.Clear();
-            _fastMap.Clear();  
+            //dic.Clear();
+            // _slim.Clear();
+            // _fastMap.Clear();  
         }
 
         #region Benchmarks
 
-        //[Benchmark]
-        //public void DenseMapSIMD()
-        //{
-        //    for (int i = 0; i < keys.Length; i++)
-        //    {
-        //        uint key = keys[i];
-        //        _denseMap.Emplace(key, key);
-        //    }
-        //}
+        [Benchmark]
+        public void DenseMapSIMD()
+        {
+            foreach (uint key in keys)
+            {
+                _denseMap.Emplace(key, key);
+            }
+        }
 
         //[Benchmark]
         //public void DenseMap()
@@ -76,14 +75,14 @@ namespace Faster.Map.Benchmark
         //    }
         //}
 
-        [Benchmark]
-        public void FastMap()
-        {
-            foreach (var key in keys)
-            {
-                _fastMap.Emplace(key, key);
-            }
-        }
+        //[Benchmark]
+        //public void FastMap()
+        //{
+        //    foreach (var key in keys)
+        //    {
+        //        _fastMap.Emplace(key, key);
+        //    }
+        //}
 
         //[Benchmark]
         //public void Dictionary()

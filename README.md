@@ -62,26 +62,25 @@ private DenseMapSIMD<uint, uint> _map = new DenseMapSIMD<uint, uint>(16);
 |         Method |     Mean |    Error |   StdDev |
 |--------------- |---------:|---------:|---------:|
 | DictionarySlim | 25.09 ms | 0.313 ms | 0.292 ms |
-| Dictionary     | 17.05 ms | 0.327 ms | 0.638 ms |
-| DenseMapSIMD   | 16.06 ms | 1.083 ms | 3.194 ms |
+| Dictionary     | 17.43 ms | 0.451 ms | 1.294 ms |
+| DenseMapSIMD   | 12.23 ms | 0.443 ms | 1.286 ms |
 | FastMap	     | 29.38 ms | 0.603 ms | 1.298 ms |
 | DenseMap       | 34.86 ms | 0.768 ms | 0.914 ms |
 
-### Upsdating a million keys
+### Updating a million keys
 |         Method |     Mean |    Error |   StdDev |
 |--------------- |---------:|---------:|---------:|
 | SlimDictionary | 14.624 ms | 0.2158 ms | 0.1913 ms |
 |   Dictionary   | 19.102 ms | 0.3739 ms | 0.7023 ms |
-| DenseMapSIMD   | 13.136 ms | 0.2614 ms | 0.2445 ms |
+| DenseMapSIMD   | 8.053 ms | 0.1523 ms | 0.1425 ms  |
 |      FastMap   |  9.953 ms | 0.1157 ms | 0.1082 ms |
 |     DenseMap   | 15.793 ms | 0.1122 ms | 0.0995 ms |
 
 ### Removing a million keys
 |         Method |      Mean |     Error |    StdDev |
 |--------------- |----------:|----------:|----------:|
-| SlimDictionary | 18.63 ms | 0.632 ms | 1.853 ms | 1
-|     Dictionary | 26.12 ms | 0.531 ms | 1.489 ms | 
-|        FastMap | 17.87 ms | 0.357 ms | 0.792 ms | 
-|   DenseMapSIMD | 18.77 ms | 0.357 ms | 0.334 ms | 
-|       DenseMap | 25.13 ms | 0.447 ms | 0.373 ms | 
-
+| SlimDictionary | 16.66 ms | 0.326 ms | 0.545 ms |
+|     Dictionary | 23.33 ms | 0.373 ms | 0.331 ms |
+|        FastMap | 17.53 ms | 0.341 ms | 0.407 ms |
+|   DenseMapSIMD | 14.71 ms | 0.288 ms | 0.332 ms |
+|       DenseMap | 25.16 ms | 0.395 ms | 0.350 ms |

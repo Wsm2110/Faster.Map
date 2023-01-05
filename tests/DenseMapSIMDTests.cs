@@ -29,6 +29,8 @@ namespace Faster.Map.Core.Tests
             //     Shuffle(new Random(), keys);
         }
 
+        Test
+
         [TestMethod]
         public void AssertDailyUseCaseWithoutResize()
         {
@@ -36,11 +38,6 @@ namespace Faster.Map.Core.Tests
 
             foreach (var k in keys.Take(900000))
             {
-                if (k == 394624864) 
-                {
-                
-                }
-
                 if (!fmap.Emplace(k, k))
                 {
                     throw new InternalTestFailureException("Error occured while add");
@@ -74,7 +71,6 @@ namespace Faster.Map.Core.Tests
                     throw new InternalTestFailureException("Error occured while removing");
                 }
             }
-
 
             Assert.IsTrue(fmap.Count == 0);
 
