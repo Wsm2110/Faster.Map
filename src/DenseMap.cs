@@ -176,6 +176,10 @@ namespace Faster.Map
             //Resize if loadfactor is reached
             if (Count >= _maxLookupsBeforeResize)
             {
+#if DEBUG
+                Console.WriteLine((double)(Count / (_length / 100)));
+#endif
+
                 Resize();
             }
 

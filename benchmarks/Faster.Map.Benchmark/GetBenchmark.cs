@@ -71,24 +71,6 @@ namespace Faster.Map.Benchmark
         }
 
         [Benchmark]
-        public void SlimDictionary()
-        {
-            foreach (var key in keys)
-            {
-                _slim.GetOrAddValueRef(key);
-            }
-        }
-
-        [Benchmark]
-        public void Dictionary()
-        {
-            foreach (var key in keys)
-            {
-                dic.TryGetValue(key, out var result);
-            }
-        }
-
-        [Benchmark]
         public void DenseMapSIMD()
         {
             foreach (var key in keys)
@@ -114,5 +96,25 @@ namespace Faster.Map.Benchmark
                 _fastMap.Get(key, out var result);
             }
         }
+
+        [Benchmark]
+        public void SlimDictionary()
+        {
+            foreach (var key in keys)
+            {
+                _slim.GetOrAddValueRef(key);
+            }
+        }
+
+        [Benchmark]
+        public void Dictionary()
+        {
+            foreach (var key in keys)
+            {
+                dic.TryGetValue(key, out var result);
+            }
+        }
+
+
     }
 }

@@ -28,9 +28,7 @@ namespace Faster.Map.Core.Tests
 
             //     Shuffle(new Random(), keys);
         }
-
-        Test
-
+             
         [TestMethod]
         public void AssertDailyUseCaseWithoutResize()
         {
@@ -95,7 +93,7 @@ namespace Faster.Map.Core.Tests
             var fmap = new DenseMapSIMD<uint, uint>(16);
 
             foreach (var k in keys.Take(900000))
-            {
+            {  
                 if (!fmap.Emplace(k, k))
                 {
                     throw new InternalTestFailureException("Error occured while add");
@@ -111,7 +109,6 @@ namespace Faster.Map.Core.Tests
             {
                 if (!fmap.Get(k, out var result))
                 {
-
                     var index = fmap.IndexOf(k);
 
                     throw new InternalTestFailureException("Error occured while get");
@@ -146,7 +143,5 @@ namespace Faster.Map.Core.Tests
 
             Assert.AreEqual(900000, fmap.Count);
         }
-
-
     }
 }

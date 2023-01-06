@@ -54,7 +54,7 @@ private DenseMapSIMD<uint, uint> _map = new DenseMapSIMD<uint, uint>(16);
 |--------------- |----------:|----------:|----------:|
 | SlimDictionary | 14.041 ms | 0.1952 ms | 0.1731 ms |
 |     Dictionary | 16.712 ms | 0.3339 ms | 0.8000 ms |
-|   DenseMapSIMD |  8.151 ms | 0.1607 ms | 0.1651 ms |
+|   DenseMapSIMD |  7.604 ms | 0.1050 ms | 0.0982 ms |
 |       DenseMap | 16.126 ms | 0.1976 ms | 0.1848 ms |
 |        FastMap |  9.577 ms | 0.1660 ms | 0.1386 ms |
 

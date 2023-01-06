@@ -8,6 +8,7 @@ using Faster.Map.Core;
 using System.ComponentModel;
 using System.Diagnostics.Metrics;
 using System.Drawing;
+using System.Diagnostics;
 
 namespace Faster.Map
 {
@@ -107,8 +108,7 @@ namespace Faster.Map
 
         private const sbyte _emptyBucket = -127;
         private const sbyte _tombstone = -126;
-        private const sbyte _outOfBoundsBucket = -1;
-        private const byte num_jump_distances = 16;
+
         private static readonly Vector128<sbyte> _emptyBucketVector = Vector128.Create(_emptyBucket);
         private static readonly Vector128<sbyte> _deletedBucketVector = Vector128.Create(_tombstone);
         private static readonly Vector128<sbyte> _emplaceBucketVector = Vector128.Create((sbyte)-125);
@@ -123,14 +123,21 @@ namespace Faster.Map
         private readonly double _loadFactor;
         private readonly IEqualityComparer<TKey> _compare;
         private const byte _bitmask = (1 << 7) - 1;
+        private const byte num_jump_distances = 31;
 
         //Probing is done by incrementing the current bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
         //So first we jump by 1 group (meaning we just continue our linear scan), then 2 groups (skipping over 1 group), then 3 groups (skipping over 2 groups), and so on.
         //Interestingly, this pattern perfectly lines up with our power-of-two size such that we will visit every single bucket exactly once without any repeats(searching is therefore guaranteed to terminate as we always have at least one EMPTY bucket).
-        //Also note that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS). Also also note that we expect to almost never actually probe, since that’s WIDTH(8-16) non-EMPTY buckets we need to fail to find our key in.//
-        private static uint[] jump_distances = new uint[num_jump_distances]
+        //Also note that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
+        //Also also note that we expect to almost never actually probe, since that’s WIDTH(16) non-EMPTY buckets we need to fail to find our key in.
+        private readonly uint[] jump_distances = new uint[num_jump_distances]
         {
-           1, 3, 6, 10, 15, 21, 28, 36, 45, 55, 66, 78, 91, 105, 120, 136
+           //    3,   6,  10, 15, 21, 28, 36, 45, 55, 66, 78, 91, 105, 120, 136, 153, 171, 190, 210, 231,
+           //  253, 276, 300, 325, 351, 378, 406, 435, 465, 496, 528, 561, 595, 630,
+           // * 16 - 16 starting point
+
+          32, 80, 144, 240, 320, 432, 560, 704, 864, 1040, 1232, 1440, 1664, 1905, 2160, 2432,
+          2720, 3344, 3680, 4032, 4400, 4784, 5184, 5600, 6032, 6480, 6944, 7424, 7920, 8432, 8960
         };
 
         #endregion
@@ -172,6 +179,11 @@ namespace Faster.Map
             _length = length;
             _loadFactor = loadFactor;
 
+            if (loadFactor > 0.9)
+            {
+                loadFactor = 0.9;
+            }
+
             if (BitOperations.IsPow2(length))
             {
                 _length = length;
@@ -184,11 +196,12 @@ namespace Faster.Map
             _maxLookupsBeforeResize = (uint)(_length * loadFactor);
             _compare = keyComparer ?? EqualityComparer<TKey>.Default;
 
-            _shift = _shift - Log2(_length) + 1;
+            _shift = _shift - BitOperations.Log2(_length);
 
             _entries = new EntrySIMD<TKey, TValue>[_length + 16];
 
             _metadata = new sbyte[_length + 16];
+
             //fill metadata with emptybucket info
             Array.Fill(_metadata, _emptyBucket);
         }
@@ -209,17 +222,21 @@ namespace Faster.Map
             //Resize if loadfactor is reached
             if (Count >= _maxLookupsBeforeResize)
             {
+#if DEBUG
+                Debug.WriteLine($"{Count} expected {_maxLookupsBeforeResize}");
+#endif
                 Resize();
             }
 
             // get object identity hashcode
             var hashcode = key.GetHashCode();
 
-            // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
-            uint index = (uint)hashcode * GoldenRatio >> _shift;
-
             // get 7 high bits from hashcode
             sbyte h2 = (sbyte)(hashcode & _bitmask);
+
+            start:
+            // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
+            uint index = (uint)hashcode * GoldenRatio >> _shift;
 
             byte distance = 0;
             uint jumpDistance = 0;
@@ -249,6 +266,7 @@ namespace Faster.Map
                     result &= ~(1 << offset);
                 }
 
+                //use greaterThan so we can find al tombstones and empty entries (-126, -127)
                 var emplaceVector = Sse2.CompareGreaterThan(_emplaceBucketVector, right);
 
                 //check for tombstones - deleted and empty entries
@@ -256,27 +274,36 @@ namespace Faster.Map
 
                 if (result != 0)
                 {
+                    //calculate proper index
                     index += jumpDistance + (uint)BitOperations.TrailingZeroCount(result);
 
-                    ref var x = ref _entries[index];
-                    x.Key = key;
-                    x.Value = value;
+                    //retrieve entry
+                    ref var current = ref _entries[index];
 
+                    //set key and value
+                    current.Key = key;
+                    current.Value = value;
+
+                    // add h2 to metadata
                     _metadata[index] = h2;
                     ++Count;
                     return true;
                 }
 
                 //calculate jump distance
-                jumpDistance = 16 * jump_distances[distance];
-                distance++;
+                jumpDistance = jump_distances[distance];
 
                 if (index + jumpDistance > _length)
                 {
+#if DEBUG
+                    Debug.WriteLine($"Resize - {Count} expected {_maxLookupsBeforeResize}");
+#endif
                     Resize();
-                    EmplaceInternal(key, value, h2);
-                    return true;
+                    //go to start and try again
+                    goto start;
                 }
+
+                distance++;
             }
         }
 
@@ -335,23 +362,21 @@ namespace Faster.Map
                 if (result != 0)
                 {
                     //contains empty buckets - break;
-
                     value = default;
-
                     //not found
                     return false;
                 }
 
                 //calculate jump distance
-                jumpDistance = 16 * jump_distances[distance];
+                jumpDistance = jump_distances[distance];
 
-                distance++;
-
-                if (index + jumpDistance > _length + 16)
+                if (index + jumpDistance > _length)
                 {
                     value = default;
                     return false;
                 }
+
+                distance++;
             }
         }
 
@@ -413,16 +438,15 @@ namespace Faster.Map
                 }
 
                 //calculate jump distance
-                jumpDistance = 16 * jump_distances[distance];
-
-                distance++;
+                jumpDistance = jump_distances[distance];
 
                 if (index + jumpDistance > _length)
                 {
                     return false;
                 }
-            }
 
+                ++distance;
+            }
             return false;
         }
 
@@ -490,15 +514,14 @@ namespace Faster.Map
                 }
 
                 //calculate jump distance
-
-                jumpDistance = 16 * jump_distances[distance];
-
-                distance++;
+                jumpDistance = jump_distances[distance];
 
                 if (index + jumpDistance > _length)
                 {
                     return false;
                 }
+
+                distance++;
             }
 
             return false;
@@ -561,14 +584,14 @@ namespace Faster.Map
                 }
 
                 //calculate jump distance
-                jumpDistance = 16 * jump_distances[distance];
-
-                distance++;
+                jumpDistance = jump_distances[distance];
 
                 if (index + jumpDistance > _length)
                 {
                     return false;
                 }
+
+                distance++;
             }
         }
 
@@ -636,7 +659,7 @@ namespace Faster.Map
         }
 
         /// <summary>
-        /// Returns an index of the specified key.
+        /// Returns an index of a key. Mostly used for testing purposes
         /// </summary>
         /// <param name="key">The key.</param>
         /// <returns></returns>
@@ -668,11 +691,12 @@ namespace Faster.Map
         /// <param name="entry">The entry.</param>
         /// <param name="current">The distance.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void EmplaceInternal(TKey key, TValue value, sbyte h2)
+        private void EmplaceInternal(EntrySIMD<TKey, TValue> entry, sbyte h2)
         {
             //expensive if hashcode is slow, or when it`s not cached like strings
-            var hashcode = key.GetHashCode();
+            var hashcode = entry.Key.GetHashCode();
 
+            start:
             //calculat index by using object identity * fibonaci followed by a shift
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
@@ -693,8 +717,7 @@ namespace Faster.Map
                     index += jumpDistance + (uint)BitOperations.TrailingZeroCount(result);
 
                     ref var x = ref _entries[index];
-                    x.Key = key;
-                    x.Value = value;
+                    x = entry;
 
                     _metadata[index] = h2;
 
@@ -703,15 +726,15 @@ namespace Faster.Map
 
                 //calculate jump distance
 
-                jumpDistance = 16 * jump_distances[distance];
-                distance++;
+                jumpDistance = jump_distances[distance];
 
-                if (index + jumpDistance > _length)
+                if (index + jumpDistance + 16 > _length)
                 {
                     Resize();
-                    EmplaceInternal(key, value, h2);
-                    return;
+                    goto start;
                 }
+
+                distance++;
             }
         }
 
@@ -750,22 +773,11 @@ namespace Faster.Map
 
                 var entry = oldEntries[i];
 
-                // EmplaceInternal(ref entry, ref m);
+                EmplaceInternal(entry, m);
             }
         }
 
-        // used for set checking operations (using enumerables) that rely on counting
-        private static byte Log2(uint value)
-        {
-            byte c = 0;
-            while (value > 0)
-            {
-                c++;
-                value >>= 1;
-            }
 
-            return c;
-        }
 
         #endregion
     }
