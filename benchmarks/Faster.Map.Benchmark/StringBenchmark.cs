@@ -8,29 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace Faster.Map.Benchmark
-{
-    public struct StringWrapper : IEquatable<StringWrapper>
-    {
-        int _hashcode = 0;
-
-        public string Value { get; set; }
-
-        public StringWrapper(string s)
-        {
-            Value = s;
-            _hashcode = s.GetHashCode();
-        }
-
-        public override int GetHashCode()
-        {
-            return _hashcode;
-        }
-
-        public bool Equals(StringWrapper other)
-        {
-           return Value.Equals(other.Value);
-        }
-    }
+{ 
 
     public class StringBenchmark
     {
