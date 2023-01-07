@@ -11,7 +11,7 @@ namespace Faster.Map
     /// <summary>
     /// This hashmap uses the following
     /// - Open addressing
-    /// - Uses Quadratic probing 
+    /// - Quadratic probing 
     /// - loadfactor by default is 0.9 while maintaining an incredible speed
     /// - fibonacci hashing
     /// </summary>
@@ -193,9 +193,7 @@ namespace Faster.Map
             _compare = keyComparer ?? EqualityComparer<TKey>.Default;
 
             _shift = _shift - BitOperations.Log2(_length);
-
             _entries = new EntrySIMD<TKey, TValue>[_length + 16];
-
             _metadata = new sbyte[_length + 16];
 
             //fill metadata with emptybucket info
@@ -291,10 +289,12 @@ namespace Faster.Map
 
                 if (index + jumpDistance > _length)
                 {
+
 #if DEBUG
                     Debug.WriteLine($"Resize - {Count} expected {_maxLookupsBeforeResize}");
 #endif
                     Resize();
+
                     //go to start and try again
                     goto start;
                 }
