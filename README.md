@@ -55,7 +55,7 @@ private DenseMapSIMD<uint, uint> _map = new DenseMapSIMD<uint, uint>(16);
 | SlimDictionary | 14.041 ms | 0.1952 ms | 0.1731 ms |
 |     Dictionary | 16.712 ms | 0.3339 ms | 0.8000 ms |
 |   DenseMapSIMD |  7.604 ms | 0.1050 ms | 0.0982 ms |
-|       DenseMap | 16.126 ms | 0.1976 ms | 0.1848 ms |
+|       DenseMap | 13.126 ms | 0.1976 ms | 0.1848 ms |
 |        FastMap |  9.577 ms | 0.1660 ms | 0.1386 ms |
 
 ### Adding a million keys
@@ -74,7 +74,7 @@ private DenseMapSIMD<uint, uint> _map = new DenseMapSIMD<uint, uint>(16);
 |   Dictionary   | 19.102 ms | 0.3739 ms | 0.7023 ms |
 | DenseMapSIMD   | 8.053 ms | 0.1523 ms | 0.1425 ms  |
 |      FastMap   |  9.953 ms | 0.1157 ms | 0.1082 ms |
-|     DenseMap   | 15.793 ms | 0.1122 ms | 0.0995 ms |
+|     DenseMap   | 13.793 ms | 0.1122 ms | 0.0995 ms |
 
 ### Removing a million keys
 |         Method |      Mean |     Error |    StdDev |

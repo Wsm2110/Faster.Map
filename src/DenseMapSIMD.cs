@@ -110,7 +110,7 @@ namespace Faster.Map
         private static readonly Vector128<sbyte> _emplaceBucketVector = Vector128.Create((sbyte)-125);
 
         private sbyte[] _metadata;
-        private EntrySIMD<TKey, TValue>[] _entries;
+        private Entry<TKey, TValue>[] _entries;
 
         private const uint GoldenRatio = 0x9E3779B9; //2654435769;
         private uint _length;
@@ -193,7 +193,7 @@ namespace Faster.Map
             _compare = keyComparer ?? EqualityComparer<TKey>.Default;
 
             _shift = _shift - BitOperations.Log2(_length);
-            _entries = new EntrySIMD<TKey, TValue>[_length + 16];
+            _entries = new Entry<TKey, TValue>[_length + 16];
             _metadata = new sbyte[_length + 16];
 
             //fill metadata with emptybucket info
@@ -678,7 +678,7 @@ namespace Faster.Map
         /// <param name="entry">The entry.</param>
         /// <param name="current">The distance.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void EmplaceInternal(EntrySIMD<TKey, TValue> entry, sbyte h2)
+        private void EmplaceInternal(Entry<TKey, TValue> entry, sbyte h2)
         {
             //expensive if hashcode is slow, or when it`s not cached like strings
             var hashcode = entry.Key.GetHashCode();
@@ -738,7 +738,7 @@ namespace Faster.Map
 
             _maxLookupsBeforeResize = (uint)(_length * _loadFactor);
 
-            var oldEntries = new EntrySIMD<TKey, TValue>[_entries.Length];
+            var oldEntries = new Entry<TKey, TValue>[_entries.Length];
             Array.Copy(_entries, oldEntries, _entries.Length);
 
             var oldMetadata = new sbyte[_metadata.Length];
@@ -748,12 +748,12 @@ namespace Faster.Map
 
             Array.Fill(_metadata, _emptyBucket);
 
-            _entries = new EntrySIMD<TKey, TValue>[_length + 16];
+            _entries = new Entry<TKey, TValue>[_length + 16];
 
             for (var i = 0; i < oldEntries.Length; ++i)
             {
                 var m = oldMetadata[i];
-                if (_metadata[i] <= 0)
+                if (m <= 0)
                 {
                     continue;
                 }

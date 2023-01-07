@@ -106,7 +106,7 @@ namespace Faster.Map
         #region Fields
 
         private InfoByte[] _info;
-        private FastEntry<TKey, TValue>[] _entries;
+        private Entry<TKey, TValue>[] _entries;
         private uint _length;
         private readonly double _loadFactor;
         private const uint GoldenRatio = 0x9E3779B9; //2654435769;
@@ -148,7 +148,7 @@ namespace Faster.Map
             _maxlengthBeforeResize = (uint)(_length * loadFactor);
 
             _shift = _shift - Log2(_length) + 1;
-            _entries = new FastEntry<TKey, TValue>[_length + _maxProbeSequenceLength + 1];
+            _entries = new Entry<TKey, TValue>[_length + _maxProbeSequenceLength + 1];
             _info = new InfoByte[_length + _maxProbeSequenceLength + 1];
         }
 
@@ -184,7 +184,7 @@ namespace Faster.Map
             }
 
             //Create entry
-            FastEntry<TKey, TValue> fastEntry = default;
+            Entry<TKey, TValue> fastEntry = default;
             fastEntry.Value = value;
             fastEntry.Key = key;
 
@@ -520,7 +520,7 @@ namespace Faster.Map
         /// <param name="entry">The fast entry.</param>
         /// <param name="current">The information byte.</param>
         [MethodImpl(256)]
-        private void EmplaceInternal(ref FastEntry<TKey, TValue> entry, ref InfoByte current)
+        private void EmplaceInternal(ref Entry<TKey, TValue> entry, ref InfoByte current)
         {
             //get objectidentiy
             var hashcode = entry.Key.GetHashCode();
@@ -568,7 +568,7 @@ namespace Faster.Map
         /// <param name="x">The x.</param>
         /// <param name="y">The y.</param>
         [MethodImpl(256)]
-        private void Swap(ref FastEntry<TKey, TValue> x, ref FastEntry<TKey, TValue> y)
+        private void Swap(ref Entry<TKey, TValue> x, ref Entry<TKey, TValue> y)
         {
             var tmp = x;
             x = y;
@@ -663,7 +663,7 @@ namespace Faster.Map
             _maxProbeSequenceLength = _loadFactor <= 0.5 ? Log2(_length) : PslLimit(_length);
             _maxlengthBeforeResize = (uint)(_length * _loadFactor);
 
-            var oldEntries = new FastEntry<TKey, TValue>[_entries.Length];
+            var oldEntries = new Entry<TKey, TValue>[_entries.Length];
             Array.Copy(_entries, oldEntries, _entries.Length);
 
             _currentProbeSequenceLength = 0;
@@ -671,7 +671,7 @@ namespace Faster.Map
             var oldInfo = new InfoByte[_info.Length];
             Array.Copy(_info, oldInfo, _info.Length);
 
-            _entries = new FastEntry<TKey, TValue>[_length + _maxProbeSequenceLength + 1];
+            _entries = new Entry<TKey, TValue>[_length + _maxProbeSequenceLength + 1];
             _info = new InfoByte[_length + _maxProbeSequenceLength + 1];
 
             for (var i = 0; i < oldEntries.Length; ++i)

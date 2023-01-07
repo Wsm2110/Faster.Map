@@ -13,11 +13,6 @@ namespace Faster.Map.Core
     public struct Entry<TKey, TValue>
     {
         /// <summary>
-        /// The hashcode
-        /// </summary>
-        public int Hashcode { get; set; }
-
-        /// <summary>
         /// Gets or sets the key.
         /// </summary>
         /// <value>

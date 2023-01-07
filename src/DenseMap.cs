@@ -199,8 +199,7 @@ namespace Faster.Map
             Entry<TKey, TValue> entry = default;
             entry.Value = value;
             entry.Key = key;
-            entry.Hashcode = hashcode;
-
+         
             //Create default infobyte
             InfoByte current = default;
 
@@ -277,7 +276,7 @@ namespace Faster.Map
                 ref var entry = ref _entries[index];
 
                 //validate hashcode
-                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key))
+                if (_keyCompare.Equals(key, entry.Key))
                 {
                     value = entry.Value;
                     return true;
@@ -314,7 +313,7 @@ namespace Faster.Map
                 ref var entry = ref _entries[index];
 
                 //validate hashcode
-                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key))
+                if (_keyCompare.Equals(key, entry.Key))
                 {
                     entry.Value = value;
                     return true;
@@ -351,7 +350,7 @@ namespace Faster.Map
                 ref var entry = ref _entries[index];
 
                 //validate hash en compare keys
-                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key))
+                if (_keyCompare.Equals(key, entry.Key))
                 {
                     //remove entry from list
                     entry = default;
@@ -402,7 +401,7 @@ namespace Faster.Map
                 var entry = _entries[index];
 
                 //validate hash
-                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key))
+                if (_keyCompare.Equals(key, entry.Key))
                 {
                     return true;
                 }
@@ -411,7 +410,7 @@ namespace Faster.Map
                 entry = _entries[++index];
 
                 //validate hash
-                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key))
+                if (_keyCompare.Equals(key, entry.Key))
                 {
                     return true;
                 }
@@ -505,7 +504,7 @@ namespace Faster.Map
                 }
 
                 var entry = _entries[i];
-                if (entry.Hashcode == key.GetHashCode() && _keyCompare.Equals(key, entry.Key))
+                if (_keyCompare.Equals(key, entry.Key))
                 {
                     return i;
                 }
@@ -529,7 +528,7 @@ namespace Faster.Map
                 ref var entry = ref _entries[index];
 
                 //validate hash
-                if (hashcode == entry.Hashcode && _keyCompare.Equals(key, entry.Key))
+                if (_keyCompare.Equals(key, entry.Key))
                 {
                     return true;
                 }
@@ -550,7 +549,7 @@ namespace Faster.Map
         [MethodImpl(256)]
         private void EmplaceInternal(Entry<TKey, TValue> entry, InfoByte current)
         {
-            uint index = (uint)entry.Hashcode * GoldenRatio >> _shift;
+            uint index = (uint)entry.Key.GetHashCode() * GoldenRatio >> _shift;
             current.Psl = 0;
 
             ref var info = ref _info[index];
