@@ -5,10 +5,6 @@ using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics.X86;
 using System.Runtime.Intrinsics;
 using Faster.Map.Core;
-using System.ComponentModel;
-using System.Diagnostics.Metrics;
-using System.Drawing;
-using System.Diagnostics;
 
 namespace Faster.Map
 {
@@ -52,7 +48,7 @@ namespace Faster.Map
                 //iterate backwards so we can remove the item
                 for (int i = _metadata.Length - 1; i >= 0; --i)
                 {
-                    if (_metadata[i] != _emptyBucket)
+                    if (_metadata[i] >= 0)
                     {
                         var entry = _entries[i];
                         yield return new KeyValuePair<TKey, TValue>(entry.Key, entry.Value);
@@ -74,7 +70,7 @@ namespace Faster.Map
                 //iterate backwards so we can remove the distance item
                 for (int i = _metadata.Length - 1; i >= 0; --i)
                 {
-                    if (_metadata[i] != _emptyBucket)
+                    if (_metadata[i] >= 0)
                     {
                         yield return _entries[i].Key;
                     }
@@ -94,7 +90,7 @@ namespace Faster.Map
             {
                 for (int i = _metadata.Length - 1; i >= 0; --i)
                 {
-                    if (_metadata[i] != _emptyBucket)
+                    if (_metadata[i] >= 0)
                     {
                         yield return _entries[i].Value;
                     }
@@ -603,8 +599,7 @@ namespace Faster.Map
         {
             for (var i = 0; i < denseMap._entries.Length; ++i)
             {
-                var metadata = denseMap._metadata[i];
-                if (metadata == _emptyBucket)
+                if (_metadata[i] <= 0)
                 {
                     continue;
                 }
@@ -667,7 +662,7 @@ namespace Faster.Map
         {
             for (int i = 0; i < _entries.Length; i++)
             {
-                if (_metadata[i] == _emptyBucket)
+                if (_metadata[i] <= 0)
                 {
                     continue;
                 }
@@ -766,7 +761,7 @@ namespace Faster.Map
             for (var i = 0; i < oldEntries.Length; ++i)
             {
                 var m = oldMetadata[i];
-                if (m == _emptyBucket || m == _tombstone)
+                if (_metadata[i] <= 0)
                 {
                     continue;
                 }
