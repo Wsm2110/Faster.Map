@@ -107,7 +107,6 @@ namespace Faster.Map
         private const sbyte _tombstone = -126;
 
         private static readonly Vector128<sbyte> _emptyBucketVector = Vector128.Create(_emptyBucket);
-        private static readonly Vector128<sbyte> _deletedBucketVector = Vector128.Create(_tombstone);
         private static readonly Vector128<sbyte> _emplaceBucketVector = Vector128.Create((sbyte)-125);
 
         private sbyte[] _metadata;
@@ -127,15 +126,7 @@ namespace Faster.Map
         //Interestingly, this pattern perfectly lines up with our power-of-two size such that we will visit every single bucket exactly once without any repeats(searching is therefore guaranteed to terminate as we always have at least one EMPTY bucket).
         //Also note that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
         //Also also note that we expect to almost never actually probe, since that’s WIDTH(16) non-EMPTY buckets we need to fail to find our key in.
-        private readonly uint[] jump_distances = new uint[num_jump_distances]
-        {
-           //    3,   6,  10, 15, 21, 28, 36, 45, 55, 66, 78, 91, 105, 120, 136, 153, 171, 190, 210, 231,
-           //  253, 276, 300, 325, 351, 378, 406, 435, 465, 496, 528, 561, 595, 630,
-           // * 16 - 16 starting point
-
-          32, 80, 144, 240, 320, 432, 560, 704, 864, 1040, 1232, 1440, 1664, 1905, 2160, 2432,
-          2720, 3344, 3680, 4032, 4400, 4784, 5184, 5600, 6032, 6480, 6944, 7424, 7920, 8432, 8960
-        };
+        private readonly uint[] jump_distances
 
         #endregion
 
@@ -217,9 +208,6 @@ namespace Faster.Map
             //Resize if loadfactor is reached
             if (Count >= _maxLookupsBeforeResize)
             {
-#if DEBUG
-                Debug.WriteLine($"{Count} expected {_maxLookupsBeforeResize}");
-#endif
                 Resize();
             }
 
@@ -290,12 +278,7 @@ namespace Faster.Map
 
                 if (index + jumpDistance > _length)
                 {
-
-#if DEBUG
-                    Debug.WriteLine($"Resize - {Count} expected {_maxLookupsBeforeResize}");
-#endif
                     Resize();
-
                     //go to start and try again
                     goto start;
                 }
@@ -452,7 +435,7 @@ namespace Faster.Map
         /// </summary>
         /// <param name="key"></param>
         /// <returns> returns if the removal succeeded </returns>
-        [MethodImpl(256)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Remove(TKey key)
         {
             //Get object identity hashcode
@@ -773,9 +756,6 @@ namespace Faster.Map
             }
         }
 
-
-
         #endregion
     }
 }
-

@@ -177,7 +177,7 @@ namespace Faster.Map
             if (Count >= _maxLookupsBeforeResize)
             {
 #if DEBUG
-                Console.WriteLine((double)(Count / (_length / 100)));
+                Console.WriteLine((double)(Count / (double)(_length / 100)));
 #endif
 
                 Resize();
