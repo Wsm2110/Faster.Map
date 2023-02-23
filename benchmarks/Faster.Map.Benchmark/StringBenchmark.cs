@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Faster.Map.Core;
 
 namespace Faster.Map.Benchmark
 { 

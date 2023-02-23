@@ -20,12 +20,13 @@ namespace Faster.Map.Benchmark
         FastMap<uint, uint> _fastMap = new FastMap<uint, uint>();
         DenseMap<uint, uint> _dense = new DenseMap<uint, uint>();
 
-        private DenseMapSIMD<uint, uint> _denseMap = new DenseMapSIMD<uint, uint>();
+        private DenseMapSIMD<uint, uint> _denseMapSIMD = new DenseMapSIMD<uint, uint>();
 
         private Dictionary<uint, uint> dic = new Dictionary<uint, uint>();
         private DictionarySlim<uint, uint> _slim = new DictionarySlim<uint, uint>();
 
         private uint[] keys;
+
         #endregion
 
         /// <summary>
@@ -47,7 +48,7 @@ namespace Faster.Map.Benchmark
             foreach (var key in keys.Take(900000))
             {
                 dic.Add(key, key);
-                _denseMap.Emplace(key, key);
+                _denseMapSIMD.Emplace(key, key);
                 _dense.Emplace(key, key);
                 _fastMap.Emplace(key, key);
                 _slim.GetOrAddValueRef(key);
@@ -55,7 +56,7 @@ namespace Faster.Map.Benchmark
 
             //    Shuffle(new Random(), keys);
         }
-            
+
 
         private static void Shuffle<T>(Random rng, T[] a)
         {
@@ -70,23 +71,23 @@ namespace Faster.Map.Benchmark
 
         }
 
-        //[Benchmark]
-        //public void DenseMapSIMD()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        _denseMap.Get(key, out var result);
-        //    }
-        //}
-
         [Benchmark]
-        public void DenseMap()
+        public void DenseMapSIMD()
         {
             foreach (var key in keys)
             {
-                _dense.Get(key, out var result);
+                _denseMapSIMD.Get(key, out var result);
             }
         }
+
+        //[Benchmark]
+        //public void DenseMap()
+        //{
+        //    foreach (var key in keys)
+        //    {
+        //        _dense.Get(key, out var result);
+        //    }
+        //  }
 
         //[Benchmark]
         //public void FastMap()
@@ -114,7 +115,6 @@ namespace Faster.Map.Benchmark
         //        dic.TryGetValue(key, out var result);
         //    }
         //}
-
 
     }
 }

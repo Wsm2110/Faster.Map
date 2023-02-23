@@ -102,6 +102,9 @@ namespace Faster.Map
 
         #region Fields
 
+        //Used to backout early will finding entries which are not in the map
+        private int _maxDistance = 0;
+
         private const sbyte _emptyBucket = -127;
         private const sbyte _tombstone = -126;
 
@@ -176,7 +179,7 @@ namespace Faster.Map
 
             if (loadFactor > 0.9)
             {
-                loadFactor = 0.9;
+                _loadFactor = 0.9;
             }
 
             if (BitOperations.IsPow2(length))
@@ -233,7 +236,7 @@ namespace Faster.Map
 
             var left = Vector128.Create(h2);
 
-            while (true)
+            while (distance < 32)
             {
                 var right = Vector128.LoadUnsafe(ref _metadata[index], jumpDistance);
 
@@ -290,8 +293,15 @@ namespace Faster.Map
                     goto start;
                 }
 
-                distance++;
+                ++distance;
+
+                if (distance > _maxDistance) 
+                {
+                    _maxDistance = distance;                  
+                }
             }
+
+            return false;
         }
 
         /// <summary>
@@ -315,7 +325,7 @@ namespace Faster.Map
             byte distance = 0;
             uint jumpDistance = 0;
 
-            while (true)
+            while (distance <= _maxDistance)
             {
                 //load vector @ index
                 var right = Vector128.LoadUnsafe(ref _metadata[index], jumpDistance);
@@ -365,6 +375,9 @@ namespace Faster.Map
 
                 distance++;
             }
+
+            value = default;
+            return false;
         }
 
         /// <summary>
@@ -388,7 +401,7 @@ namespace Faster.Map
             byte distance = 0;
             uint jumpDistance = 0;
 
-            while (true)
+            while (distance <= _maxDistance)
             {
                 var right = Vector128.LoadUnsafe(ref _metadata[index], jumpDistance);
                 var comparison = Sse2.CompareEqual(left, right);
@@ -434,6 +447,8 @@ namespace Faster.Map
 
                 ++distance;
             }
+
+            //entry not found
             return false;
         }
 
@@ -458,7 +473,7 @@ namespace Faster.Map
             byte distance = 0;
             uint jumpDistance = 0;
 
-            while (true)
+            while (distance <= _maxDistance)
             {
                 var right = Vector128.LoadUnsafe(ref _metadata[index], jumpDistance);
                 var comparison = Sse2.CompareEqual(left, right);
@@ -534,7 +549,7 @@ namespace Faster.Map
             byte distance = 0;
             uint jumpDistance = 0;
 
-            while (true)
+            while (distance <= _maxDistance)
             {
                 //load vector @ index
                 var right = Vector128.LoadUnsafe(ref _metadata[index], jumpDistance);
@@ -580,6 +595,8 @@ namespace Faster.Map
 
                 distance++;
             }
+
+            return false;
         }
 
         /// <summary>
@@ -590,7 +607,7 @@ namespace Faster.Map
         {
             for (var i = 0; i < denseMap._entries.Length; ++i)
             {
-                if (_metadata[i] <= 0)
+                if (_metadata[i] < 0)
                 {
                     continue;
                 }
@@ -652,12 +669,7 @@ namespace Faster.Map
         public int IndexOf(TKey key)
         {
             for (int i = 0; i < _entries.Length; i++)
-            {
-                if (_metadata[i] <= 0)
-                {
-                    continue;
-                }
-
+            {  
                 var entry = _entries[i];
                 if (_compare.Equals(key, entry.Key))
                 {
@@ -689,7 +701,7 @@ namespace Faster.Map
             byte distance = 0;
             uint jumpDistance = 0;
 
-            while (true)
+            while (distance < 32)
             {
                 var right = Vector128.LoadUnsafe(ref _metadata[index], jumpDistance);
                 var emplaceVector = Sse2.CompareGreaterThan(_emplaceBucketVector, right);
@@ -720,7 +732,12 @@ namespace Faster.Map
                     goto start;
                 }
 
-                distance++;
+                ++distance;
+
+                if (distance > _maxDistance)
+                {
+                    _maxDistance = distance;
+                }
             }
         }
 
@@ -731,6 +748,7 @@ namespace Faster.Map
         private void Resize()
         {
             _shift--;
+            _maxDistance = 0;
 
             //next pow of 2
             _length = _length * 2;
@@ -752,7 +770,7 @@ namespace Faster.Map
             for (var i = 0; i < oldEntries.Length; ++i)
             {
                 var m = oldMetadata[i];
-                if (m <= 0)
+                if (m < 0)
                 {
                     continue;
                 }
