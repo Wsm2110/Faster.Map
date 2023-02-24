@@ -28,7 +28,7 @@ namespace Faster.Map.Core.Tests
 
             //     Shuffle(new Random(), keys);
         }
-             
+
         [TestMethod]
         public void AssertDailyUseCaseWithoutResize()
         {
@@ -95,9 +95,9 @@ namespace Faster.Map.Core.Tests
             foreach (var k in keys.Take(900000))
             {
 
-                if (k == 434322304) 
+                if (k == 434322304)
                 {
-                
+
                 }
 
                 if (!fmap.Emplace(k, k))
@@ -148,6 +148,18 @@ namespace Faster.Map.Core.Tests
             }
 
             Assert.AreEqual(900000, fmap.Count);
+        }
+
+        [TestMethod]
+        public void AssertUnsuccesfulLookupReturnsFalse()
+        {
+            DenseMapSIMD<uint, uint> map = new DenseMapSIMD<uint, uint>(1000000);
+
+            var found = map.Get(345, out var result);
+            result = 0;
+
+            Assert.AreEqual(false, found);
+            Assert.IsTrue(result == 0);
         }
     }
 }

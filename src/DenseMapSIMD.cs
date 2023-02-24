@@ -102,7 +102,7 @@ namespace Faster.Map
 
         #region Fields
 
-        //Used to backout early will finding entries which are not in the map
+        //Used to backout early while finding entries which are not in the map
         private int _maxDistance = 0;
 
         private const sbyte _emptyBucket = -127;
@@ -132,6 +132,8 @@ namespace Faster.Map
         {
            //    3,   6,  10, 15, 21, 28, 36, 45, 55, 66, 78, 91, 105, 120, 136, 153, 171, 190, 210, 231,
            //  253, 276, 300, 325, 351, 378, 406, 435, 465, 496, 528, 561, 595, 630,
+        
+           // results in
            // * 16 - 16 starting point
 
           32, 80, 144, 240, 320, 432, 560, 704, 864, 1040, 1232, 1440, 1664, 1905, 2160, 2432,
@@ -191,7 +193,7 @@ namespace Faster.Map
                 _length = BitOperations.RoundUpToPowerOf2(_length);
             }
 
-            _maxLookupsBeforeResize = (uint)(_length * loadFactor);
+            _maxLookupsBeforeResize = (uint)(_length * _loadFactor);
             _compare = keyComparer ?? EqualityComparer<TKey>.Default;
 
             _shift = _shift - BitOperations.Log2(_length);
@@ -236,7 +238,7 @@ namespace Faster.Map
 
             var left = Vector128.Create(h2);
 
-            while (distance < 32)
+            while (distance < num_jump_distances)
             {
                 var right = Vector128.LoadUnsafe(ref _metadata[index], jumpDistance);
 
@@ -295,9 +297,9 @@ namespace Faster.Map
 
                 ++distance;
 
-                if (distance > _maxDistance) 
+                if (distance > _maxDistance)
                 {
-                    _maxDistance = distance;                  
+                    _maxDistance = distance;
                 }
             }
 
@@ -319,7 +321,7 @@ namespace Faster.Map
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
-            //create vector of the bottom 7 bits
+            //create vector of the 7 high bits
             var left = Vector128.Create((sbyte)(hashcode & _bitmask));
 
             byte distance = 0;
@@ -669,7 +671,7 @@ namespace Faster.Map
         public int IndexOf(TKey key)
         {
             for (int i = 0; i < _entries.Length; i++)
-            {  
+            {
                 var entry = _entries[i];
                 if (_compare.Equals(key, entry.Key))
                 {
@@ -701,7 +703,7 @@ namespace Faster.Map
             byte distance = 0;
             uint jumpDistance = 0;
 
-            while (distance < 32)
+            while (distance < num_jump_distances)
             {
                 var right = Vector128.LoadUnsafe(ref _metadata[index], jumpDistance);
                 var emplaceVector = Sse2.CompareGreaterThan(_emplaceBucketVector, right);
