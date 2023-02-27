@@ -1,4 +1,4 @@
-# Faster.Map - A collection of Robin-hood hashmaps (FastMap, DenseMapSIMD and DenseMap)
+# Faster.Map - A collection of hashmaps (FastMap, DenseMapSIMD and DenseMap)
 
 The goal of Faster is to provide a collection of incredible fast hashmaps that integrates into the .net framework.
    
