@@ -67,7 +67,7 @@ namespace Faster.Map
         {
             get
             {
-                //iterate backwards so we can remove the distance item
+                //iterate backwards so we can remove the jumpDistanceIndex item
                 for (int i = _metadata.Length - 1; i >= 0; --i)
                 {
                     if (_metadata[i] >= 0)
@@ -233,12 +233,12 @@ namespace Faster.Map
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
-            byte distance = 0;
-            uint jumpDistance = 0;
+            byte jumpDistanceIndex = 0;
+            ushort jumpDistance = 0;
 
             var left = Vector128.Create(h2);
 
-            while (distance < num_jump_distances)
+            while (jumpDistanceIndex < num_jump_distances)
             {
                 var right = Vector128.LoadUnsafe(ref _metadata[index], jumpDistance);
 
@@ -285,8 +285,8 @@ namespace Faster.Map
                     return true;
                 }
 
-                //calculate jump distance
-                jumpDistance = jump_distances[distance];
+                //calculate jump jumpDistanceIndex
+                jumpDistance = jump_distances[jumpDistanceIndex];
 
                 if (index + jumpDistance > _length)
                 {
@@ -295,11 +295,11 @@ namespace Faster.Map
                     goto start;
                 }
 
-                ++distance;
+                ++jumpDistanceIndex;
 
-                if (distance > _maxDistance)
+                if (jumpDistanceIndex > _maxDistance)
                 {
-                    _maxDistance = distance;
+                    _maxDistance = jumpDistanceIndex;
                 }
             }
 
@@ -324,10 +324,10 @@ namespace Faster.Map
             //create vector of the 7 high bits
             var left = Vector128.Create((sbyte)(hashcode & _bitmask));
 
-            byte distance = 0;
-            uint jumpDistance = 0;
+            byte jumpDistanceIndex = 0;
+            ushort jumpDistance = 0;
 
-            while (distance <= _maxDistance)
+            while (jumpDistanceIndex <= _maxDistance)
             {
                 //load vector @ index
                 var right = Vector128.LoadUnsafe(ref _metadata[index], jumpDistance);
@@ -366,8 +366,8 @@ namespace Faster.Map
                     return false;
                 }
 
-                //calculate jump distance
-                jumpDistance = jump_distances[distance];
+                //calculate jump jumpDistanceIndex
+                jumpDistance = jump_distances[jumpDistanceIndex];
 
                 if (index + jumpDistance > _length)
                 {
@@ -375,7 +375,7 @@ namespace Faster.Map
                     return false;
                 }
 
-                distance++;
+                jumpDistanceIndex++;
             }
 
             value = default;
@@ -400,10 +400,11 @@ namespace Faster.Map
             //create vector of lower first 7 bits
             var left = Vector128.Create((sbyte)(hashcode & _bitmask));
 
-            byte distance = 0;
-            uint jumpDistance = 0;
+            byte jumpDistanceIndex = 0;
 
-            while (distance <= _maxDistance)
+            ushort jumpDistance = 0;
+
+            while (jumpDistanceIndex <= _maxDistance)
             {
                 var right = Vector128.LoadUnsafe(ref _metadata[index], jumpDistance);
                 var comparison = Sse2.CompareEqual(left, right);
@@ -439,15 +440,15 @@ namespace Faster.Map
                     break;
                 }
 
-                //calculate jump distance
-                jumpDistance = jump_distances[distance];
+                //calculate jump jumpDistanceIndex
+                jumpDistance = jump_distances[jumpDistanceIndex];
 
                 if (index + jumpDistance > _length)
                 {
                     return false;
                 }
 
-                ++distance;
+                ++jumpDistanceIndex;
             }
 
             //entry not found
@@ -472,10 +473,10 @@ namespace Faster.Map
 
             var left = Vector128.Create((sbyte)(hashcode & _bitmask));
 
-            byte distance = 0;
-            uint jumpDistance = 0;
+            byte jumpDistanceIndex = 0;
+            ushort jumpDistance = 0;
 
-            while (distance <= _maxDistance)
+            while (jumpDistanceIndex <= _maxDistance)
             {
                 var right = Vector128.LoadUnsafe(ref _metadata[index], jumpDistance);
                 var comparison = Sse2.CompareEqual(left, right);
@@ -517,15 +518,15 @@ namespace Faster.Map
                     break;
                 }
 
-                //calculate jump distance
-                jumpDistance = jump_distances[distance];
+                //calculate jump jumpDistanceIndex
+                jumpDistance = jump_distances[jumpDistanceIndex];
 
                 if (index + jumpDistance > _length)
                 {
                     return false;
                 }
 
-                distance++;
+                jumpDistanceIndex++;
             }
 
             return false;
@@ -548,10 +549,10 @@ namespace Faster.Map
             //create vector of the bottom 7 bits
             var left = Vector128.Create((sbyte)(hashcode & _bitmask));
 
-            byte distance = 0;
-            uint jumpDistance = 0;
+            byte jumpDistanceIndex = 0;
+            ushort jumpDistance = 0;
 
-            while (distance <= _maxDistance)
+            while (jumpDistanceIndex <= _maxDistance)
             {
                 //load vector @ index
                 var right = Vector128.LoadUnsafe(ref _metadata[index], jumpDistance);
@@ -587,15 +588,15 @@ namespace Faster.Map
                     return false;
                 }
 
-                //calculate jump distance
-                jumpDistance = jump_distances[distance];
+                //calculate jump jumpDistanceIndex
+                jumpDistance = jump_distances[jumpDistanceIndex];
 
                 if (index + jumpDistance > _length)
                 {
                     return false;
                 }
 
-                distance++;
+                jumpDistanceIndex++;
             }
 
             return false;
@@ -689,7 +690,7 @@ namespace Faster.Map
         /// Emplaces a new entry without checking for key existence. Keys have already been checked and are unique
         /// </summary>
         /// <param name="entry">The entry.</param>
-        /// <param name="current">The distance.</param>
+        /// <param name="current">The jumpDistanceIndex.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void EmplaceInternal(Entry<TKey, TValue> entry, sbyte h2)
         {
@@ -700,10 +701,10 @@ namespace Faster.Map
             //calculat index by using object identity * fibonaci followed by a shift
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
-            byte distance = 0;
-            uint jumpDistance = 0;
+            byte jumpDistanceIndex = 0;
+            ushort jumpDistance = 0;
 
-            while (distance < num_jump_distances)
+            while (jumpDistanceIndex < num_jump_distances)
             {
                 var right = Vector128.LoadUnsafe(ref _metadata[index], jumpDistance);
                 var emplaceVector = Sse2.CompareGreaterThan(_emplaceBucketVector, right);
@@ -724,9 +725,9 @@ namespace Faster.Map
                     return;
                 }
 
-                //calculate jump distance
+                //calculate jump jumpDistanceIndex
 
-                jumpDistance = jump_distances[distance];
+                jumpDistance = jump_distances[jumpDistanceIndex];
 
                 if (index + jumpDistance + 16 > _length)
                 {
@@ -734,11 +735,11 @@ namespace Faster.Map
                     goto start;
                 }
 
-                ++distance;
+                ++jumpDistanceIndex;
 
-                if (distance > _maxDistance)
+                if (jumpDistanceIndex > _maxDistance)
                 {
-                    _maxDistance = distance;
+                    _maxDistance = jumpDistanceIndex;
                 }
             }
         }
@@ -776,10 +777,8 @@ namespace Faster.Map
                 {
                     continue;
                 }
-
-                var entry = oldEntries[i];
-
-                EmplaceInternal(entry, m);
+               
+                EmplaceInternal(oldEntries[i], m);
             }
         }
 
