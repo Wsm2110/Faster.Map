@@ -127,8 +127,8 @@ namespace Faster.Map
         //So first we jump by 1 group (meaning we just continue our linear scan), then 2 groups (skipping over 1 group), then 3 groups (skipping over 2 groups), and so on.
         //Interestingly, this pattern perfectly lines up with our power-of-two size such that we will visit every single bucket exactly once without any repeats(searching is therefore guaranteed to terminate as we always have at least one EMPTY bucket).
         //Also note that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
-        //Also also note that we expect to almost never actually probe, since that’s WIDTH(16) non-EMPTY buckets we need to fail to find our key in.
-        private readonly uint[] jump_distances = new uint[num_jump_distances]
+        //Also note that we expect to almost never actually probe, since that’s WIDTH(16) non-EMPTY buckets we need to fail to find our key in.
+        private static ushort[] jump_distances = new ushort[num_jump_distances]
         {
            //    3,   6,  10, 15, 21, 28, 36, 45, 55, 66, 78, 91, 105, 120, 136, 153, 171, 190, 210, 231,
            //  253, 276, 300, 325, 351, 378, 406, 435, 465, 496, 528, 561, 595, 630,
@@ -609,7 +609,7 @@ namespace Faster.Map
         {
             for (var i = 0; i < denseMap._entries.Length; ++i)
             {
-                if (_metadata[i] < 0)
+                if (denseMap._metadata[i] < 0)
                 {
                     continue;
                 }
@@ -664,10 +664,10 @@ namespace Faster.Map
         }
 
         /// <summary>
-        /// Returns an index of a key. Mostly used for testing purposes
+        /// Loop through every entry in the map. Mostly used for testing purposes
         /// </summary>
         /// <param name="key">The key.</param>
-        /// <returns></returns>
+        /// <returns>Returns the index</returns>
         public int IndexOf(TKey key)
         {
             for (int i = 0; i < _entries.Length; i++)

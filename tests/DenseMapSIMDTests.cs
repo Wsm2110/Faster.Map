@@ -161,5 +161,25 @@ namespace Faster.Map.Core.Tests
             Assert.AreEqual(false, found);
             Assert.IsTrue(result == 0);
         }
+
+        [TestMethod]
+        public void AssertCopyMapToAnother()
+        {
+            DenseMapSIMD<uint, uint> map = new DenseMapSIMD<uint, uint>(16);
+            DenseMapSIMD<uint, uint> map2 = new DenseMapSIMD<uint, uint>(16);
+
+            map.Emplace(1, 1);
+            map.Emplace(2, 1);
+
+            map2.Emplace(3, 1); 
+            map2.Emplace(4, 1);
+
+            map.Copy(map2);
+
+            Assert.IsTrue(4 == map.Count);
+        }
+
+
+
     }
 }
