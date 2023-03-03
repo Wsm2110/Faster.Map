@@ -8,7 +8,7 @@
     <LangVersion>Latest</LangVersion>
     <Authors>Wiljan Ruizendaal</Authors>
     <PackageReleaseNotes>
-      Increase version to 4.0.5
+      Increase version to 4.0.6
       minor bugfixes
     </PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/Wsm2110/Faster.Map</PackageProjectUrl>
