@@ -134,7 +134,7 @@ namespace Faster.Map
            //  253, 276, 300, 325, 351, 378, 406, 435, 465, 496, 528, 561, 595, 630,
         
            // results in
-           // * 16 - 16 starting point
+           // * 16 - 16 entrypoint
 
           32, 80, 144, 240, 320, 432, 560, 704, 864, 1040, 1232, 1440, 1664, 1905, 2160, 2432,
           2720, 3344, 3680, 4032, 4400, 4784, 5184, 5600, 6032, 6480, 6944, 7424, 7920, 8432, 8960
@@ -297,13 +297,17 @@ namespace Faster.Map
 
                 ++jumpDistanceIndex;
 
+                // keep track of the max jump distance used to find an empty slot
                 if (jumpDistanceIndex > _maxDistance)
                 {
                     _maxDistance = jumpDistanceIndex;
                 }
             }
 
-            return false;
+            //All jumpdistances are used -> resize since we couldnt find an empty slot
+            Resize();
+            //go to start and try again
+            goto start;
         }
 
         /// <summary>
@@ -716,16 +720,10 @@ namespace Faster.Map
                 if (result != 0)
                 {
                     index += jumpDistance + (uint)BitOperations.TrailingZeroCount(result);
-
-                    ref var x = ref _entries[index];
-                    x = entry;
-
+                    _entries[index] = entry;
                     _metadata[index] = h2;
-
                     return;
-                }
-
-                //calculate jump jumpDistanceIndex
+                }               
 
                 jumpDistance = jump_distances[jumpDistanceIndex];
 
@@ -746,8 +744,7 @@ namespace Faster.Map
 
         /// <summary>
         /// Resizes this instance.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        /// </summary>     
         private void Resize()
         {
             _shift--;
@@ -777,7 +774,7 @@ namespace Faster.Map
                 {
                     continue;
                 }
-               
+
                 EmplaceInternal(oldEntries[i], m);
             }
         }
