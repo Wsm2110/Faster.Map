@@ -254,7 +254,7 @@ namespace Faster.Map
                     var offset = BitOperations.TrailingZeroCount(result);
                     if (_compare.Equals(_entries[index + jumpDistance + offset].Key, key))
                     {
-                        return true;
+                        return false;
                     }
 
                     //clear bit
