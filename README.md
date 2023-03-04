@@ -17,7 +17,7 @@ Faster.Map provides 3 unique hashmaps:
 
 3. DenseMapSIMD<Tkey, TValue> is a next level hashmap using simd intructions.
    The default loadfactor is 0.9. This allows us to store 15% more entries than a dictionary while maintaining incredible speed.
-   This hashmap is fast and i mean mindblowing fast. DenseMapSIMD wont cache hashcodes, using types like strings actually need a wrapper that caches the hashcode. Hence using a slow hash fuction will result in a slow hashmap.
+   This hashmap is fast and i mean mindblowing fast.
 
  ## Examples    
   ### Default Example
