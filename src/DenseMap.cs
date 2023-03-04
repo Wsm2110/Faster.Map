@@ -689,11 +689,8 @@ namespace Faster.Map
             _maxLookupsBeforeResize = (int)(_length * _loadFactor);
             _currentProbeSequenceLength = 0;
 
-            var oldEntries = new Entry<TKey, TValue>[_entries.Length];
-            Array.Copy(_entries, oldEntries, _entries.Length);
-
-            var oldInfo = new InfoByte[_entries.Length];
-            Array.Copy(_info, oldInfo, _info.Length);
+            var oldEntries = _entries.Clone() as Entry<TKey, TValue>[];
+            var oldInfo = _info.Clone() as InfoByte[];
 
             _entries = new Entry<TKey, TValue>[_length + _maxProbeSequenceLength + 1];
             _info = new InfoByte[_length + _maxProbeSequenceLength + 1];

@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics.X86;
 using System.Runtime.Intrinsics;
 using Faster.Map.Core;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Faster.Map
 {
@@ -755,17 +756,13 @@ namespace Faster.Map
 
             _maxLookupsBeforeResize = (uint)(_length * _loadFactor);
 
-            var oldEntries = new Entry<TKey, TValue>[_entries.Length];
-            Array.Copy(_entries, oldEntries, _entries.Length);
+            var oldEntries = _entries.Clone() as Entry<TKey, TValue>[];
+            var oldMetadata = _metadata.Clone() as sbyte[];
 
-            var oldMetadata = new sbyte[_metadata.Length];
-            Array.Copy(_metadata, oldMetadata, _metadata.Length);
-
-            _metadata = new sbyte[_length + 16];
-
-            Array.Fill(_metadata, _emptyBucket);
-
+            _metadata = new sbyte[_length + 16];         
             _entries = new Entry<TKey, TValue>[_length + 16];
+         
+            new Span<sbyte>(_metadata).Fill(_emptyBucket);
 
             for (var i = 0; i < oldEntries.Length; ++i)
             {

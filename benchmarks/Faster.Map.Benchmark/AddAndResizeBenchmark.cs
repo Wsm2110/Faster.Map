@@ -1,26 +1,24 @@
-﻿using System;
+﻿using BenchmarkDotNet.Attributes;
+using Microsoft.Collections.Extensions;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using BenchmarkDotNet.Attributes;
-using Microsoft.Collections.Extensions;
-using Microsoft.Diagnostics.Tracing.Parsers.MicrosoftWindowsTCPIP;
 
 namespace Faster.Map.Benchmark
 {
     [MarkdownExporterAttribute.GitHub]
-    public class AddBenchmark
+    public class AddAndResizeBenchmark
     {
         #region Fields
-
-        //fixed size, dont want to measure resize()
-        FastMap<uint, uint> _fastMap = new FastMap<uint, uint>(2000000); // remove resizing from benchmark hence the 2000000 size
-        DenseMap<uint, uint> _dense = new DenseMap<uint, uint>(2000000);
-        DenseMapSIMD<uint, uint> _denseMap = new DenseMapSIMD<uint, uint>(1000000, 0.9);
-        private Dictionary<uint, uint> dic = new Dictionary<uint, uint>(1000000);
-        private DictionarySlim<uint, uint> _slim = new DictionarySlim<uint, uint>(1000000);
+     
+        FastMap<uint, uint> _fastMap = new FastMap<uint, uint>(); 
+        DenseMap<uint, uint> _dense = new DenseMap<uint, uint>();
+        DenseMapSIMD<uint, uint> _denseMap = new DenseMapSIMD<uint, uint>();
+        private Dictionary<uint, uint> dic = new Dictionary<uint, uint>();
+        private DictionarySlim<uint, uint> _slim = new DictionarySlim<uint, uint>();
         private uint[] keys;
 
         #endregion
@@ -41,18 +39,18 @@ namespace Faster.Map.Benchmark
                 keys[index] = uint.Parse(splittedOutput[index]);
             }
 
-            keys = keys.Take(899999).ToArray();
+            keys = keys.Take(900000).ToArray();
             //  Shuffle(new Random(), keys);
         }
 
         [IterationCleanup]
         public void ResetMaps()
         {
-            _denseMap.Clear();
-            _dense.Clear();
-            dic.Clear();
-            _slim.Clear();
-            _fastMap.Clear();
+            _denseMap = new DenseMapSIMD<uint, uint>();
+            _dense = new DenseMap<uint, uint>();
+            dic = new Dictionary<uint, uint>();
+            _slim = new DictionarySlim<uint, uint>();
+            _fastMap = new FastMap<uint, uint>();
         }
 
         #region Benchmarks

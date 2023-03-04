@@ -661,15 +661,11 @@ namespace Faster.Map
             _length = NextPow2(_length + 1);
 
             _maxProbeSequenceLength = _loadFactor <= 0.5 ? Log2(_length) : PslLimit(_length);
-            _maxlengthBeforeResize = (uint)(_length * _loadFactor);
-
-            var oldEntries = new Entry<TKey, TValue>[_entries.Length];
-            Array.Copy(_entries, oldEntries, _entries.Length);
-
+            _maxlengthBeforeResize = (uint)(_length * _loadFactor);                       
             _currentProbeSequenceLength = 0;
 
-            var oldInfo = new InfoByte[_info.Length];
-            Array.Copy(_info, oldInfo, _info.Length);
+            var oldEntries = _entries.Clone() as Entry<TKey, TValue>[];
+            var oldInfo = _info.Clone() as InfoByte[]; 
 
             _entries = new Entry<TKey, TValue>[_length + _maxProbeSequenceLength + 1];
             _info = new InfoByte[_length + _maxProbeSequenceLength + 1];
