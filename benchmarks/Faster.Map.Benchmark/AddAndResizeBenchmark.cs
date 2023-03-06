@@ -64,41 +64,41 @@ namespace Faster.Map.Benchmark
             }
         }
 
-        [Benchmark]
-        public void DenseMap()
-        {
-            foreach (var key in keys)
-            {
-                _dense.Emplace(key, key);
-            }
-        }
+        //[Benchmark]
+        //public void DenseMap()
+        //{
+        //    foreach (var key in keys)
+        //    {
+        //        _dense.Emplace(key, key);
+        //    }
+        //}
 
-        [Benchmark]
-        public void FastMap()
-        {
-            foreach (var key in keys)
-            {
-                _fastMap.Emplace(key, key);
-            }
-        }
+        //[Benchmark]
+        //public void FastMap()
+        //{
+        //    foreach (var key in keys)
+        //    {
+        //        _fastMap.Emplace(key, key);
+        //    }
+        //}
 
-        [Benchmark]
-        public void Dictionary()
-        {
-            foreach (var key in keys)
-            {
-                dic.Add(key, key);
-            }
-        }
+        //[Benchmark]
+        //public void Dictionary()
+        //{
+        //    foreach (var key in keys)
+        //    {
+        //        dic.Add(key, key);
+        //    }
+        //}
 
-        [Benchmark]
-        public void DictionarySlim()
-        {
-            foreach (var key in keys)
-            {
-                _slim.GetOrAddValueRef(key);
-            }
-        }
+        //[Benchmark]
+        //public void DictionarySlim()
+        //{
+        //    foreach (var key in keys)
+        //    {
+        //        _slim.GetOrAddValueRef(key);
+        //    }
+        //}
 
         #endregion
 

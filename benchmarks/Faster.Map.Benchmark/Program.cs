@@ -13,7 +13,7 @@ namespace Faster.Map.Benchmark
 
             // //  TypeLayout.PrintLayout<MultiEntry<int, int>>();
            
-            BenchmarkRunner.Run<AddAndResizeBenchmark>();
+            BenchmarkRunner.Run<AddBenchmark>();
 
             // BenchmarkRunner.Run<GetBenchmark>();
             // 

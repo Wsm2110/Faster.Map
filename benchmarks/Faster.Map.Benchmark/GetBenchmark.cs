@@ -3,9 +3,6 @@ using BenchmarkDotNet.Attributes;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading;
-using BenchmarkDotNet.Engines;
-using BenchmarkDotNet.Jobs;
 using Microsoft.Collections.Extensions;
 
 namespace Faster.Map.Benchmark
@@ -57,7 +54,6 @@ namespace Faster.Map.Benchmark
             //    Shuffle(new Random(), keys);
         }
 
-
         private static void Shuffle<T>(Random rng, T[] a)
         {
             int n = a.Length;
@@ -68,7 +64,6 @@ namespace Faster.Map.Benchmark
                 a[n] = a[k];
                 a[k] = temp;
             }
-
         }
 
         [Benchmark]

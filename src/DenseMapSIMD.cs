@@ -6,6 +6,7 @@ using System.Runtime.Intrinsics.X86;
 using System.Runtime.Intrinsics;
 using Faster.Map.Core;
 using static System.Runtime.InteropServices.JavaScript.JSType;
+using System.Runtime.InteropServices;
 
 namespace Faster.Map
 {
@@ -118,10 +119,10 @@ namespace Faster.Map
         private const uint GoldenRatio = 0x9E3779B9; //2654435769;
         private uint _length;
         private int _shift = 32;
-        private uint _maxLookupsBeforeResize;
+        private double _maxLookupsBeforeResize;
         private readonly double _loadFactor;
         private readonly IEqualityComparer<TKey> _compare;
-        private const byte _bitmask = (1 << 7) - 1;
+        private const sbyte _bitmask = (1 << 7) - 1;
         private const byte num_jump_distances = 31;
 
         //Probing is done by incrementing the current bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
@@ -219,7 +220,7 @@ namespace Faster.Map
         public bool Emplace(TKey key, TValue value)
         {
             //Resize if loadfactor is reached
-            if (Count >= _maxLookupsBeforeResize)
+            if (Count > _maxLookupsBeforeResize)
             {
                 Resize();
             }
@@ -326,8 +327,10 @@ namespace Faster.Map
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
+            var h2 = hashcode & _bitmask;
+
             //create vector of the 7 high bits
-            var left = Vector128.Create((sbyte)(hashcode & _bitmask));
+            var left = Vector128.Create(Unsafe.As<int, sbyte>(ref h2));
 
             byte jumpDistanceIndex = 0;
             ushort jumpDistance = 0;
@@ -703,7 +706,8 @@ namespace Faster.Map
             var hashcode = entry.Key.GetHashCode();
 
             start:
-            //calculat index by using object identity * fibonaci followed by a shift
+
+            //calculate index by using object identity * fibonaci followed by a shift
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
             byte jumpDistanceIndex = 0;
@@ -712,19 +716,18 @@ namespace Faster.Map
             while (jumpDistanceIndex < num_jump_distances)
             {
                 var right = Vector128.LoadUnsafe(ref _metadata[index], jumpDistance);
-                var emplaceVector = Sse2.CompareGreaterThan(_emplaceBucketVector, right);
+                var emplaceVector = Sse2.CompareEqual(_emptyBucketVector, right);
 
-                //check for tombstones - deleted  or empty entries
-
+                //check for empty entries
                 int result = Sse2.MoveMask(emplaceVector);
 
                 if (result != 0)
                 {
                     index += jumpDistance + (uint)BitOperations.TrailingZeroCount(result);
-                    _entries[index] = entry;
                     _metadata[index] = h2;
+                    _entries[index] = entry;                  
                     return;
-                }               
+                }
 
                 jumpDistance = jump_distances[jumpDistanceIndex];
 
@@ -735,11 +738,6 @@ namespace Faster.Map
                 }
 
                 ++jumpDistanceIndex;
-
-                if (jumpDistanceIndex > _maxDistance)
-                {
-                    _maxDistance = jumpDistanceIndex;
-                }
             }
         }
 
@@ -751,18 +749,20 @@ namespace Faster.Map
             _shift--;
             _maxDistance = 0;
 
-            //next pow of 2
+            //next power of 2
             _length = _length * 2;
 
-            _maxLookupsBeforeResize = (uint)(_length * _loadFactor);
+            _maxLookupsBeforeResize = _length * _loadFactor;
 
-            var oldEntries = _entries.Clone() as Entry<TKey, TValue>[];
-            var oldMetadata = _metadata.Clone() as sbyte[];
+            var oldEntries = Unsafe.As<Entry<TKey, TValue>[]>(_entries.Clone());
+            var oldMetadata = Unsafe.As<sbyte[]>(_metadata.Clone());
 
-            _metadata = new sbyte[_length + 16];         
-            _entries = new Entry<TKey, TValue>[_length + 16];
-         
-            new Span<sbyte>(_metadata).Fill(_emptyBucket);
+            var size = Unsafe.As<uint, int>(ref _length) + 16;
+
+            _metadata = GC.AllocateUninitializedArray<sbyte>(size);
+            _entries = GC.AllocateUninitializedArray<Entry<TKey, TValue>>(size);
+
+            _metadata.AsSpan().Fill(_emptyBucket);
 
             for (var i = 0; i < oldEntries.Length; ++i)
             {

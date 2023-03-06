@@ -59,13 +59,13 @@ private DenseMapSIMD<uint, uint> _map = new DenseMapSIMD<uint, uint>(16);
 |        FastMap |  9.577 ms | 0.1660 ms | 0.1386 ms |
 
 ### Adding a million keys
-|         Method |     Mean |    Error |   StdDev |
-|--------------- |---------:|---------:|---------:|
-| DictionarySlim | 25.09 ms | 0.313 ms | 0.292 ms |
-| Dictionary     | 17.43 ms | 0.451 ms | 1.294 ms |
-| DenseMapSIMD   | 12.23 ms | 0.443 ms | 1.286 ms |
-| FastMap	     | 29.38 ms | 0.603 ms | 1.298 ms |
-| DenseMap       | 34.86 ms | 0.768 ms | 0.914 ms |
+|         Method |      Mean |     Error |    StdDev |    Median |
+|--------------- |----------:|----------:|----------:|----------:|
+|   DenseMapSIMD |  8.833 ms | 1.1089 ms | 3.2695 ms |  6.550 ms |
+|       DenseMap | 46.001 ms | 0.9141 ms | 1.5769 ms | 46.319 ms |
+|        FastMap | 30.295 ms | 0.5997 ms | 1.3899 ms | 30.388 ms |
+|     Dictionary | 16.858 ms | 0.3355 ms | 0.8840 ms | 16.690 ms |
+| DictionarySlim | 29.328 ms | 0.5691 ms | 0.5323 ms | 29.249 ms |
 
 ### Updating a million keys
 |         Method |     Mean |    Error |   StdDev |
@@ -86,10 +86,9 @@ private DenseMapSIMD<uint, uint> _map = new DenseMapSIMD<uint, uint>(16);
 |       DenseMap | 25.16 ms | 0.395 ms | 0.350 ms |
 
 ### Add and resize
-
 |         Method |     Mean |    Error |   StdDev |   Median |
-|--------------- |---------:|---------:|---------:|---------:|
-|   DenseMapSIMD | 17.09 ms | 0.914 ms | 2.694 ms | 18.81 ms |
+|--------------- |----------:|----------:|----------:|
+|   DenseMapSIMD | 12.83 ms | 0.256 ms | 0.274 ms | 13.55 ms |
 |       DenseMap | 55.18 ms | 1.103 ms | 2.601 ms | 55.39 ms |
 |        FastMap | 42.25 ms | 0.805 ms | 0.988 ms | 42.11 ms |
 |     Dictionary | 34.22 ms | 0.673 ms | 1.007 ms | 34.24 ms |
