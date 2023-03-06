@@ -3,8 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Faster.Map.Core.Tests
 {
@@ -171,15 +169,12 @@ namespace Faster.Map.Core.Tests
             map.Emplace(1, 1);
             map.Emplace(2, 1);
 
-            map2.Emplace(3, 1); 
+            map2.Emplace(3, 1);
             map2.Emplace(4, 1);
 
             map.Copy(map2);
 
             Assert.IsTrue(4 == map.Count);
         }
-
-
-
     }
 }

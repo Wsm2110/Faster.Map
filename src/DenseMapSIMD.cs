@@ -754,9 +754,9 @@ namespace Faster.Map
 
             _maxLookupsBeforeResize = _length * _loadFactor;
 
-            var oldEntries = Unsafe.As<Entry<TKey, TValue>[]>(_entries.Clone());
-            var oldMetadata = Unsafe.As<sbyte[]>(_metadata.Clone());
-
+            var oldEntries = _entries;
+            var oldMetadata = _metadata;
+           
             var size = Unsafe.As<uint, int>(ref _length) + 16;
 
             _metadata = GC.AllocateUninitializedArray<sbyte>(size);
