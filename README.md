@@ -87,7 +87,7 @@ private DenseMapSIMD<uint, uint> _map = new DenseMapSIMD<uint, uint>(16);
 
 ### Add and resize
 |         Method |     Mean |    Error |   StdDev |   Median |
-|--------------- |----------:|----------:|----------:|
+|--------------- |----------:|----------:|----------:|----------:|
 |   DenseMapSIMD | 12.83 ms | 0.256 ms | 0.274 ms | 13.55 ms |
 |       DenseMap | 55.18 ms | 1.103 ms | 2.601 ms | 55.39 ms |
 |        FastMap | 42.25 ms | 0.805 ms | 0.988 ms | 42.11 ms |

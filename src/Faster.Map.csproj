@@ -8,14 +8,14 @@
     <LangVersion>Latest</LangVersion>
     <Authors>Wiljan Ruizendaal</Authors>
     <PackageReleaseNotes>
-      Increase version to 4.0.6
+      Increase version to 4.0.7
       minor bugfixes
     </PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/Wsm2110/Faster.Map</PackageProjectUrl>
-    <AssemblyVersion>4.0.6</AssemblyVersion>
-    <FileVersion>4.0.6</FileVersion>
+    <AssemblyVersion>4.0.7</AssemblyVersion>
+    <FileVersion>4.0.7</FileVersion>
     <Title>Fastest .net hashmap</Title>
-    <Version>4.0.6</Version>
+    <Version>4.0.7</Version>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Description>incredible fast hashmap using robinghood hashing</Description>
     <RepositoryUrl>https://github.com/Wsm2110/Faster.Map</RepositoryUrl>
