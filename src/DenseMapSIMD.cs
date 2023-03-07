@@ -723,7 +723,7 @@ namespace Faster.Map
                 {
                     index += jumpDistance + (uint)BitOperations.TrailingZeroCount(result);
                     _metadata[index] = h2;
-                    _entries[index] = entry;                  
+                    _entries[index] = entry;
                     return;
                 }
 
@@ -736,6 +736,12 @@ namespace Faster.Map
                 }
 
                 ++jumpDistanceIndex;
+
+                // keep track of the max jump distance used to find an empty slot
+                if (jumpDistanceIndex > _maxDistance)
+                {
+                    _maxDistance = jumpDistanceIndex;
+                }
             }
         }
 
@@ -754,7 +760,7 @@ namespace Faster.Map
 
             var oldEntries = _entries;
             var oldMetadata = _metadata;
-           
+
             var size = Unsafe.As<uint, int>(ref _length) + 16;
 
             _metadata = GC.AllocateUninitializedArray<sbyte>(size);

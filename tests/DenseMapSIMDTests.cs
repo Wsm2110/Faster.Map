@@ -91,13 +91,7 @@ namespace Faster.Map.Core.Tests
             var fmap = new DenseMapSIMD<uint, uint>(16);
 
             foreach (var k in keys.Take(900000))
-            {
-
-                if (k == 434322304)
-                {
-
-                }
-
+            {   
                 if (!fmap.Emplace(k, k))
                 {
                     throw new InternalTestFailureException("Error occured while add");
