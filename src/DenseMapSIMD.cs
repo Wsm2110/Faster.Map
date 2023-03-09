@@ -707,7 +707,7 @@ namespace Faster.Map
         /// <param name="current">The jumpDistanceIndex.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void EmplaceInternal(Entry<TKey, TValue> entry, sbyte h2)
-        {
+        {            
             //expensive if hashcode is slow, or when it`s not cached like strings
             var hashcode = entry.Key.GetHashCode();
 
@@ -734,6 +734,13 @@ namespace Faster.Map
 
                 //Calculate jumpDistance
                 index += GetArrayVal(jump_distances, jumpDistanceIndex);
+
+                if (index > _length)
+                {
+                    index = 0;
+                    jumpDistanceIndex = 0;
+                    continue;
+                }
 
                 ++jumpDistanceIndex;
 
