@@ -64,7 +64,7 @@ namespace Faster.UnitTest
         [TestMethod]
         public void AssertAddingEntriesShouldResize()
         {
-            var densemap = new DenseMapSIMD<uint, uint>(5, 0.75);
+            var densemap = new DenseMap<uint, uint>(5, 0.75);
             densemap.Emplace(1, 100);
             densemap.Emplace(2, 200);
             densemap.Emplace(3, 300);
@@ -77,7 +77,7 @@ namespace Faster.UnitTest
         [TestMethod]
         public void AssertRetrievalFromMapAfterResize()
         {
-            var densemap = new DenseMapSIMD<uint, uint>(5, 0.75);
+            var densemap = new DenseMap<uint, uint>(5, 0.75);
 
             densemap.Emplace(1, 100);
             densemap.Emplace(2, 200);
@@ -94,7 +94,7 @@ namespace Faster.UnitTest
         public void AssertUpdate()
         {
             //Assign
-            var faster = new DenseMapSIMD<ulong, ulong>(16, 0.88);
+            var faster = new DenseMap<ulong, ulong>(16, 0.88);
             faster.Emplace(454, 454);
             faster.Emplace(438, 438);
             faster.Emplace(422, 422);
@@ -114,7 +114,7 @@ namespace Faster.UnitTest
         public void AssertAddingAndRemovingSetsProperOffsetPartOne()
         {
             //assign
-            DenseMapSIMD<uint, uint> map = new DenseMapSIMD<uint, uint>(16, 0.9);
+            var map = new DenseMap<uint, uint>(16, 0.9);
 
             map.Emplace(202, 202); //13
             map.Emplace(131, 131); //15
@@ -132,7 +132,7 @@ namespace Faster.UnitTest
         [TestMethod]
         public void AssertbackShiftRemoval()
         {
-            var fmap = new DenseMapSIMD<uint, uint>(1000000, 0.90);
+            var fmap = new DenseMap<uint, uint>(1000000, 0.90);
 
             foreach (var k in keys.Take(900000))
             {
@@ -151,9 +151,6 @@ namespace Faster.UnitTest
             {
                 if (!fmap.Get(k, out var result))
                 {
-
-                    var index = fmap.IndexOf(k);
-
                     throw new InternalTestFailureException("Error occured while get");
                 }
             }
@@ -163,9 +160,7 @@ namespace Faster.UnitTest
             foreach (var k in keys.Take(900000))
             {
                 if (!fmap.Remove(k))
-                {
-                    var index = fmap.IndexOf(k);
-
+                {                 
                     throw new InternalTestFailureException("Error occured while removing");
                 }
             }
@@ -178,9 +173,7 @@ namespace Faster.UnitTest
             foreach (var k in keys.Take(900000))
             {
                 if (!fmap.Emplace(k, k))
-                {
-                    var index = fmap.IndexOf(k);
-
+                {               
                     throw new InternalTestFailureException("Error occured while removing");
                 }
             }

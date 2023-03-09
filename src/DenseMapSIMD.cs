@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics.X86;
 using System.Runtime.Intrinsics;
 using Faster.Map.Core;
+using System.Runtime.InteropServices;
 
 namespace Faster.Map
 {
@@ -116,10 +117,11 @@ namespace Faster.Map
 
         private const uint GoldenRatio = 0x9E3779B9; //2654435769;
         private uint _length;
+
         private int _shift = 32;
         private double _maxLookupsBeforeResize;
         private readonly double _loadFactor;
-        private readonly IEqualityComparer<TKey> _compare;
+        private readonly IEqualityComparer<TKey> _comparer;
         private const sbyte _bitmask = (1 << 7) - 1;
         private const byte num_jump_distances = 31;
 
@@ -137,7 +139,7 @@ namespace Faster.Map
            // * 16 - 16 entrypoint
 
           32, 80, 144, 240, 320, 432, 560, 704, 864, 1040, 1232, 1440, 1664, 1905, 2160, 2432,
-          2720, 3344, 3680, 4032, 4400, 4784, 5184, 5600, 6032, 6480, 6944, 7424, 7920, 8432, 8960
+          2720, 3344, 3680, 4032, 4400, 4784, 5184, 5600, 6032, 6480, 6944, 7424, 7920, 8432, 8960,
         };
 
         #endregion
@@ -194,7 +196,7 @@ namespace Faster.Map
             }
 
             _maxLookupsBeforeResize = (uint)(_length * _loadFactor);
-            _compare = keyComparer ?? EqualityComparer<TKey>.Default;
+            _comparer = keyComparer ?? EqualityComparer<TKey>.Default;
 
             _shift = _shift - BitOperations.Log2(_length);
             _entries = new Entry<TKey, TValue>[_length + 16];
@@ -223,24 +225,27 @@ namespace Faster.Map
                 Resize();
             }
 
-            // get object identity hashcode
+            // Get object identity hashcode
             var hashcode = key.GetHashCode();
 
-            // get 7 high bits from hashcode
-            sbyte h2 = (sbyte)(hashcode & _bitmask);
+            // Get 7 high bits
+            var h2 = hashcode & _bitmask;
+
+            //Create vector of the 7 high bits
+            var left = Vector128.Create(Unsafe.As<int, sbyte>(ref h2));
 
             start:
+
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
+            //Set initial jumpdistance index
             byte jumpDistanceIndex = 0;
-            ushort jumpDistance = 0;
 
-            var left = Vector128.Create(h2);
-
-            while (jumpDistanceIndex < num_jump_distances)
+            do
             {
-                var right = Vector128.LoadUnsafe(ref _metadata[index], jumpDistance);
+                //load vector @ index
+                var right = Vector128.LoadUnsafe(ref GetArrayValRef(_metadata, index));
 
                 //compare vectors
                 var comparison = Sse2.CompareEqual(left, right);
@@ -252,8 +257,9 @@ namespace Faster.Map
                 while (result != 0)
                 {
                     var offset = BitOperations.TrailingZeroCount(result);
-                    if (_compare.Equals(_entries[index + jumpDistance + offset].Key, key))
+                    if (_comparer.Equals(_entries[index + offset].Key, key))
                     {
+                        //duplicate key found
                         return false;
                     }
 
@@ -261,16 +267,14 @@ namespace Faster.Map
                     result &= ~(1 << offset);
                 }
 
-                //use greaterThan so we can find al tombstones and empty entries (-126, -127)
-                var emplaceVector = Sse2.CompareGreaterThan(_emplaceBucketVector, right);
-
-                //check for tombstones - deleted and empty entries
-                result = Sse2.MoveMask(emplaceVector);
+                //check for tombstones and empty entries
+                result = Sse2.MoveMask(right);
 
                 if (result != 0)
                 {
+                    var offset = BitOperations.TrailingZeroCount(result);
                     //calculate proper index
-                    index += jumpDistance + (uint)BitOperations.TrailingZeroCount(result);
+                    index += Unsafe.As<int, uint>(ref offset);
 
                     //retrieve entry
                     ref var current = ref _entries[index];
@@ -280,29 +284,31 @@ namespace Faster.Map
                     current.Value = value;
 
                     // add h2 to metadata
-                    _metadata[index] = h2;
+                    _metadata[index] = Unsafe.As<int, sbyte>(ref h2);
                     ++Count;
                     return true;
                 }
 
-                //calculate jump jumpDistanceIndex
-                jumpDistance = jump_distances[jumpDistanceIndex];
+                //Calculate jumpDistance
+                index += GetArrayVal(jump_distances, jumpDistanceIndex);
 
-                if (index + jumpDistance > _length)
-                {
-                    Resize();
-                    //go to start and try again
-                    goto start;
+                if (index > _length)
+                {    
+                    //reset index to 0 and start probing again forcing a 90% loadfactor                    
+                    index = 0;
+                    jumpDistanceIndex = 0;
+                    continue;
                 }
 
                 ++jumpDistanceIndex;
 
-                // keep track of the max jump distance used to find an empty slot
+                // Keep track of the max jump distance used to find an empty slot
                 if (jumpDistanceIndex > _maxDistance)
                 {
                     _maxDistance = jumpDistanceIndex;
                 }
-            }
+
+            } while (jumpDistanceIndex < num_jump_distances);
 
             //All jumpdistances are used -> resize since we couldnt find an empty slot
             Resize();
@@ -319,24 +325,25 @@ namespace Faster.Map
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Get(TKey key, out TValue value)
         {
-            //Get object identity hashcode
+            // Get object identity hashcode
             var hashcode = key.GetHashCode();
 
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
+            // Get 7 high bits
             var h2 = hashcode & _bitmask;
 
-            //create vector of the 7 high bits
+            //Create vector of the 7 high bits
             var left = Vector128.Create(Unsafe.As<int, sbyte>(ref h2));
 
+            //Set initial jumpdistance index
             byte jumpDistanceIndex = 0;
-            ushort jumpDistance = 0;
 
-            while (jumpDistanceIndex <= _maxDistance)
+            do
             {
                 //load vector @ index
-                var right = Vector128.LoadUnsafe(ref _metadata[index], jumpDistance);
+                var right = Vector128.LoadUnsafe(ref GetArrayValRef(_metadata, index));
 
                 //compare two vectors
                 var comparison = Sse2.CompareEqual(left, right);
@@ -347,13 +354,14 @@ namespace Faster.Map
                 //Could be multiple bits which are set
                 while (result != 0)
                 {
-                    //retrieve offset 
+                    //Retrieve offset 
                     var offset = BitOperations.TrailingZeroCount(result);
 
-                    //get index and eq
-                    var entry = _entries[index + jumpDistance + offset];
+                    //Get index and eq
+                    var entry = GetArrayVal(_entries, index + Unsafe.As<int, uint>(ref offset));
 
-                    if (_compare.Equals(entry.Key, key))
+                    //Use EqualityComparer to find proper entry
+                    if (_comparer.Equals(entry.Key, key))
                     {
                         value = entry.Value;
                         return true;
@@ -364,25 +372,26 @@ namespace Faster.Map
                 }
 
                 result = Sse2.MoveMask(Sse2.CompareEqual(_emptyBucketVector, right));
+
+                //Contains empty buckets;    
                 if (result != 0)
                 {
-                    //contains empty buckets - break;
-                    value = default;
-                    //not found
-                    return false;
+                    break;
                 }
 
-                //calculate jump jumpDistanceIndex
-                jumpDistance = jump_distances[jumpDistanceIndex];
+                //Calculate jumpDistance
+                index += GetArrayVal(jump_distances, jumpDistanceIndex);
 
-                if (index + jumpDistance > _length)
-                {
-                    value = default;
-                    return false;
+                if (index > _length)
+                {    
+                    index = 0;
+                    jumpDistanceIndex = 0;
+                    continue;
                 }
 
-                jumpDistanceIndex++;
-            }
+                ++jumpDistanceIndex;
+
+            } while (jumpDistanceIndex <= _maxDistance);
 
             value = default;
             return false;
@@ -397,23 +406,28 @@ namespace Faster.Map
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Update(TKey key, TValue value)
         {
-            //Get object identity hashcode
+            // Get object identity hashcode
             var hashcode = key.GetHashCode();
 
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
-            //create vector of lower first 7 bits
-            var left = Vector128.Create((sbyte)(hashcode & _bitmask));
+            // Get 7 high bits
+            var h2 = hashcode & _bitmask;
 
+            //Create vector of the 7 high bits
+            var left = Vector128.Create(Unsafe.As<int, sbyte>(ref h2));
+
+            //Set initial jumpdistance index
             byte jumpDistanceIndex = 0;
 
-            ushort jumpDistance = 0;
-
-            while (jumpDistanceIndex <= _maxDistance)
+            do
             {
-                var right = Vector128.LoadUnsafe(ref _metadata[index], jumpDistance);
-                var comparison = Sse2.CompareEqual(left, right);
+                //load vector @ index
+                var right = Vector128.LoadUnsafe(ref GetArrayValRef(_metadata, index));
+
+                //compare two vectors
+                var comparison = Sse2.CompareEqual(left, right);        
 
                 //get result
                 int result = Sse2.MoveMask(comparison);
@@ -425,9 +439,9 @@ namespace Faster.Map
                     var offset = BitOperations.TrailingZeroCount(result);
 
                     //get index and eq
-                    ref var entry = ref _entries[index + jumpDistance + offset];
+                    ref var entry = ref _entries[index + offset];
 
-                    if (_compare.Equals(entry.Key, key))
+                    if (_comparer.Equals(entry.Key, key))
                     {
                         entry.Value = value;
                         return true;
@@ -446,16 +460,19 @@ namespace Faster.Map
                     break;
                 }
 
-                //calculate jump jumpDistanceIndex
-                jumpDistance = jump_distances[jumpDistanceIndex];
+                //Calculate jumpDistance
+                index += GetArrayVal(jump_distances, jumpDistanceIndex);
 
-                if (index + jumpDistance > _length)
+                if (index > _length)
                 {
-                    return false;
+                    index = 0;
+                    jumpDistanceIndex = 0;
+                    continue;
                 }
 
                 ++jumpDistanceIndex;
-            }
+
+            } while (jumpDistanceIndex <= _maxDistance);
 
             //entry not found
             return false;
@@ -469,22 +486,26 @@ namespace Faster.Map
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Remove(TKey key)
         {
-            //Get object identity hashcode
+            // Get object identity hashcode
             var hashcode = key.GetHashCode();
 
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
-            //get lower first 7 bits
+            // Get 7 high bits
+            var h2 = hashcode & _bitmask;
 
-            var left = Vector128.Create((sbyte)(hashcode & _bitmask));
+            //Create vector of the 7 high bits
+            var left = Vector128.Create(Unsafe.As<int, sbyte>(ref h2));
 
+            //Set initial jumpdistance index
             byte jumpDistanceIndex = 0;
-            ushort jumpDistance = 0;
 
-            while (jumpDistanceIndex <= _maxDistance)
+            do
             {
-                var right = Vector128.LoadUnsafe(ref _metadata[index], jumpDistance);
+                //load vector @ index
+                var right = Vector128.LoadUnsafe(ref GetArrayValRef(_metadata, index));
+
                 var comparison = Sse2.CompareEqual(left, right);
 
                 //get result
@@ -496,16 +517,12 @@ namespace Faster.Map
                     //retrieve offset 
                     var offset = BitOperations.TrailingZeroCount(result);
 
-                    //get index and eq
+                    ref var entry = ref _entries[index + offset];
 
-                    var i = index + jumpDistance + offset;
-
-                    ref var entry = ref _entries[i];
-
-                    if (_compare.Equals(entry.Key, key))
+                    if (_comparer.Equals(entry.Key, key))
                     {
                         entry = default;
-                        _metadata[i] = _tombstone;
+                        _metadata[index + offset] = _tombstone;
                         --Count;
                         return true;
                     }
@@ -524,16 +541,19 @@ namespace Faster.Map
                     break;
                 }
 
-                //calculate jump jumpDistanceIndex
-                jumpDistance = jump_distances[jumpDistanceIndex];
+                //Calculate jumpDistance
+                index += GetArrayVal(jump_distances, jumpDistanceIndex);
 
-                if (index + jumpDistance > _length)
+                if (index > _length)
                 {
-                    return false;
+                    index = 0;
+                    jumpDistanceIndex = 0;
+                    continue;
                 }
 
-                jumpDistanceIndex++;
-            }
+                ++jumpDistanceIndex;
+
+            } while (jumpDistanceIndex <= _maxDistance);
 
             return false;
         }
@@ -546,22 +566,25 @@ namespace Faster.Map
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Contains(TKey key)
         {
-            //Get object identity hashcode
+            // Get object identity hashcode
             var hashcode = key.GetHashCode();
 
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
-            //create vector of the bottom 7 bits
-            var left = Vector128.Create((sbyte)(hashcode & _bitmask));
+            // Get 7 high bits
+            var h2 = hashcode & _bitmask;
 
+            //Create vector of the 7 high bits
+            var left = Vector128.Create(Unsafe.As<int, sbyte>(ref h2));
+
+            //Set initial jumpdistance index
             byte jumpDistanceIndex = 0;
-            ushort jumpDistance = 0;
 
-            while (jumpDistanceIndex <= _maxDistance)
+            do
             {
                 //load vector @ index
-                var right = Vector128.LoadUnsafe(ref _metadata[index], jumpDistance);
+                var right = Vector128.LoadUnsafe(ref GetArrayValRef(_metadata, index));
 
                 //compare two vectors
                 var comparison = Sse2.CompareEqual(left, right);
@@ -576,9 +599,9 @@ namespace Faster.Map
                     var offset = BitOperations.TrailingZeroCount(result);
 
                     //get index and eq
-                    var entry = _entries[index + jumpDistance + offset];
+                    var entry = _entries[index + offset];
 
-                    if (_compare.Equals(entry.Key, key))
+                    if (_comparer.Equals(entry.Key, key))
                     {
                         return true;
                     }
@@ -594,16 +617,19 @@ namespace Faster.Map
                     return false;
                 }
 
-                //calculate jump jumpDistanceIndex
-                jumpDistance = jump_distances[jumpDistanceIndex];
+                //Calculate jumpDistance
+                index += GetArrayVal(jump_distances, jumpDistanceIndex);
 
-                if (index + jumpDistance > _length)
+                if (index > _length)
                 {
-                    return false;
+                    index = 0;
+                    jumpDistanceIndex = 0;
+                    continue;
                 }
 
-                jumpDistanceIndex++;
-            }
+                ++jumpDistanceIndex;
+
+            } while (jumpDistanceIndex <= _maxDistance);
 
             return false;
         }
@@ -670,24 +696,6 @@ namespace Faster.Map
             }
         }
 
-        /// <summary>
-        /// Loop through every entry in the map. Mostly used for testing purposes
-        /// </summary>
-        /// <param name="key">The key.</param>
-        /// <returns>Returns the index</returns>
-        public int IndexOf(TKey key)
-        {
-            for (int i = 0; i < _entries.Length; i++)
-            {
-                var entry = _entries[i];
-                if (_compare.Equals(key, entry.Key))
-                {
-                    return i;
-                }
-            }
-            return -1;
-        }
-
         #endregion
 
         #region Private Methods
@@ -703,46 +711,39 @@ namespace Faster.Map
             //expensive if hashcode is slow, or when it`s not cached like strings
             var hashcode = entry.Key.GetHashCode();
 
-            start:
-
             //calculate index by using object identity * fibonaci followed by a shift
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
+            //Set initial jumpdistance index
             byte jumpDistanceIndex = 0;
-            ushort jumpDistance = 0;
 
-            while (jumpDistanceIndex < num_jump_distances)
+            do
             {
-                var right = Vector128.LoadUnsafe(ref _metadata[index], jumpDistance);
-                var emplaceVector = Sse2.CompareEqual(_emptyBucketVector, right);
-
                 //check for empty entries
-                int result = Sse2.MoveMask(emplaceVector);
-
+                int result = Sse2.MoveMask(Vector128.LoadUnsafe(ref GetArrayValRef(_metadata, index)));
                 if (result != 0)
                 {
-                    index += jumpDistance + (uint)BitOperations.TrailingZeroCount(result);
+                    var offset = BitOperations.TrailingZeroCount(result);
+
+                    index += Unsafe.As<int, uint>(ref offset);
+
                     _metadata[index] = h2;
                     _entries[index] = entry;
                     return;
                 }
 
-                jumpDistance = jump_distances[jumpDistanceIndex];
-
-                if (index + jumpDistance + 16 > _length)
-                {
-                    Resize();
-                    goto start;
-                }
+                //Calculate jumpDistance
+                index += GetArrayVal(jump_distances, jumpDistanceIndex);
 
                 ++jumpDistanceIndex;
 
-                // keep track of the max jump distance used to find an empty slot
+                // Keep track of the max jump distance used to find an empty slot
                 if (jumpDistanceIndex > _maxDistance)
                 {
                     _maxDistance = jumpDistanceIndex;
                 }
-            }
+
+            } while (true);
         }
 
         /// <summary>
@@ -755,7 +756,6 @@ namespace Faster.Map
 
             //next power of 2
             _length = _length * 2;
-
             _maxLookupsBeforeResize = _length * _loadFactor;
 
             var oldEntries = _entries;
@@ -778,6 +778,28 @@ namespace Faster.Map
 
                 EmplaceInternal(oldEntries[i], m);
             }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static T GetArrayVal<T>(T[] array, uint index)
+        {
+#if DEBUG
+            return array[index];
+#else
+            ref var arr0 = ref MemoryMarshal.GetArrayDataReference(array);
+            return Unsafe.Add(ref arr0, index);
+#endif
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static ref T GetArrayValRef<T>(T[] array, uint index)
+        {
+#if DEBUG
+            return ref array[index];
+#else
+            ref var arr0 = ref MemoryMarshal.GetArrayDataReference(array);
+            return ref Unsafe.Add(ref arr0, index);
+#endif
         }
 
         #endregion

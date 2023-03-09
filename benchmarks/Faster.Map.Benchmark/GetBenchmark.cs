@@ -9,6 +9,7 @@ namespace Faster.Map.Benchmark
 {
 
     [MarkdownExporterAttribute.GitHub]
+    [DisassemblyDiagnoser]
     // [SimpleJob(RunStrategy.Monitoring, 1, 10, 50)]
     public class GetBenchmark
     {

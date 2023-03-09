@@ -38,7 +38,7 @@ namespace Faster.Map.Benchmark
                 keys[index] = uint.Parse(splittedOutput[index]);
             }
 
-            keys = keys.Take(899999).ToArray();
+            keys = keys.Take(900000).ToArray();
             //  Shuffle(new Random(), keys);
         }
 
@@ -60,6 +60,11 @@ namespace Faster.Map.Benchmark
             foreach (uint key in keys)
             {
                 _denseMap.Emplace(key, key);
+            }
+
+            if (_denseMap.Count != 900000)
+            {
+                throw new Exception($"expected 900000, {_denseMap.Count}");
             }
         }
 
