@@ -79,6 +79,59 @@ namespace Faster.Map.Core.Tests
             Assert.AreEqual(900000, fmap.Count);
         }
 
+
+        [TestMethod]
+        public void AssertDailyUseCaseWithResize()
+        {
+            var fmap = new DenseMapSIMD<uint, uint>(16);
+
+            foreach (var k in keys.Take(900000))
+            {             
+                if (!fmap.Emplace(k, k))
+                {
+                    throw new InternalTestFailureException("Error occured while add");
+                }
+            }
+
+            Assert.AreEqual(900000, fmap.Count);
+
+            //find all entries from map
+
+            //var offset = 0;
+            foreach (var k in keys.Take(900000))
+            {
+                if (!fmap.Get(k, out var result))
+                {
+                    throw new InternalTestFailureException("Error occured while get");
+                }
+            }
+
+            //remove all entries from map
+
+            foreach (var k in keys.Take(900000))
+            {
+                if (!fmap.Remove(k))
+                {
+                    throw new InternalTestFailureException("Error occured while removing");
+                }
+            }
+
+            Assert.IsTrue(fmap.Count == 0);
+
+            //map full of tombstones, try inserting again
+
+            foreach (var k in keys.Take(900000))
+            {
+                if (!fmap.Emplace(k, k))
+                {
+                    throw new InternalTestFailureException("Error occured while removing");
+                }
+            }
+
+            Assert.AreEqual(900000, fmap.Count);
+        }
+
+
         [TestMethod]
         public void AssertUpdateEntryInMapReturnsProperValue()
         {
@@ -211,7 +264,7 @@ namespace Faster.Map.Core.Tests
             //assert  
             // 16 * 2) + 16
 
-            Assert.AreEqual(48,(uint) map.Size);
+            Assert.AreEqual(48,(int) map.Size);
         }
 
         [TestMethod]
@@ -354,62 +407,6 @@ namespace Faster.Map.Core.Tests
 
             //assert
             Assert.AreEqual(1, map.Count);
-        }
-
-        [TestMethod]
-        public void AssertDailyUseCaseWithResize()
-        {
-            var fmap = new DenseMapSIMD<uint, uint>(16);
-
-            foreach (var k in keys.Take(900000))
-            {
-                if (k == 1912101639)
-                {
-
-                }
-
-                if (!fmap.Emplace(k, k))
-                {
-                    throw new InternalTestFailureException("Error occured while add");
-                }
-            }
-
-            Assert.AreEqual(900000, fmap.Count);
-
-            //find all entries from map
-
-            //var offset = 0;
-            foreach (var k in keys.Take(900000))
-            {
-                if (!fmap.Get(k, out var result))
-                {
-                    throw new InternalTestFailureException("Error occured while get");
-                }
-            }
-
-            //remove all entries from map
-
-            foreach (var k in keys.Take(900000))
-            {
-                if (!fmap.Remove(k))
-                {
-                    throw new InternalTestFailureException("Error occured while removing");
-                }
-            }
-
-            Assert.IsTrue(fmap.Count == 0);
-
-            //map full of tombstones, try inserting again
-
-            foreach (var k in keys.Take(900000))
-            {
-                if (!fmap.Emplace(k, k))
-                {
-                    throw new InternalTestFailureException("Error occured while removing");
-                }
-            }
-
-            Assert.AreEqual(900000, fmap.Count);
         }
 
         [TestMethod]

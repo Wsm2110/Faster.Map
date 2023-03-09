@@ -10,7 +10,7 @@ using Faster.Map;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Runtime.CompilerServices;
 
-namespace Faster.UnitTest
+namespace Faster.Map.Core.Tests
 {
     [TestClass]
     public class DenseMapTests

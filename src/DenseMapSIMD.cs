@@ -5,7 +5,6 @@ using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics.X86;
 using System.Runtime.Intrinsics;
 using Faster.Map.Core;
-using System.Runtime.InteropServices;
 
 namespace Faster.Map
 {
@@ -225,6 +224,9 @@ namespace Faster.Map
                 Resize();
             }
 
+            // Prevent endless loops
+            byte loopDetection = 0;
+
             // Get object identity hashcode
             var hashcode = key.GetHashCode();
 
@@ -293,10 +295,26 @@ namespace Faster.Map
                 index += GetArrayVal(jump_distances, jumpDistanceIndex);
 
                 if (index > _length)
-                {    
-                    //reset index to 0 and start probing again forcing a 90% loadfactor                    
+                {
+                    //Expect to actually never hit this part, but better safe than sorry
+                    if (loopDetection == 1)
+                    {
+                        Resize();
+                        goto start;
+                    }
+
+                    // hashing to the top region of this hashmap always had some drawbacks
+                    // even when the table was half full the table would resize when the last 16 slots were full
+                    // and the jumpdistance exceeded the length of the array. this is not intended
+                    // 
+                    // when the index exceeds the length, which means all groups of 16 near the upper region of the map are full
+                    // reset the index to 0 and try probing again from the start this will enforce a secure and trustable hashmap which will always
+                    // resize when we reach a 90% load
+                    // Note these entries will not be properly cache alligned but in the end its well worth it
+                    //          
                     index = 0;
                     jumpDistanceIndex = 0;
+                    loopDetection = 1;
                     continue;
                 }
 
@@ -707,16 +725,23 @@ namespace Faster.Map
         /// <param name="current">The jumpDistanceIndex.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void EmplaceInternal(Entry<TKey, TValue> entry, sbyte h2)
-        {            
+        {
+            // Note this method is mostly mirrored in DenseMapSIMD.Emplace()
+            // If you make any changes here, make sure to keep that version in sync as well.
+
+            // Prevent endless loops
+            byte loopDetection = 0;
+
             //expensive if hashcode is slow, or when it`s not cached like strings
             var hashcode = entry.Key.GetHashCode();
 
+            start:
             //calculate index by using object identity * fibonaci followed by a shift
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
             //Set initial jumpdistance index
             byte jumpDistanceIndex = 0;
-
+          
             do
             {
                 //check for empty entries
@@ -737,8 +762,25 @@ namespace Faster.Map
 
                 if (index > _length)
                 {
+                    //Expect to never hit this part, but better safe than sorry
+                    if (loopDetection == 1)
+                    {
+                        Resize();
+                        goto start;
+                    }
+
+                    // hashing to the top region of this hashmap always had some drawbacks
+                    // even when the table was half full the table would resize when the last 16 slots were full
+                    // and the jumpdistance exceeded the length of the array. this is not intended
+                    // 
+                    // when the index exceeds the length, which means all groups of 16 near the upper region of the map are full
+                    // reset the index to 0 and try probing again from the start this will enforce a secure and trustable hashmap which will always
+                    // resize when we reach a 90% load
+                    // Note these entries will not be properly cache alligned but in the end its well worth it
+                    //                   
                     index = 0;
-                    jumpDistanceIndex = 0;
+                    jumpDistanceIndex = 0;                  
+                    loopDetection = 1; 
                     continue;
                 }
 
