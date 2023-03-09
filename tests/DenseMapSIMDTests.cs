@@ -86,7 +86,7 @@ namespace Faster.Map.Core.Tests
             var fmap = new DenseMapSIMD<uint, uint>(16);
 
             foreach (var k in keys.Take(900000))
-            {             
+            {
                 if (!fmap.Emplace(k, k))
                 {
                     throw new InternalTestFailureException("Error occured while add");
@@ -131,6 +131,21 @@ namespace Faster.Map.Core.Tests
             Assert.AreEqual(900000, fmap.Count);
         }
 
+        [TestMethod]
+        public void AssertAddingDuplicateKeysSHouldFail()
+        {
+            //arrange
+            var map = new DenseMapSIMD<uint, uint>(16);
+
+            //act
+            var r1 = map.Emplace(1, 1);
+
+            var r2 = map.Emplace(1, 2);
+
+            //assert
+            Assert.AreEqual(r1, true);
+            Assert.AreEqual(r2, false);
+        }
 
         [TestMethod]
         public void AssertUpdateEntryInMapReturnsProperValue()
@@ -264,7 +279,7 @@ namespace Faster.Map.Core.Tests
             //assert  
             // 16 * 2) + 16
 
-            Assert.AreEqual(48,(int) map.Size);
+            Assert.AreEqual(48, (int)map.Size);
         }
 
         [TestMethod]
