@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics.X86;
 using System.Runtime.Intrinsics;
 using Faster.Map.Core;
+using System.Runtime.InteropServices;
 
 namespace Faster.Map
 {
@@ -109,8 +110,7 @@ namespace Faster.Map
         private const sbyte _tombstone = -126;
 
         private static readonly Vector128<sbyte> _emptyBucketVector = Vector128.Create(_emptyBucket);
-        private static readonly Vector128<sbyte> _emplaceBucketVector = Vector128.Create((sbyte)-125);
-
+    
         private sbyte[] _metadata;
         private Entry<TKey, TValue>[] _entries;
 
@@ -299,7 +299,11 @@ namespace Faster.Map
                     //Expect to actually never hit this part, but better safe than sorry
                     if (loopDetection == 1)
                     {
+                        // resize map and try again
                         Resize();
+                        // reset loopdetection
+                        loopDetection = 0;
+                        // try again
                         goto start;
                     }
 
@@ -765,7 +769,11 @@ namespace Faster.Map
                     //Expect to never hit this part, but better safe than sorry
                     if (loopDetection == 1)
                     {
+                        // resize map and try again
                         Resize();
+                        // reset loopdetection
+                        loopDetection = 0;
+                        // try again
                         goto start;
                     }
 
