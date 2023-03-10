@@ -1,9 +1,11 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Security.Cryptography;
 
 namespace Faster.Map.Core.Tests
 {
@@ -130,9 +132,9 @@ namespace Faster.Map.Core.Tests
 
             Assert.AreEqual(900000, fmap.Count);
         }
-
+          
         [TestMethod]
-        public void AssertAddingDuplicateKeysSHouldFail()
+        public void AssertAddingDuplicateKeysShouldFail()
         {
             //arrange
             var map = new DenseMapSIMD<uint, uint>(16);

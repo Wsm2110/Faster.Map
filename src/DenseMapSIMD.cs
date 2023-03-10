@@ -102,15 +102,11 @@ namespace Faster.Map
         #endregion
 
         #region Fields
-
-        //Used to backout early while finding entries which are not in the map
-        private int _maxDistance = 0;
-
         private const sbyte _emptyBucket = -127;
         private const sbyte _tombstone = -126;
 
         private static readonly Vector128<sbyte> _emptyBucketVector = Vector128.Create(_emptyBucket);
-    
+
         private sbyte[] _metadata;
         private Entry<TKey, TValue>[] _entries;
 
@@ -123,23 +119,6 @@ namespace Faster.Map
         private readonly IEqualityComparer<TKey> _comparer;
         private const sbyte _bitmask = (1 << 7) - 1;
         private const byte num_jump_distances = 31;
-
-        //Probing is done by incrementing the current bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
-        //So first we jump by 1 group (meaning we just continue our linear scan), then 2 groups (skipping over 1 group), then 3 groups (skipping over 2 groups), and so on.
-        //Interestingly, this pattern perfectly lines up with our power-of-two size such that we will visit every single bucket exactly once without any repeats(searching is therefore guaranteed to terminate as we always have at least one EMPTY bucket).
-        //Also note that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
-        //Also note that we expect to almost never actually probe, since that’s WIDTH(16) non-EMPTY buckets we need to fail to find our key in.
-        private static ushort[] jump_distances = new ushort[num_jump_distances]
-        {
-           //    3,   6,  10, 15, 21, 28, 36, 45, 55, 66, 78, 91, 105, 120, 136, 153, 171, 190, 210, 231,
-           //  253, 276, 300, 325, 351, 378, 406, 435, 465, 496, 528, 561, 595, 630,
-        
-           // results in
-           // * 16 - 16 entrypoint
-
-          32, 80, 144, 240, 320, 432, 560, 704, 864, 1040, 1232, 1440, 1664, 1905, 2160, 2432,
-          2720, 3344, 3680, 4032, 4400, 4784, 5184, 5600, 6032, 6480, 6944, 7424, 7920, 8432, 8960,
-        };
 
         #endregion
 
@@ -224,9 +203,6 @@ namespace Faster.Map
                 Resize();
             }
 
-            // Prevent endless loops
-            byte loopDetection = 0;
-
             // Get object identity hashcode
             var hashcode = key.GetHashCode();
 
@@ -236,13 +212,11 @@ namespace Faster.Map
             //Create vector of the 7 high bits
             var left = Vector128.Create(Unsafe.As<int, sbyte>(ref h2));
 
-            start:
-
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
             //Set initial jumpdistance index
-            byte jumpDistanceIndex = 0;
+            uint jumpDistance = 16;
 
             do
             {
@@ -291,51 +265,32 @@ namespace Faster.Map
                     return true;
                 }
 
-                //Calculate jumpDistance
-                index += GetArrayVal(jump_distances, jumpDistanceIndex);
+                //Probing is done by incrementing the current bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
+                //So first we jump by 1 group (meaning we just continue our linear scan), then 2 groups (skipping over 1 group), then 3 groups (skipping over 2 groups), and so on.
+                //Interestingly, this pattern perfectly lines up with our power-of-two size such that we will visit every single bucket exactly once without any repeats(searching is therefore guaranteed to terminate as we always have at least one EMPTY bucket).
+                //Also note that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
+                //Also note that we expect to almost never actually probe, since that’s WIDTH(16) non-EMPTY buckets we need to fail to find our key in.
+
+                jumpDistance += 16;
+                index += jumpDistance;
 
                 if (index > _length)
                 {
-                    //Expect to actually never hit this part, but better safe than sorry
-                    if (loopDetection == 1)
-                    {
-                        // resize map and try again
-                        Resize();
-                        // reset loopdetection
-                        loopDetection = 0;
-                        // try again
-                        goto start;
-                    }
-
                     // hashing to the top region of this hashmap always had some drawbacks
                     // even when the table was half full the table would resize when the last 16 slots were full
                     // and the jumpdistance exceeded the length of the array. this is not intended
                     // 
                     // when the index exceeds the length, which means all groups of 16 near the upper region of the map are full
-                    // reset the index to 0 and try probing again from the start this will enforce a secure and trustable hashmap which will always
+                    // reset the index and try probing again from the start this will enforce a secure and trustable hashmap which will always
                     // resize when we reach a 90% load
                     // Note these entries will not be properly cache alligned but in the end its well worth it
-                    //          
-                    index = 0;
-                    jumpDistanceIndex = 0;
-                    loopDetection = 1;
-                    continue;
+                    //
+                    // adding jumpdistance to the index will prevent endless loops.
+                    // Every time this code block is entered jumpdistance will be different hence the index will be different too
+                    // thus it will always look for an empty spot
+                    index = BitOperations.RotateLeft(Unsafe.As<int, uint>(ref hashcode), 31) + jumpDistance >> _shift;
                 }
-
-                ++jumpDistanceIndex;
-
-                // Keep track of the max jump distance used to find an empty slot
-                if (jumpDistanceIndex > _maxDistance)
-                {
-                    _maxDistance = jumpDistanceIndex;
-                }
-
-            } while (jumpDistanceIndex < num_jump_distances);
-
-            //All jumpdistances are used -> resize since we couldnt find an empty slot
-            Resize();
-            //go to start and try again
-            goto start;
+            } while (true);
         }
 
         /// <summary>
@@ -360,7 +315,7 @@ namespace Faster.Map
             var left = Vector128.Create(Unsafe.As<int, sbyte>(ref h2));
 
             //Set initial jumpdistance index
-            byte jumpDistanceIndex = 0;
+            uint jumpDistance = 16;
 
             do
             {
@@ -398,25 +353,37 @@ namespace Faster.Map
                 //Contains empty buckets;    
                 if (result != 0)
                 {
-                    break;
+                    value = default;
+                    return false;
                 }
 
-                //Calculate jumpDistance
-                index += GetArrayVal(jump_distances, jumpDistanceIndex);
+                //Probing is done by incrementing the current bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
+                //So first we jump by 1 group (meaning we just continue our linear scan), then 2 groups (skipping over 1 group), then 3 groups (skipping over 2 groups), and so on.
+                //Interestingly, this pattern perfectly lines up with our power-of-two size such that we will visit every single bucket exactly once without any repeats(searching is therefore guaranteed to terminate as we always have at least one EMPTY bucket).
+                //Also note that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
+                //Also note that we expect to almost never actually probe, since that’s WIDTH(16) non-EMPTY buckets we need to fail to find our key in.
+
+                jumpDistance += 16;
+                index += jumpDistance;
 
                 if (index > _length)
-                {    
-                    index = 0;
-                    jumpDistanceIndex = 0;
-                    continue;
+                {
+                    // hashing to the top region of this hashmap always had some drawbacks
+                    // even when the table was half full the table would resize when the last 16 slots were full
+                    // and the jumpdistance exceeded the length of the array. this is not intended
+                    // 
+                    // when the index exceeds the length, which means all groups of 16 near the upper region of the map are full
+                    // reset the index and try probing again from the start this will enforce a secure and trustable hashmap which will always
+                    // resize when we reach a 90% load
+                    // Note these entries will not be properly cache alligned but in the end its well worth it
+                    //                                    
+                    // adding jumpdistance to the index will prevent endless loops.
+                    // Every time this code block is entered jumpdistance will be different hence the index will be different too
+                    // thus it will always look for an empty spot to back out;
+                    index = BitOperations.RotateLeft(Unsafe.As<int, uint>(ref hashcode), 31) + jumpDistance >> _shift;
                 }
 
-                ++jumpDistanceIndex;
-
-            } while (jumpDistanceIndex <= _maxDistance);
-
-            value = default;
-            return false;
+            } while (true);
         }
 
         /// <summary>
@@ -441,7 +408,7 @@ namespace Faster.Map
             var left = Vector128.Create(Unsafe.As<int, sbyte>(ref h2));
 
             //Set initial jumpdistance index
-            byte jumpDistanceIndex = 0;
+            uint jumpDistance = 0;
 
             do
             {
@@ -449,7 +416,7 @@ namespace Faster.Map
                 var right = Vector128.LoadUnsafe(ref GetArrayValRef(_metadata, index));
 
                 //compare two vectors
-                var comparison = Sse2.CompareEqual(left, right);        
+                var comparison = Sse2.CompareEqual(left, right);
 
                 //get result
                 int result = Sse2.MoveMask(comparison);
@@ -479,25 +446,36 @@ namespace Faster.Map
                 if (result != 0)
                 {
                     //contains empty buckets - break;
-                    break;
+                    return false;
                 }
 
-                //Calculate jumpDistance
-                index += GetArrayVal(jump_distances, jumpDistanceIndex);
+                //Probing is done by incrementing the current bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
+                //So first we jump by 1 group (meaning we just continue our linear scan), then 2 groups (skipping over 1 group), then 3 groups (skipping over 2 groups), and so on.
+                //Interestingly, this pattern perfectly lines up with our power-of-two size such that we will visit every single bucket exactly once without any repeats(searching is therefore guaranteed to terminate as we always have at least one EMPTY bucket).
+                //Also note that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
+                //Also note that we expect to almost never actually probe, since that’s WIDTH(16) non-EMPTY buckets we need to fail to find our key in.
+
+                jumpDistance += 16;
+                index += jumpDistance;
 
                 if (index > _length)
                 {
-                    index = 0;
-                    jumpDistanceIndex = 0;
-                    continue;
+                    // hashing to the top region of this hashmap always had some drawbacks
+                    // even when the table was half full the table would resize when the last 16 slots were full
+                    // and the jumpdistance exceeded the length of the array. this is not intended
+                    // 
+                    // when the index exceeds the length, which means all groups of 16 near the upper region of the map are full
+                    // reset the index and try probing again from the start this will enforce a secure and trustable hashmap which will always
+                    // resize when we reach a 90% load
+                    // Note these entries will not be properly cache alligned but in the end its well worth it
+                    //
+                    // adding jumpdistance to the index will prevent endless loops.
+                    // Every time this code block is entered jumpdistance will be different hence the index will be different too
+                    // thus it will always look for an empty spot to back out;
+                    index = BitOperations.RotateLeft(Unsafe.As<int, uint>(ref hashcode), 31) + jumpDistance >> _shift;
                 }
-
-                ++jumpDistanceIndex;
-
-            } while (jumpDistanceIndex <= _maxDistance);
-
-            //entry not found
-            return false;
+            }
+            while (true);
         }
 
         /// <summary>
@@ -521,7 +499,7 @@ namespace Faster.Map
             var left = Vector128.Create(Unsafe.As<int, sbyte>(ref h2));
 
             //Set initial jumpdistance index
-            byte jumpDistanceIndex = 0;
+            uint jumpDistance = 16;
 
             do
             {
@@ -560,24 +538,36 @@ namespace Faster.Map
                 if (result != 0)
                 {
                     //contains empty buckets - break;
-                    break;
+                    return false;
                 }
 
-                //Calculate jumpDistance
-                index += GetArrayVal(jump_distances, jumpDistanceIndex);
+                //Probing is done by incrementing the current bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
+                //So first we jump by 1 group (meaning we just continue our linear scan), then 2 groups (skipping over 1 group), then 3 groups (skipping over 2 groups), and so on.
+                //Interestingly, this pattern perfectly lines up with our power-of-two size such that we will visit every single bucket exactly once without any repeats(searching is therefore guaranteed to terminate as we always have at least one EMPTY bucket).
+                //Also note that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
+                //Also note that we expect to almost never actually probe, since that’s WIDTH(16) non-EMPTY buckets we need to fail to find our key in.
+
+                jumpDistance += 16;
+                index += jumpDistance;
 
                 if (index > _length)
                 {
-                    index = 0;
-                    jumpDistanceIndex = 0;
-                    continue;
+                    // hashing to the top region of this hashmap always had some drawbacks
+                    // even when the table was half full the table would resize when the last 16 slots were full
+                    // and the jumpdistance exceeded the length of the array. this is not intended
+                    // 
+                    // when the index exceeds the length, which means all groups of 16 near the upper region of the map are full
+                    // reset the index and try probing again from the start this will enforce a secure and trustable hashmap which will always
+                    // resize when we reach a 90% load
+                    // Note these entries will not be properly cache alligned but in the end its well worth it
+                    // 
+                    // adding jumpdistance to the index will prevent endless loops.
+                    // Every time this code block is entered jumpdistance will be different hence the index will be different too
+                    // thus it will always look for an empty spot to back out;
+                    index = BitOperations.RotateLeft(Unsafe.As<int, uint>(ref hashcode), 31) + jumpDistance >> _shift;
                 }
 
-                ++jumpDistanceIndex;
-
-            } while (jumpDistanceIndex <= _maxDistance);
-
-            return false;
+            } while (true);
         }
 
         /// <summary>
@@ -601,7 +591,7 @@ namespace Faster.Map
             var left = Vector128.Create(Unsafe.As<int, sbyte>(ref h2));
 
             //Set initial jumpdistance index
-            byte jumpDistanceIndex = 0;
+            uint jumpDistance = 16;
 
             do
             {
@@ -639,21 +629,33 @@ namespace Faster.Map
                     return false;
                 }
 
-                //Calculate jumpDistance
-                index += GetArrayVal(jump_distances, jumpDistanceIndex);
+                //Probing is done by incrementing the current bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
+                //So first we jump by 1 group (meaning we just continue our linear scan), then 2 groups (skipping over 1 group), then 3 groups (skipping over 2 groups), and so on.
+                //Interestingly, this pattern perfectly lines up with our power-of-two size such that we will visit every single bucket exactly once without any repeats(searching is therefore guaranteed to terminate as we always have at least one EMPTY bucket).
+                //Also note that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
+                //Also note that we expect to almost never actually probe, since that’s WIDTH(16) non-EMPTY buckets we need to fail to find our key in.
+
+                jumpDistance += 16;
+                index += jumpDistance;
 
                 if (index > _length)
                 {
-                    index = 0;
-                    jumpDistanceIndex = 0;
-                    continue;
+                    // hashing to the top region of this hashmap always had some drawbacks
+                    // even when the table was half full the table would resize when the last 16 slots were full
+                    // and the jumpdistance exceeded the length of the array. this is not intended
+                    // 
+                    // when the index exceeds the length, which means all groups of 16 near the upper region of the map are full
+                    // reset the index and try probing again from the start this will enforce a secure and trustable hashmap which will always
+                    // resize when we reach a 90% load
+                    // Note these entries will not be properly cache alligned but in the end its well worth it
+                    //
+                    // adding jumpdistance to the index will prevent endless loops.
+                    // Every time this code block is entered jumpdistance will be different hence the index will be different too
+                    // thus it will always look for an empty spot to back out;
+                    index = BitOperations.RotateLeft(Unsafe.As<int, uint>(ref hashcode), 31) + jumpDistance >> _shift;
                 }
 
-                ++jumpDistanceIndex;
-
-            } while (jumpDistanceIndex <= _maxDistance);
-
-            return false;
+            } while (true);
         }
 
         /// <summary>
@@ -733,19 +735,15 @@ namespace Faster.Map
             // Note this method is mostly mirrored in DenseMapSIMD.Emplace()
             // If you make any changes here, make sure to keep that version in sync as well.
 
-            // Prevent endless loops
-            byte loopDetection = 0;
-
             //expensive if hashcode is slow, or when it`s not cached like strings
             var hashcode = entry.Key.GetHashCode();
 
-            start:
             //calculate index by using object identity * fibonaci followed by a shift
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
             //Set initial jumpdistance index
-            byte jumpDistanceIndex = 0;
-          
+            uint jumpDistance = 16;
+
             do
             {
                 //check for empty entries
@@ -762,42 +760,24 @@ namespace Faster.Map
                 }
 
                 //Calculate jumpDistance
-                index += GetArrayVal(jump_distances, jumpDistanceIndex);
+                jumpDistance += 16;
+                index += jumpDistance;
 
                 if (index > _length)
                 {
-                    //Expect to never hit this part, but better safe than sorry
-                    if (loopDetection == 1)
-                    {
-                        // resize map and try again
-                        Resize();
-                        // reset loopdetection
-                        loopDetection = 0;
-                        // try again
-                        goto start;
-                    }
-
                     // hashing to the top region of this hashmap always had some drawbacks
                     // even when the table was half full the table would resize when the last 16 slots were full
                     // and the jumpdistance exceeded the length of the array. this is not intended
                     // 
                     // when the index exceeds the length, which means all groups of 16 near the upper region of the map are full
-                    // reset the index to 0 and try probing again from the start this will enforce a secure and trustable hashmap which will always
+                    // reset the index and try probing again from the start this will enforce a secure and trustable hashmap which will always
                     // resize when we reach a 90% load
                     // Note these entries will not be properly cache alligned but in the end its well worth it
                     //                   
-                    index = 0;
-                    jumpDistanceIndex = 0;                  
-                    loopDetection = 1; 
-                    continue;
-                }
-
-                ++jumpDistanceIndex;
-
-                // Keep track of the max jump distance used to find an empty slot
-                if (jumpDistanceIndex > _maxDistance)
-                {
-                    _maxDistance = jumpDistanceIndex;
+                    // adding jumpdistance to the index will prevent endless loops.
+                    // Every time this code block is entered jumpdistance will be different hence the index will be different too
+                    // thus it will always look for an empty spot to back out;
+                    index = BitOperations.RotateLeft(Unsafe.As<int, uint>(ref hashcode), 31) + jumpDistance >> _shift;
                 }
 
             } while (true);
@@ -809,7 +789,6 @@ namespace Faster.Map
         private void Resize()
         {
             _shift--;
-            _maxDistance = 0;
 
             //next power of 2
             _length = _length * 2;
