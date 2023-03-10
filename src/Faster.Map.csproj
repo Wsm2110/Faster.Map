@@ -8,16 +8,13 @@
     <LangVersion>Latest</LangVersion>
     <Authors>Wiljan Ruizendaal</Authors>
     <PackageReleaseNotes>
-      remove bounds checks
-      improved algorithm
-      enforce resize at 90%
-      overall performance improvements
+   fix quadratic probing 
     </PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/Wsm2110/Faster.Map</PackageProjectUrl>
-    <AssemblyVersion>4.1.0</AssemblyVersion>
-    <FileVersion>4.1.0</FileVersion>
+    <AssemblyVersion>4.1.1</AssemblyVersion>
+    <FileVersion>4.1.1</FileVersion>
     <Title>Fastest .net hashmap</Title>
-    <Version>4.1.0</Version>
+    <Version>4.1.1</Version>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Description>incredible fast hashmap using robinghood hashing</Description>
     <RepositoryUrl>https://github.com/Wsm2110/Faster.Map</RepositoryUrl>
