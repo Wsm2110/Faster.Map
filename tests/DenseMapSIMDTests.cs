@@ -132,7 +132,7 @@ namespace Faster.Map.Core.Tests
 
             Assert.AreEqual(900000, fmap.Count);
         }
-          
+
         [TestMethod]
         public void AssertAddingDuplicateKeysShouldFail()
         {
@@ -456,5 +456,47 @@ namespace Faster.Map.Core.Tests
 
             Assert.IsTrue(4 == map.Count);
         }
+
+        [TestMethod]
+        public void AssertRemovingMultipleEntries()
+        {
+            //assign
+            DenseMapSIMD<uint, uint> map = new DenseMapSIMD<uint, uint>(16);
+
+            map.Emplace(1, 1);
+            map.Emplace(2, 2);
+            map.Emplace(3, 3);
+            map.Emplace(4, 4);
+
+            //act
+
+            map.Remove(2);
+            map.Remove(3);
+            map.Remove(1);
+
+
+            //assert
+            map.Get(4, out var result);
+
+            Assert.IsTrue((uint)4 == result);
+        }
+
+        [TestMethod]
+        public void AssertEmplaceRemoveAndEmplaceAgainShouldLeaveTombstone()
+        {
+            //assign
+            DenseMapSIMD<uint, uint> map = new DenseMapSIMD<uint, uint>(16);
+
+            //act
+            map.Emplace(1, 1);
+            map.Remove(1);
+            map.Emplace(1, 2);
+
+            //assert
+            map.Get(1, out var result);
+
+            Assert.IsTrue((uint)2 == result);
+        }
+
     }
 }

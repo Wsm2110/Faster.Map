@@ -774,7 +774,7 @@ namespace Faster.Map
                     // resize when we reach a 90% load
                     // Note these entries will not be properly cache alligned but in the end its well worth it
                     //                   
-                    // adding jumpdistance to the index will prevent endless loops.
+                        // adding jumpdistance to the index will prevent endless loops.
                     // Every time this code block is entered jumpdistance will be different hence the index will be different too
                     // thus it will always look for an empty spot to back out;
                     index = BitOperations.RotateLeft(Unsafe.As<int, uint>(ref hashcode), 31) + jumpDistance >> _shift;
