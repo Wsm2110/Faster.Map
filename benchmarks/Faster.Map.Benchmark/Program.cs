@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices;
+﻿using System.Diagnostics;
+using System.Runtime.InteropServices;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Running;
 
@@ -8,11 +9,7 @@ namespace Faster.Map.Benchmark
     {
         static void Main(string[] args)
         {
-            //  TypeLayout.PrintLayout<Entry<string, string>>();
-
-            // //  TypeLayout.PrintLayout<MultiEntry<int, int>>();
-           
-            BenchmarkRunner.Run<GetBenchmark>();
+            BenchmarkRunner.Run<GetBenchmark>(new DebugInProcessConfig());
 
             // BenchmarkRunner.Run<GetBenchmark>();
             // 

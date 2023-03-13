@@ -16,7 +16,7 @@ namespace Faster.Map.Benchmark
         #region Fields
 
         FastMap<uint, uint> _fastMap = new FastMap<uint, uint>();
-        DenseMap<uint, uint> _dense = new DenseMap<uint, uint>();
+        DenseMap<uint, uint> _denseMap = new DenseMap<uint, uint>(16, 0.5);
 
         private DenseMapSIMD<uint, uint> _denseMapSIMD = new DenseMapSIMD<uint, uint>();
 
@@ -45,45 +45,27 @@ namespace Faster.Map.Benchmark
 
             foreach (var key in keys.Take(900000))
             {
-                dic.Add(key, key);
-                _denseMapSIMD.Emplace(key, key);
-                _dense.Emplace(key, key);
-                _fastMap.Emplace(key, key);
-                _slim.GetOrAddValueRef(key);
+                //dic.Add(key, key);
+                //_denseMapSIMD.Emplace(key, key);
+                _denseMap.Emplace(key, key);
+                //_fastMap.Emplace(key, key);
+                //_slim.GetOrAddValueRef(key);
             }
 
             //    Shuffle(new Random(), keys);
         }
 
-        private static void Shuffle<T>(Random rng, T[] a)
-        {
-            int n = a.Length;
-            while (n > 1)
-            {
-                int k = rng.Next(--n);
-                T temp = a[n];
-                a[n] = a[k];
-                a[k] = temp;
-            }
-        }
+ 
+
 
         [Benchmark]
-        public void DenseMapSIMD()
+        public void DenseMap()
         {
             foreach (var key in keys)
             {
-                _denseMapSIMD.Get(key, out var result);
+                _denseMap.Get(key, out var result);
             }
         }
-
-        //[Benchmark]
-        //public void DenseMap()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        _dense.Get(key, out var result);
-        //    }
-        //  }
 
         //[Benchmark]
         //public void FastMap()

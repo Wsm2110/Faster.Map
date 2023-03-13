@@ -30,5 +30,6 @@ namespace Faster.Map.Core
         {
             return Value.Equals(other.Value);
         }
+
     }
 }

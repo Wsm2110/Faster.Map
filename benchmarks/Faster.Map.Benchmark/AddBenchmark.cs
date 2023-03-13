@@ -54,19 +54,14 @@ namespace Faster.Map.Benchmark
 
         #region Benchmarks
 
-        [Benchmark]
-        public void DenseMapSIMD()
-        {
-            foreach (uint key in keys)
-            {
-                _denseMap.Emplace(key, key);
-            }
-
-            if (_denseMap.Count != 900000)
-            {
-                throw new Exception($"expected 900000, {_denseMap.Count}");
-            }
-        }
+        //[Benchmark]
+        //public void DenseMapSIMD()
+        //{
+        //    foreach (uint key in keys)
+        //    {
+        //        _denseMapSIMD.Emplace(key, key);
+        //    }
+        //}
 
         [Benchmark]
         public void DenseMap()
@@ -77,32 +72,32 @@ namespace Faster.Map.Benchmark
             }
         }
 
-        [Benchmark]
-        public void FastMap()
-        {
-            foreach (var key in keys)
-            {
-                _fastMap.Emplace(key, key);
-            }
-        }
+        //[Benchmark]
+        //public void FastMap()
+        //{
+        //    foreach (var key in keys)
+        //    {
+        //        _fastMap.Emplace(key, key);
+        //    }
+        //}
 
-        [Benchmark]
-        public void Dictionary()
-        {
-            foreach (var key in keys)
-            {
-                dic.Add(key, key);
-            }
-        }
+        //[Benchmark]
+        //public void Dictionary()
+        //{
+        //    foreach (var key in keys)
+        //    {
+        //        dic.Add(key, key);
+        //    }
+        //}
 
-        [Benchmark]
-        public void DictionarySlim()
-        {
-            foreach (var key in keys)
-            {
-                _slim.GetOrAddValueRef(key);
-            }
-        }
+        //[Benchmark]
+        //public void DictionarySlim()
+        //{
+        //    foreach (var key in keys)
+        //    {
+        //        _slim.GetOrAddValueRef(key);
+        //    }
+        //}
 
         #endregion
 

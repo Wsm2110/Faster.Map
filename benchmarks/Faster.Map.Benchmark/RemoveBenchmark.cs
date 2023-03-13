@@ -13,13 +13,14 @@ namespace Faster.Map.Benchmark
     {
         #region Fields
 
-        FastMap<uint, uint> _fastMap = new FastMap<uint, uint>(16, 0.5);
-        private DenseMapSIMD<uint, uint> _denseMap = new DenseMapSIMD<uint, uint>(16);
-        private DenseMap<uint, uint> _dense = new DenseMap<uint, uint>(16, 0.5);
+        FastMap<uint, uint> _fastMap = new FastMap<uint, uint>();
+        private DenseMapSIMD<uint, uint> _denseMapSIMD = new DenseMapSIMD<uint, uint>();
+        private DenseMap<uint, uint> _denseMap = new DenseMap<uint, uint>();
         private Dictionary<uint, uint> dic = new Dictionary<uint, uint>();
         private DictionarySlim<uint, uint> _slim = new DictionarySlim<uint, uint>();
 
         private uint[] keys;
+        private int _length = 900000;
         #endregion
 
         /// <summary>
@@ -38,13 +39,13 @@ namespace Faster.Map.Benchmark
                 keys[index] = uint.Parse(splittedOutput[index]);
             }
 
-            foreach (var key in keys.Take(900000))
+            foreach (var key in keys.Take(_length))
             {
-                dic.Add(key, key);
+              //  dic.Add(key, key);
+              //  _denseMapSIMD.Emplace(key, key);
+              //  _fastMap.Emplace(key, key);
                 _denseMap.Emplace(key, key);
-                _fastMap.Emplace(key, key);
-                _dense.Emplace(key, key);
-                _slim.GetOrAddValueRef(key);
+             //   _slim.GetOrAddValueRef(key);
             }
 
             // Shuffle(new Random(), keys);
@@ -54,8 +55,8 @@ namespace Faster.Map.Benchmark
         public void clear()
         {
             dic.Clear();
+            _denseMapSIMD.Clear();
             _denseMap.Clear();
-            _dense.Clear();
             _fastMap.Clear();
             _slim.Clear();
         }
@@ -74,48 +75,50 @@ namespace Faster.Map.Benchmark
 
         #region Benchmarks
 
-        [Benchmark]
-        public void SlimDictionary()
-        {
-            foreach (var key in keys)
-            {
-                _slim.Remove(key);
-            }
-        }
+        //[Benchmark]
+        //public void SlimDictionary()
+        //{
+        //    foreach (var key in keys)
+        //    {
+        //        _slim.Remove(key);
+        //    }
+        //}
 
-        [Benchmark]
-        public void Dictionary()
-        {
-            foreach (var key in keys)
-            {
-                dic.Remove(key, out var result);
-            }
-        }
+        //[Benchmark]
+        //public void Dictionary()
+        //{
+        //    foreach (var key in keys)
+        //    {
+        //        dic.Remove(key, out var result);
+        //    }
+        //}
 
-        [Benchmark]
-        public void FastMap()
-        {
-            foreach (var key in keys)
-            {
-                _fastMap.Remove(key);
-            }
-        }
+        //[Benchmark]
+        //public void FastMap()
+        //{
+        //    foreach (var key in keys)
+        //    {
+        //        _fastMap.Remove(key);
+        //    }
+        //}
 
-        [Benchmark]
-        public void DenseMapSIMD()
-        {
-            foreach (var key in keys)
-            {
-                _denseMap.Remove(key);
-            }
-        }
+        //[Benchmark]
+        //public void DenseMapSIMD()
+        //{
+        //    for (int i = 0; i < _length; ++i)
+        //    {
+        //        uint key = keys[i];
+        //        _denseMapSIMD.Remove(key);
+        //    }
+        //}
 
         [Benchmark]
         public void DenseMap()
         {
-            foreach (var key in keys)
+            for (int i = 0; i < _length; ++i)
             {
-                _dense.Remove(key);
+                uint key = keys[i];
+                _denseMap.Remove(key);
             }
         }
 

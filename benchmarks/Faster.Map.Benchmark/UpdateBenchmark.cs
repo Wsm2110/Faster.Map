@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Threading;
 using BenchmarkDotNet.Attributes;
 using Microsoft.Collections.Extensions;
 
@@ -15,14 +16,15 @@ namespace Faster.Map.Benchmark
         #region Fields
 
         FastMap<uint, uint> _fastMap = new FastMap<uint, uint>(16, 0.5);
-        private DenseMapSIMD<uint, uint> _denseMap = new DenseMapSIMD<uint, uint>(1000000,0.9);
-        private DenseMap<uint, uint> _dense = new DenseMap<uint, uint>(16);
+        private DenseMapSIMD<uint, uint> _denseMapSIMD = new DenseMapSIMD<uint, uint>();
+        private DenseMap<uint, uint> _denseMap = new DenseMap<uint, uint>();
 
-        private Dictionary<uint, uint> dic = new Dictionary<uint, uint>();    
+        private Dictionary<uint, uint> dic = new Dictionary<uint, uint>();
         private DictionarySlim<uint, uint> _slim = new DictionarySlim<uint, uint>();
-    
+
 
         private uint[] keys;
+        private int _length = 900000;
         #endregion
 
         /// <summary>
@@ -31,6 +33,7 @@ namespace Faster.Map.Benchmark
         [GlobalSetup]
         public void Setup()
         {
+
             var output = File.ReadAllText("Numbers.txt");
             var splittedOutput = output.Split(',');
 
@@ -41,21 +44,18 @@ namespace Faster.Map.Benchmark
                 keys[index] = uint.Parse(splittedOutput[index]);
             }
 
-            foreach (var key in keys.Take(900000))
+            foreach (var key in keys.Take(_length))
             {
-                dic.Add(key, key);
-                _denseMap.Emplace(key, key);     
-                _dense.Emplace(key, key);
-                _fastMap.Emplace(key, key);
-                _slim.GetOrAddValueRef(key);
-                
+                //   dic.Add(key, key);
+                //  _denseMapSIMD.Emplace(key, key);
+                _denseMap.Emplace(key, key);
+                //  _fastMap.Emplace(key, key);
+                //  _slim.GetOrAddValueRef(key);
+
             }
 
-           // Shuffle(new Random(), keys);
+            // Shuffle(new Random(), keys);
         }
-
-  
-
 
         private static void Shuffle<T>(Random rng, T[] a)
         {
@@ -89,14 +89,14 @@ namespace Faster.Map.Benchmark
         //    }
         //}
 
-        [Benchmark]
-        public void DenseMapSIMD()
-        {
-            foreach (var key in keys)
-            {
-                _denseMap.Update(key, 222);
-            }
-        }
+        //[Benchmark]
+        //public void DenseMapSIMD()
+        //{
+        //    foreach (var key in keys)
+        //    {
+        //        _denseMapSIMD.Update(key, 222);
+        //    }
+        //}
 
         //[Benchmark]
         //public void FastMap()
@@ -107,15 +107,15 @@ namespace Faster.Map.Benchmark
         //    }
         //}
 
-        //[Benchmark]
-        //public void DenseMap()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        _dense.Update(key, 222);
-        //    }
-        //}
-          
+        [Benchmark]
+        public void DenseMap()
+        {
+            for (uint i = 0; i < _length; i++)
+            {
+                _denseMap.Update(keys[i], 222);
+            }          
+        }
+
         #endregion
     }
 }

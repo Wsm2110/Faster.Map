@@ -9,7 +9,7 @@ namespace Faster.Map.Core
     /// </summary>
     [StructLayout(LayoutKind.Sequential)]
     [DebuggerDisplay("psl - {Psl}")]
-    public struct InfoByte
+    public struct Metabyte
     {
         private byte _psl;
 

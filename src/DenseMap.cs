@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using Faster.Map.Core;
 
 namespace Faster.Map
@@ -8,8 +10,7 @@ namespace Faster.Map
     /// <summary>
     /// This hashmap uses the following
     /// - Open addressing
-    /// - Uses linear probing
-    /// - Robinghood hashing
+    /// 
     /// - Upper limit on the probe sequence lenght(psl) which is Log2(size)
     /// - Keeps track of the currentProbeCount which makes sure we can back out early eventhough the maxprobcount exceeds the cpc
     /// - loadfactor can easily be increased to 0.9 while maintaining an incredible speed
@@ -25,7 +26,7 @@ namespace Faster.Map
         /// <value>
         /// The entry count.
         /// </value>
-        public int Count { get; private set; }
+        public uint Count { get; private set; }
 
         /// <summary>
         /// Gets the size of the map
@@ -46,9 +47,9 @@ namespace Faster.Map
             get
             {
                 //iterate backwards so we can remove the current item
-                for (int i = _info.Length - 1; i >= 0; --i)
+                for (int i = _metadata.Length - 1; i >= 0; --i)
                 {
-                    if (!_info[i].IsEmpty())
+                    if (_metadata[i] > 0)
                     {
                         var entry = _entries[i];
                         yield return new KeyValuePair<TKey, TValue>(entry.Key, entry.Value);
@@ -68,9 +69,9 @@ namespace Faster.Map
             get
             {
                 //iterate backwards so we can remove the current item
-                for (int i = _info.Length - 1; i >= 0; --i)
+                for (int i = _metadata.Length - 1; i >= 0; --i)
                 {
-                    if (!_info[i].IsEmpty())
+                    if (_metadata[i] > 0)
                     {
                         yield return _entries[i].Key;
                     }
@@ -88,9 +89,9 @@ namespace Faster.Map
         {
             get
             {
-                for (int i = _info.Length - 1; i >= 0; --i)
+                for (int i = _metadata.Length - 1; i >= 0; --i)
                 {
-                    if (!_info[i].IsEmpty())
+                    if (_metadata[i] > 0)
                     {
                         yield return _entries[i].Value;
                     }
@@ -102,16 +103,18 @@ namespace Faster.Map
 
         #region Fields
 
-        private InfoByte[] _info;
+        private sbyte[] _metadata;
+        private const sbyte _empty = 0;
+        private const sbyte _tombstone = -1;
+        private const sbyte _full = 1;
+
         private Entry<TKey, TValue>[] _entries;
         private uint _length;
         private readonly double _loadFactor;
         private const uint GoldenRatio = 0x9E3779B9; //2654435769;
         private int _shift = 32;
-        private byte _maxProbeSequenceLength;
-        private byte _currentProbeSequenceLength;
         private readonly IEqualityComparer<TKey> _keyCompare;
-        private int _maxLookupsBeforeResize;
+        private double _maxLookupsBeforeResize;
 
         #endregion
 
@@ -142,22 +145,31 @@ namespace Faster.Map
         /// <param name="loadFactor">The loadfactor determines when the hashmap will resize(default is 0.5d) i.e size 32 loadfactor 0.5 hashmap will resize at 16</param>
         /// <param name="keyComparer">Used to compare keys to resolve hashcollisions</param>
         public DenseMap(uint length, double loadFactor, IEqualityComparer<TKey> keyComparer)
-        {
+        {  
             //default length is 8
             _length = length;
             _loadFactor = loadFactor;
 
-            var size = NextPow2(_length);
-            _maxProbeSequenceLength = loadFactor <= 0.5 ? Log2(size) : PslLimit(size);
+            if (_length < 8)
+            {
+                _length = 8;
+            }
 
-            _maxLookupsBeforeResize = (int)(size * loadFactor);
+            if (BitOperations.IsPow2(length))
+            {
+                _length = length;
+            }
+            else
+            {
+                _length = BitOperations.RoundUpToPowerOf2(_length);
+            }
 
+            _maxLookupsBeforeResize = (_length * loadFactor);
             _keyCompare = keyComparer ?? EqualityComparer<TKey>.Default;
 
-            _shift = _shift - Log2(_length) + 1;
-
-            _entries = new Entry<TKey, TValue>[size + _maxProbeSequenceLength + 1];
-            _info = new InfoByte[size + _maxProbeSequenceLength + 1];
+            _shift = _shift - BitOperations.Log2(_length);
+            _entries = new Entry<TKey, TValue>[_length];
+            _metadata = new sbyte[_length];
         }
 
         #endregion
@@ -170,16 +182,12 @@ namespace Faster.Map
         /// <param name="key">The key.</param>
         /// <param name="value">The value.</param>
         /// <returns></returns>
-        [MethodImpl(256)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Emplace(TKey key, TValue value)
         {
             //Resize if loadfactor is reached
-            if (Count >= _maxLookupsBeforeResize)
+            if (Count > _maxLookupsBeforeResize)
             {
-#if DEBUG
-                Console.WriteLine((double)(Count / (double)(_length / 100)));
-#endif
-
                 Resize();
             }
 
@@ -189,65 +197,49 @@ namespace Faster.Map
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
-            //check if key is unique
-            if (ContainsKey(ref hashcode, index, key))
-            {
-                return false;
-            }
-
-            //create entry
-            Entry<TKey, TValue> entry = default;
-            entry.Value = value;
-            entry.Key = key;
-         
-            //Create default infobyte
-            InfoByte current = default;
-
-            //Assign 0 to psl so it wont be seen as empty
-            current.Psl = 0;
-
-            //retrieve infobyte
-            ref var info = ref _info[index];
+            uint jumpDistance = 1;
 
             do
             {
-                //Increase _current probe sequence
-                if (_currentProbeSequenceLength < current.Psl)
-                {
-                    _currentProbeSequenceLength = current.Psl;
-                }
+                //retrieve infobyte
+                ref var metadata = ref _metadata[index];
+                ref var entry = ref _entries[index];
 
                 //Empty spot, add entry
-                if (info.IsEmpty())
+                if (metadata == _empty || metadata == _tombstone)
                 {
-                    _entries[index] = entry;
-                    info = current;
+                    entry.Value = value;
+                    entry.Key = key;
+
+                    metadata = _full;
+
                     ++Count;
                     return true;
                 }
 
-                //Steal from the rich, give to the poor
-                if (current.Psl > info.Psl)
+                //validate hash
+                if (_keyCompare.Equals(key, entry.Key))
                 {
-                    Swap(ref entry, ref _entries[index]);
-                    Swap(ref current, ref info);
-                    continue;
+                    return false;
                 }
 
-                //max psl is reached, resize
-                if (current.Psl == _maxProbeSequenceLength)
+                //Probing is done by incrementing the current bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
+                //So first we jump by 1 group (meaning we just continue our linear scan), then 2 groups (skipping over 1 group), then 3 groups (skipping over 2 groups), and so on.
+                //Interestingly, this pattern perfectly lines up with our power-of-two size such that we will visit every single bucket exactly once without any repeats(searching is therefore guaranteed to terminate as we always have at least one EMPTY bucket).
+                //Also note that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
+                //Also note that we expect to almost never actually probe, since that’s WIDTH(16) non-EMPTY buckets we need to fail to find our key in.
+
+                index += jumpDistance;
+
+                if (index >= _length)
                 {
-                    ++Count;
-                    Resize();
-                    EmplaceInternal(entry, current);
-                    return true;
+                    // adding jumpdistance to the index will prevent endless loops.
+                    // Every time this code block is entered jumpdistance will be different hence the index will be different too
+                    // thus it will always look for an empty spot
+                    index = BitOperations.RotateRight(Unsafe.As<int, uint>(ref hashcode), 31) + jumpDistance >> _shift;
                 }
 
-                //increase index
-                info = ref _info[++index];
-
-                //increase probe sequence length
-                ++current.Psl;
+                jumpDistance += 1;
 
             } while (true);
         }
@@ -258,7 +250,7 @@ namespace Faster.Map
         /// <param name="key">The key.</param>
         /// <param name="value">The value.</param>
         /// <returns></returns>
-        [MethodImpl(256)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Get(TKey key, out TValue value)
         {
             //Get object identity hashcode
@@ -267,105 +259,138 @@ namespace Faster.Map
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
-            //Determine max distance
-            var maxDistance = index + _currentProbeSequenceLength;
+            uint jumpDistance = 1;
 
             do
             {
-                //Get entry by ref
-                ref var entry = ref _entries[index];
+                //retrieve infobyte
+                var metadata = GetArrayVal(_metadata, index);
 
-                //validate hashcode
+                //Empty spot, add entry
+                if (metadata == _empty)
+                {
+                    value = default;
+                    return false;
+                }
+
+                var entry = GetArrayVal(_entries, index);
                 if (_keyCompare.Equals(key, entry.Key))
                 {
                     value = entry.Value;
                     return true;
                 }
 
-                ++index;
-                //increase index by one and validate if within bounds
-            } while (index <= maxDistance);
+                index += jumpDistance;
 
-            value = default;
+                if (index >= _length)
+                {
+                    // adding jumpdistance to the index will prevent endless loops.
+                    // Every time this code block is entered jumpdistance will be different hence the index will be different too
+                    // thus it will always look for an empty spot
+                    index = BitOperations.RotateRight(Unsafe.As<int, uint>(ref hashcode), 31) + jumpDistance >> _shift;
+                }
 
-            //not found
-            return false;
+                jumpDistance += 1;
+
+            } while (true);
         }
 
         /// <summary>
         ///Updates the value of a specific key
         /// </summary>
-        [MethodImpl(256)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Update(TKey key, TValue value)
         {
             //Get object identity hashcode
             var hashcode = key.GetHashCode();
 
-            //Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
+            // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
-            //Determine max distance
-            var maxDistance = index + _currentProbeSequenceLength;
+            uint jumpDistance = 1;
 
             do
             {
-                //Get entry by ref
-                ref var entry = ref _entries[index];
+                //retrieve infobyte
+                var metadata = GetArrayVal(_metadata, index);
 
-                //validate hashcode
+                //Empty spot, add entry
+                if (metadata == _empty)
+                {
+                    return false;
+                }
+
+                ref var entry = ref GetArrayValRef(_entries, index);
                 if (_keyCompare.Equals(key, entry.Key))
                 {
                     entry.Value = value;
                     return true;
                 }
 
-                ++index;
-                //increase index by one and validate if within bounds
-            } while (index <= maxDistance);
+                index += jumpDistance;
 
-            //entry not found
-            return false;
+                if (index >= _length)
+                {
+                    // adding jumpdistance to the index will prevent endless loops.
+                    // Every time this code block is entered jumpdistance will be different hence the index will be different too
+                    // thus it will always look for an empty spot
+                    index = BitOperations.RotateRight(Unsafe.As<int, uint>(ref hashcode), 31) + jumpDistance >> _shift;
+                }
+
+                jumpDistance += 1;
+
+            } while (true);
         }
 
         /// <summary>
-        ///  Remove entry with a backshift removal
+        ///  Remove entry using a tombstone
         /// </summary>
         /// <param name="key"></param>
         /// <returns></returns>
-        [MethodImpl(256)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Remove(TKey key)
         {
-            //Get ObjectIdentity hashcode
-            int hashcode = key.GetHashCode();
+            //Get object identity hashcode
+            var hashcode = key.GetHashCode();
 
-            //Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
+            // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
-            //Determine max distance
-            var maxDistance = index + _currentProbeSequenceLength;
+            uint jumpDistance = 1;
 
             do
             {
-                //unrolling loop twice seems to give a minor speedboost
-                ref var entry = ref _entries[index];
+                //retrieve infobyte
+                ref var metadata = ref GetArrayValRef(_metadata, index);
 
-                //validate hash en compare keys
-                if (_keyCompare.Equals(key, entry.Key))
+                //Empty spot, add entry
+                if (metadata == _empty)
                 {
-                    //remove entry from list
-                    entry = default;
-                    _info[index] = default;
+                    return false;
+                }
+
+                var entry = GetArrayVal(_entries, index);
+                if (_keyCompare.Equals(key, entry.Key))
+                {             
+                    // Set tombstone
+                    metadata = _tombstone;
                     --Count;
-                    ShiftRemove(index);
                     return true;
                 }
 
-                ++index;
-                //increase index by one and validate if within bounds
-            } while (index <= maxDistance);
+                index += jumpDistance;
 
-            // No entries removed
-            return false;
+                if (index >= _length)
+                {
+                    // adding jumpdistance to the index will prevent endless loops.
+                    // Every time this code block is entered jumpdistance will be different hence the index will be different too
+                    // thus it will always look for an empty spot
+                    index = BitOperations.RotateRight(Unsafe.As<int, uint>(ref hashcode), 31) + jumpDistance >> _shift;
+                }
+
+                jumpDistance += 1;
+
+            } while (true);
         }
 
         /// <summary>
@@ -375,51 +400,47 @@ namespace Faster.Map
         /// <returns>
         ///   <c>true</c> if the specified key contains key; otherwise, <c>false</c>.
         /// </returns>
-        [MethodImpl(256)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Contains(TKey key)
         {
-            //Get ObjectIdentity hashcode
-            int hashcode = key.GetHashCode();
+            //Get object identity hashcode
+            var hashcode = key.GetHashCode();
 
-            //Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
+            // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
-            //backout early
-            var info = _info[index];
-            if (info.IsEmpty())
-            {
-                //Dont unnecessary iterate over the entries
-                return false;
-            }
-
-            //Determine max distance
-            var maxDistance = index + _currentProbeSequenceLength;
+            uint jumpDistance = 1;
 
             do
             {
-                //unrolling loop twice seems to give a minor speedboost
-                var entry = _entries[index];
+                //retrieve infobyte
+                var metadata = GetArrayVal(_metadata, index);
 
-                //validate hash
-                if (_keyCompare.Equals(key, entry.Key))
+                //Empty spot
+                if (metadata == _empty)
                 {
+                    return false;
+                }
+
+                ref var entry = ref GetArrayValRef(_entries, index);
+                if (_keyCompare.Equals(key, entry.Key))
+                {                   
                     return true;
                 }
 
-                //increase index by 1
-                entry = _entries[++index];
+                index += jumpDistance;
 
-                //validate hash
-                if (_keyCompare.Equals(key, entry.Key))
+                if (index >= _length)
                 {
-                    return true;
+                    // adding jumpdistance to the index will prevent endless loops.
+                    // Every time this code block is entered jumpdistance will be different hence the index will be different too
+                    // thus it will always look for an empty spot
+                    index = BitOperations.RotateRight(Unsafe.As<int, uint>(ref hashcode), 31) + jumpDistance >> _shift;
                 }
 
-                //increase index by one and validate if within bounds
-            } while (++index <= maxDistance);
+                jumpDistance += 1;
 
-            //not found
-            return false;
+            } while (true);
         }
 
         /// <summary>
@@ -430,8 +451,8 @@ namespace Faster.Map
         {
             for (var i = 0; i < denseMap._entries.Length; ++i)
             {
-                var info = denseMap._info[i];
-                if (info.IsEmpty())
+                var info = denseMap._metadata[i];
+                if (info == _empty)
                 {
                     continue;
                 }
@@ -449,7 +470,7 @@ namespace Faster.Map
             for (var i = 0; i < _entries.Length; ++i)
             {
                 _entries[i] = default;
-                _info[i] = default;
+                _metadata[i] = default;
             }
 
             Count = 0;
@@ -488,192 +509,63 @@ namespace Faster.Map
             }
         }
 
-        /// <summary>
-        /// Returns an index of the specified key.
-        /// </summary>
-        /// <param name="key">The key.</param>
-        /// <returns></returns>
-        public int IndexOf(TKey key)
-        {
-            for (int i = 0; i < _entries.Length; i++)
-            {
-                var info = _info[i];
-                if (info.IsEmpty())
-                {
-                    continue;
-                }
-
-                var entry = _entries[i];
-                if (_keyCompare.Equals(key, entry.Key))
-                {
-                    return i;
-                }
-            }
-            return -1;
-        }
-
         #endregion
 
         #region Private Methods
-
-        [MethodImpl(256)]
-        private bool ContainsKey(ref int hashcode, uint index, TKey key)
-        {
-            //Determine max distance
-            var maxDistance = index + _currentProbeSequenceLength;
-
-            do
-            {
-                //unrolling loop twice seems to give a minor speedboost
-                ref var entry = ref _entries[index];
-
-                //validate hash
-                if (_keyCompare.Equals(key, entry.Key))
-                {
-                    return true;
-                }
-
-                ++index;
-                //increase index by one and validate if within bounds
-            } while (index <= maxDistance);
-
-
-            return false;
-        }
 
         /// <summary>
         /// Emplaces a new entry without checking for key existence. Keys have already been checked and are unique
         /// </summary>
         /// <param name="entry">The entry.</param>
         /// <param name="current">The current.</param>
-        [MethodImpl(256)]
-        private void EmplaceInternal(Entry<TKey, TValue> entry, InfoByte current)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void EmplaceInternal(Entry<TKey, TValue> entry)
         {
-            uint index = (uint)entry.Key.GetHashCode() * GoldenRatio >> _shift;
-            current.Psl = 0;
+            var hashcode = entry.Key.GetHashCode();
 
-            ref var info = ref _info[index];
+            uint index = (uint)hashcode * GoldenRatio >> _shift;
+
+            uint jumpDistance = 1;
 
             do
             {
+                //retrieve infobyte
+                ref var metadata = ref _metadata[index];
+                ref var next = ref _entries[index];
 
-                if (_currentProbeSequenceLength < current.Psl)
+                //Empty spot, add entry
+                if (metadata == _empty)
                 {
-                    _currentProbeSequenceLength = current.Psl;
-                }
+                    next = entry;
 
-                if (info.IsEmpty())
-                {
-                    _entries[index] = entry;
-                    info = current;
+                    metadata = _full;
+
                     return;
                 }
 
-                if (current.Psl > info.Psl)
+
+                index += jumpDistance;
+
+                if (index >= _length)
                 {
-                    Swap(ref entry, ref _entries[index]);
-                    Swap(ref current, ref info);
-                    continue;
+                    // hashing to the top region of this hashmap always had some drawbacks
+                    // even when the table was half full the table would resize when the last 16 slots were full
+                    // and the jumpdistance exceeded the length of the array. this is not intended
+                    // 
+                    // when the index exceeds the length, which means all groups of 16 near the upper region of the map are full
+                    // reset the index and try probing again from the start this will enforce a secure and trustable hashmap which will always
+                    // resize when we reach a 90% load
+                    // Note these entries will not be properly cache alligned but in the end its well worth it
+                    //
+                    // adding jumpdistance to the index will prevent endless loops.
+                    // Every time this code block is entered jumpdistance will be different hence the index will be different too
+                    // thus it will always look for an empty spot
+                    index = BitOperations.RotateRight(Unsafe.As<int, uint>(ref hashcode), 31) + jumpDistance >> _shift;
                 }
 
-                if (current.Psl == _maxProbeSequenceLength)
-                {
-                    Resize();
-                    EmplaceInternal(entry, current);
-                    return;
-                }
-
-                //increase index
-                info = ref _info[++index];
-
-                //increase probe sequence length
-                ++current.Psl;
+                ++jumpDistance;
 
             } while (true);
-        }
-
-        private void ShiftRemove(uint index)
-        {
-            //Get next entry
-            ref var next = ref _info[++index];
-
-            while (!next.IsEmpty() && next.Psl != 0)
-            {
-                //decrease next psl by 1
-                next.Psl--;
-                //swap upper info with lower
-                Swap(ref next, ref _info[index - 1]);
-                //swap upper entry with lower
-                Swap(ref _entries[index], ref _entries[index - 1]);
-                //increase index by one
-                next = ref _info[++index];
-            }
-        }
-
-        /// <summary>
-        /// Swaps the specified x.
-        /// </summary>
-        /// <param name="x">The x.</param>
-        /// <param name="y">The y.</param>
-        private void Swap(ref Entry<TKey, TValue> x, ref Entry<TKey, TValue> y)
-        {
-            var tmp = x;
-
-            x = y;
-            y = tmp;
-        }
-
-        /// <summary>
-        /// Swaps the specified x.
-        /// </summary>
-        /// <param name="x">The x.</param>
-        /// <param name="y">The y.</param>
-        private void Swap(ref InfoByte x, ref InfoByte y)
-        {
-            var tmp = x;
-
-            x = y;
-            y = tmp;
-        }
-
-        /// <summary>
-        /// PSLs the limit.
-        /// </summary>
-        /// <param name="size">The size.</param>
-        /// <returns></returns>
-        [MethodImpl(256)]
-        private byte PslLimit(uint size)
-        {
-            switch (size)
-            {
-                case 16: return 6;
-                case 32: return 8;
-                case 64: return 12;
-                case 128: return 16;
-                case 256: return 20;
-                case 512: return 24;
-                case 1024: return 32;
-                case 2048: return 36;
-                case 4096: return 40;
-                case 8192: return 50;
-                case 16384: return 60;
-                case 32768: return 65;
-                case 65536: return 70;
-                case 131072: return 75;
-                case 262144: return 80;
-                case 524288: return 85;
-                case 1048576: return 90;
-                case 2097152: return 94;
-                case 4194304: return 98;
-                case 8388608: return 102;
-                case 16777216: return 104;
-                case 33554432: return 108;
-                case 67108864: return 112;
-                case 134217728: return 116;
-                case 268435456: return 120;
-                case 536870912: return 124;
-                default: return 10;
-            }
         }
 
         /// <summary>
@@ -683,90 +575,53 @@ namespace Faster.Map
         private void Resize()
         {
             _shift--;
-            _length = NextPow2(_length + 1);
-            _maxProbeSequenceLength = _loadFactor <= 0.5 ? Log2(_length) : PslLimit(_length);
+            _length = _length * 2;
 
-            _maxLookupsBeforeResize = (int)(_length * _loadFactor);
-            _currentProbeSequenceLength = 0;
+            _maxLookupsBeforeResize = _length * _loadFactor;
 
-            var oldEntries = _entries.Clone() as Entry<TKey, TValue>[];
-            var oldInfo = _info.Clone() as InfoByte[];
+            var oldEntries = _entries;
+            var oldInfo = _metadata;
 
-            _entries = new Entry<TKey, TValue>[_length + _maxProbeSequenceLength + 1];
-            _info = new InfoByte[_length + _maxProbeSequenceLength + 1];
+            var size = Unsafe.As<uint, int>(ref _length);
+
+            _metadata = new sbyte[size];
+            _entries = GC.AllocateUninitializedArray<Entry<TKey, TValue>>(size);
 
             for (var i = 0; i < oldEntries.Length; ++i)
             {
                 var info = oldInfo[i];
-                if (info.IsEmpty())
+                if (info == _empty)
                 {
                     continue;
                 }
 
                 var entry = oldEntries[i];
 
-                EmplaceInternal(entry, info);
+                EmplaceInternal(entry);
             }
         }
 
-        /// <summary>
-        /// calculates next power of 2
-        /// </summary>
-        /// <param name="c">The c.</param>
-        /// <returns></returns>
-        ///
-        [MethodImpl(256)]
-        private static uint NextPow2(uint c)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static T GetArrayVal<T>(T[] array, uint index)
         {
-            c--;
-            c |= c >> 1;
-            c |= c >> 2;
-            c |= c >> 4;
-            c |= c >> 8;
-            c |= c >> 16;
-            return ++c;
+#if DEBUG
+            return array[index];
+#else
+            ref var arr0 = ref MemoryMarshal.GetArrayDataReference(array);
+            return Unsafe.Add(ref arr0, index);
+#endif
         }
 
-        // used for set checking operations (using enumerables) that rely on counting
-        private static byte Log2(uint value)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static ref T GetArrayValRef<T>(T[] array, uint index)
         {
-            byte c = 0;
-            while (value > 0)
-            {
-                c++;
-                value >>= 1;
-            }
-
-            return c;
+#if DEBUG
+            return ref array[index];
+#else
+            ref var arr0 = ref MemoryMarshal.GetArrayDataReference(array);
+            return ref Unsafe.Add(ref arr0, index);
+#endif
         }
-
-
-        /// <summary>
-        /// Gets the first entry matching the specified key.
-        /// If the same key is used for multiple entries we return the first entry matching the given criteria
-        /// </summary>
-        /// <param name="key">The key.</param>
-        /// <returns></returns>
-        [MethodImpl(256)]
-        internal InfoByte Get(TKey key)
-        {
-            //Get object identity hashcode
-            var hashcode = key.GetHashCode();
-
-            // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
-            uint index = (uint)hashcode * GoldenRatio >> _shift;
-
-            // Retrieve entry
-            var info = _info[index];
-
-            if (info.IsEmpty())
-            {
-                return default;
-            }
-
-            return info;
-        }
-
 
         #endregion
     }

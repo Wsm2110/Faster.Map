@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Runtime.Intrinsics.X86;
 using System.Security.Cryptography;
 
 namespace Faster.Map.Core.Tests
@@ -496,6 +497,25 @@ namespace Faster.Map.Core.Tests
             map.Get(1, out var result);
 
             Assert.IsTrue((uint)2 == result);
+        }
+
+        [TestMethod]
+        public void AssertCustomSize()
+        {
+            for (int i = 0; i < 100; i++)
+            {
+
+                DenseMapSIMD<uint, uint> map = new DenseMapSIMD<uint, uint>(1000000, 0.9);
+
+                foreach (var k in keys.Take(900000))
+                {
+                    if (!map.Emplace(k, k))
+                    {
+                        throw new InternalTestFailureException("Error occured while add");
+                    }
+                }
+            }
+
         }
 
     }

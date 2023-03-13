@@ -118,7 +118,7 @@ namespace Faster.Map
         private readonly double _loadFactor;
         private readonly IEqualityComparer<TKey> _comparer;
         private const sbyte _bitmask = (1 << 7) - 1;
-        private const byte num_jump_distances = 31;
+
 
         #endregion
 
@@ -162,6 +162,11 @@ namespace Faster.Map
             if (loadFactor > 0.9)
             {
                 _loadFactor = 0.9;
+            }
+
+            if (_length < 16)
+            {
+                _length = 16;
             }
 
             if (BitOperations.IsPow2(length))
@@ -366,7 +371,7 @@ namespace Faster.Map
                 jumpDistance += 16;
                 index += jumpDistance;
 
-                if (index > _length)
+                if (index >= _length)
                 {
                     // hashing to the top region of this hashmap always had some drawbacks
                     // even when the table was half full the table would resize when the last 16 slots were full
@@ -458,7 +463,7 @@ namespace Faster.Map
                 jumpDistance += 16;
                 index += jumpDistance;
 
-                if (index > _length)
+                if (index >= _length)
                 {
                     // hashing to the top region of this hashmap always had some drawbacks
                     // even when the table was half full the table would resize when the last 16 slots were full
@@ -550,7 +555,7 @@ namespace Faster.Map
                 jumpDistance += 16;
                 index += jumpDistance;
 
-                if (index > _length)
+                if (index >= _length)
                 {
                     // hashing to the top region of this hashmap always had some drawbacks
                     // even when the table was half full the table would resize when the last 16 slots were full
@@ -638,7 +643,7 @@ namespace Faster.Map
                 jumpDistance += 16;
                 index += jumpDistance;
 
-                if (index > _length)
+                if (index >= _length)
                 {
                     // hashing to the top region of this hashmap always had some drawbacks
                     // even when the table was half full the table would resize when the last 16 slots were full
@@ -763,7 +768,7 @@ namespace Faster.Map
                 jumpDistance += 16;
                 index += jumpDistance;
 
-                if (index > _length)
+                if (index >= _length)
                 {
                     // hashing to the top region of this hashmap always had some drawbacks
                     // even when the table was half full the table would resize when the last 16 slots were full
@@ -774,7 +779,7 @@ namespace Faster.Map
                     // resize when we reach a 90% load
                     // Note these entries will not be properly cache alligned but in the end its well worth it
                     //                   
-                        // adding jumpdistance to the index will prevent endless loops.
+                    // adding jumpdistance to the index will prevent endless loops.
                     // Every time this code block is entered jumpdistance will be different hence the index will be different too
                     // thus it will always look for an empty spot to back out;
                     index = BitOperations.RotateLeft(Unsafe.As<int, uint>(ref hashcode), 31) + jumpDistance >> _shift;

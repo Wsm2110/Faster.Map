@@ -105,7 +105,7 @@ namespace Faster.Map
 
         #region Fields
 
-        private InfoByte[] _info;
+        private Metabyte[] _info;
         private Entry<TKey, TValue>[] _entries;
         private uint _length;
         private readonly double _loadFactor;
@@ -149,7 +149,7 @@ namespace Faster.Map
 
             _shift = _shift - Log2(_length) + 1;
             _entries = new Entry<TKey, TValue>[_length + _maxProbeSequenceLength + 1];
-            _info = new InfoByte[_length + _maxProbeSequenceLength + 1];
+            _info = new Metabyte[_length + _maxProbeSequenceLength + 1];
         }
 
         #endregion
@@ -189,7 +189,7 @@ namespace Faster.Map
             fastEntry.Key = key;
 
             //Create default info byte
-            InfoByte current = default;
+            Metabyte current = default;
 
             //Assign 0 to psl so it wont be seen as empty
             current.Psl = 0;
@@ -520,7 +520,7 @@ namespace Faster.Map
         /// <param name="entry">The fast entry.</param>
         /// <param name="current">The information byte.</param>
         [MethodImpl(256)]
-        private void EmplaceInternal(ref Entry<TKey, TValue> entry, ref InfoByte current)
+        private void EmplaceInternal(ref Entry<TKey, TValue> entry, ref Metabyte current)
         {
             //get objectidentiy
             var hashcode = entry.Key.GetHashCode();
@@ -581,7 +581,7 @@ namespace Faster.Map
         /// <param name="x">The x.</param>
         /// <param name="y">The y.</param>
         [MethodImpl(256)]
-        private void Swap(ref InfoByte x, ref InfoByte y)
+        private void Swap(ref Metabyte x, ref Metabyte y)
         {
             var tmp = x;
             x = y;
@@ -665,10 +665,10 @@ namespace Faster.Map
             _currentProbeSequenceLength = 0;
 
             var oldEntries = _entries.Clone() as Entry<TKey, TValue>[];
-            var oldInfo = _info.Clone() as InfoByte[]; 
+            var oldInfo = _info.Clone() as Metabyte[]; 
 
             _entries = new Entry<TKey, TValue>[_length + _maxProbeSequenceLength + 1];
-            _info = new InfoByte[_length + _maxProbeSequenceLength + 1];
+            _info = new Metabyte[_length + _maxProbeSequenceLength + 1];
 
             for (var i = 0; i < oldEntries.Length; ++i)
             {

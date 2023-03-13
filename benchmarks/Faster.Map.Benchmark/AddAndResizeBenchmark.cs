@@ -69,7 +69,7 @@ namespace Faster.Map.Benchmark
         //{
         //    foreach (var key in keys)
         //    {
-        //        _dense.Emplace(key, key);
+        //        _denseMapSIMD.Emplace(key, key);
         //    }
         //}
 
