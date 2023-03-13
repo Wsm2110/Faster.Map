@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Faster.Map.Core
 {
@@ -30,6 +31,8 @@ namespace Faster.Map.Core
         {
             return Value.Equals(other.Value);
         }
+        public static explicit operator StringWrapper(string s) => new(s);
+        public static implicit operator string(StringWrapper b) => b.Value;
 
     }
 }
