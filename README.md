@@ -100,7 +100,7 @@ InvocationCount=1  UnrollFactor=1
 |         Method |     Mean |    Error |   StdDev |   Median |
 |--------------- |----------:|----------:|----------:|----------:|
 |   DenseMapSIMD | 11.81 ms | 0.089 ms | 0.079 ms | 12.55 ms |
-| DenseMapSIMD   | 14.08 ms | 0.860 ms | 2.535 ms | 15.60 ms |
+| DenseMap  | 14.08 ms | 0.860 ms | 2.535 ms | 15.60 ms |
 |        FastMap | 42.25 ms | 0.805 ms | 0.988 ms | 42.11 ms |
 |     Dictionary | 34.22 ms | 0.673 ms | 1.007 ms | 34.24 ms |
 | DictionarySlim | 27.08 ms | 0.531 ms | 0.546 ms | 27.11 ms |
