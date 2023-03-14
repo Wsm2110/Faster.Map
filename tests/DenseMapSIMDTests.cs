@@ -515,7 +515,74 @@ namespace Faster.Map.Core.Tests
                     }
                 }
             }
+        }
 
+        [TestMethod]
+        public void AssertKeyEnumerator()
+        {
+            //assign
+            var map = new DenseMap<uint, uint>(16, 0.5);
+
+            //act
+            map.Emplace(1, 1);
+            map.Emplace(2, 2);
+            map.Emplace(3, 2);
+            map.Emplace(4, 2);
+
+            var count = 0;
+            foreach (var item in map.Keys)
+            {
+                ++count;
+            }
+
+            //assert
+            Assert.AreEqual(count, 4);
+        }
+
+
+        [TestMethod]
+        public void AssertValueEnumerator()
+        {
+            //assign
+            var map = new DenseMap<uint, uint>(16, 0.5);
+
+            //act
+            map.Emplace(1, 1);
+            map.Emplace(2, 2);
+            map.Emplace(3, 2);
+            map.Emplace(4, 2);
+
+            var count = 0;
+            foreach (var item in map.Values)
+            {
+                ++count;
+            }
+
+            //assert
+            Assert.AreEqual(count, 4);
+        }
+
+
+        [TestMethod]
+        public void AssertEntriesEnumerator()
+        {
+            //assign
+            var map = new DenseMap<uint, uint>(16, 0.5);
+
+            //act
+            map.Emplace(1, 1);
+            map.Emplace(2, 2);
+            map.Emplace(3, 2);
+            map.Emplace(4, 2);
+
+            var count = 0;
+            foreach (var item in map.Entries)
+            {
+                ++count;
+            }
+
+            //assert
+            Assert.AreEqual(count, 4);
         }
 
     }

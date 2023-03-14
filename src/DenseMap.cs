@@ -9,12 +9,10 @@ namespace Faster.Map
 {
     /// <summary>
     /// This hashmap uses the following
-    /// - Open addressing
-    /// 
-    /// - Upper limit on the probe sequence lenght(psl) which is Log2(size)
-    /// - Keeps track of the currentProbeCount which makes sure we can back out early eventhough the maxprobcount exceeds the cpc
-    /// - loadfactor can easily be increased to 0.9 while maintaining an incredible speed
-    /// - fibonacci hashing
+    /// Open addressing   
+    /// Quadratic probing
+    /// Fibonacci hashing
+    /// Default loadfactor is 0.5
     /// </summary>
     public class DenseMap<TKey, TValue>
     {
@@ -46,10 +44,10 @@ namespace Faster.Map
         {
             get
             {
-                //iterate backwards so we can remove the current item
+                //iterate backwards so we can remove the item
                 for (int i = _metadata.Length - 1; i >= 0; --i)
                 {
-                    if (_metadata[i] > 0)
+                    if (_metadata[i] >= 0)
                     {
                         var entry = _entries[i];
                         yield return new KeyValuePair<TKey, TValue>(entry.Key, entry.Value);
@@ -68,10 +66,10 @@ namespace Faster.Map
         {
             get
             {
-                //iterate backwards so we can remove the current item
+                //iterate backwards so we can remove the jumpDistanceIndex item
                 for (int i = _metadata.Length - 1; i >= 0; --i)
                 {
-                    if (_metadata[i] > 0)
+                    if (_metadata[i] >= 0)
                     {
                         yield return _entries[i].Key;
                     }
@@ -91,7 +89,7 @@ namespace Faster.Map
             {
                 for (int i = _metadata.Length - 1; i >= 0; --i)
                 {
-                    if (_metadata[i] > 0)
+                    if (_metadata[i] >= 0)
                     {
                         yield return _entries[i].Value;
                     }
@@ -208,24 +206,24 @@ namespace Faster.Map
             {
                 //retrieve infobyte
                 ref var metadata = ref _metadata[index];
-              
+
                 //Empty spot, add entry
                 if (metadata == _emptyBucket || metadata == _tombstone)
                 {
                     _entries[index].Key = key;
                     _entries[index].Value = value;
-                 
+
                     metadata = Unsafe.As<int, sbyte>(ref h2);
 
                     ++Count;
                     return true;
                 }
-              
+
                 //validate hash
                 if (h2 == metadata && _comparer.Equals(key, _entries[index].Key))
                 {
                     return false;
-                }             
+                }
 
                 //Probing is done by incrementing the current bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
                 //So first we jump by 1 group (meaning we just continue our linear scan), then 2 groups (skipping over 1 group), then 3 groups (skipping over 2 groups), and so on.
@@ -279,13 +277,13 @@ namespace Faster.Map
                     value = default;
                     return false;
                 }
-                
+
                 var entry = GetArrayVal(_entries, index);
                 if (h2 == metadata && _comparer.Equals(key, entry.Key))
                 {
                     value = entry.Value;
                     return true;
-                }            
+                }
 
                 index += jumpDistance;
 
@@ -336,7 +334,7 @@ namespace Faster.Map
                     entry.Value = value;
                     return true;
                 }
-                   
+
                 index += jumpDistance;
 
                 if (index >= _length)
@@ -379,7 +377,7 @@ namespace Faster.Map
                 if (metadata == _emptyBucket)
                 {
                     return false;
-                }            
+                }
 
                 var entry = GetArrayVal(_entries, index);
                 if (h2 == metadata && _comparer.Equals(key, entry.Key))
@@ -388,7 +386,7 @@ namespace Faster.Map
                     metadata = _tombstone;
                     --Count;
                     return true;
-                }             
+                }
 
                 index += jumpDistance;
 
@@ -434,13 +432,13 @@ namespace Faster.Map
                 if (metadata == _emptyBucket)
                 {
                     return false;
-                }             
+                }
 
                 var entry = GetArrayVal(_entries, index);
                 if (h2 == metadata && _comparer.Equals(key, entry.Key))
                 {
                     return true;
-                }               
+                }
 
                 index += jumpDistance;
 
@@ -545,12 +543,12 @@ namespace Faster.Map
             {
                 //retrieve infobyte
                 ref var metadata = ref _metadata[index];
-              
+
                 //Empty spot, add entry
                 if (metadata == _emptyBucket)
                 {
                     metadata = Unsafe.As<int, sbyte>(ref h2);
-                    _entries[index] = entry;    
+                    _entries[index] = entry;
                     return;
                 }
 

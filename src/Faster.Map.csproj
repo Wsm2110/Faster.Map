@@ -8,13 +8,13 @@
     <LangVersion>Latest</LangVersion>
     <Authors>Wiljan Ruizendaal</Authors>
     <PackageReleaseNotes>
-     Move away from robinhood hashing and implement quadratic probing.
+     Fix enumerator in densemap
     </PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/Wsm2110/Faster.Map</PackageProjectUrl>
-    <AssemblyVersion>4.1.2</AssemblyVersion>
-    <FileVersion>4.1.2</FileVersion>
+    <AssemblyVersion>4.1.3</AssemblyVersion>
+    <FileVersion>4.1.3</FileVersion>
     <Title>Fastest .net hashmap</Title>
-    <Version>4.1.2</Version>
+    <Version>4.1.3</Version>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Description>incredible fast hashmaps using robinhood hashing or quadratic probing with triangular numbers</Description>
     <RepositoryUrl>https://github.com/Wsm2110/Faster.Map</RepositoryUrl>
