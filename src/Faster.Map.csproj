@@ -8,13 +8,13 @@
     <LangVersion>Latest</LangVersion>
     <Authors>Wiljan Ruizendaal</Authors>
     <PackageReleaseNotes>
-     Fix enumerator in densemap
+     Enable sourcelink
     </PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/Wsm2110/Faster.Map</PackageProjectUrl>
-    <AssemblyVersion>4.1.3</AssemblyVersion>
-    <FileVersion>4.1.3</FileVersion>
+    <AssemblyVersion>4.1.4</AssemblyVersion>
+    <FileVersion>4.1.4</FileVersion>
     <Title>Fastest .net hashmap</Title>
-    <Version>4.1.3</Version>
+    <Version>4.1.4</Version>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Description>incredible fast hashmaps using robinhood hashing or quadratic probing with triangular numbers</Description>
     <RepositoryUrl>https://github.com/Wsm2110/Faster.Map</RepositoryUrl>
@@ -23,6 +23,16 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>Hashmap Hashtable Dictionary Faster.map performance, simd, robinhood hashing, swisstable, absl</PackageTags>
   </PropertyGroup>
+
+  <PropertyGroup>
+    <EmbedAllSources>True</EmbedAllSources>
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
+  </PropertyGroup>
+
   <ItemGroup>
     <None Include="..\README.md">
       <Pack>True</Pack>

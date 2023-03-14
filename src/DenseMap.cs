@@ -192,10 +192,10 @@ namespace Faster.Map
             }
 
             //Get object identity hashcode
-            var hashcode = key.GetHashCode();
+            var hashcode = (uint) key.GetHashCode();
 
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
-            uint index = (uint)hashcode * GoldenRatio >> _shift;
+            uint index = hashcode * GoldenRatio >> _shift;
 
             uint jumpDistance = 1;
 
@@ -213,7 +213,7 @@ namespace Faster.Map
                     _entries[index].Key = key;
                     _entries[index].Value = value;
 
-                    metadata = Unsafe.As<int, sbyte>(ref h2);
+                    metadata = Unsafe.As<long, sbyte>(ref h2);
 
                     ++Count;
                     return true;
@@ -238,7 +238,7 @@ namespace Faster.Map
                     // adding jumpdistance to the index will prevent endless loops.
                     // Every time this code block is entered jumpdistance will be different hence the index will be different too
                     // thus it will always look for an empty spot
-                    index = BitOperations.RotateRight(Unsafe.As<int, uint>(ref hashcode), 31) + jumpDistance >> _shift;
+                    index = BitOperations.RotateRight(hashcode, 31) + jumpDistance >> _shift;
                 }
 
                 jumpDistance += 1;
@@ -256,10 +256,10 @@ namespace Faster.Map
         public bool Get(TKey key, out TValue value)
         {
             //Get object identity hashcode
-            var hashcode = key.GetHashCode();
+            var hashcode = (uint)key.GetHashCode();
 
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
-            uint index = (uint)hashcode * GoldenRatio >> _shift;
+            uint index = hashcode * GoldenRatio >> _shift;
 
             // Get 7 high bits
             var h2 = hashcode & _bitmask;
@@ -292,7 +292,7 @@ namespace Faster.Map
                     // adding jumpdistance to the index will prevent endless loops.
                     // Every time this code block is entered jumpdistance will be different hence the index will be different too
                     // thus it will always look for an empty spot
-                    index = BitOperations.RotateRight(Unsafe.As<int, uint>(ref hashcode), 31) + jumpDistance >> _shift;
+                    index = BitOperations.RotateRight(hashcode, 31) + jumpDistance >> _shift;
                 }
 
                 jumpDistance += 1;
@@ -307,13 +307,11 @@ namespace Faster.Map
         public bool Update(TKey key, TValue value)
         {
             //Get object identity hashcode
-            var hashcode = key.GetHashCode();
-
+            var hashcode = (uint) key.GetHashCode();
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
-            uint index = (uint)hashcode * GoldenRatio >> _shift;
-
+            uint index = hashcode * GoldenRatio >> _shift;
+            //set initiale jump distance
             uint jumpDistance = 1;
-
             // Get 7 high bits
             var h2 = hashcode & _bitmask;
 
@@ -342,7 +340,7 @@ namespace Faster.Map
                     // adding jumpdistance to the index will prevent endless loops.
                     // Every time this code block is entered jumpdistance will be different hence the index will be different too
                     // thus it will always look for an empty spot
-                    index = BitOperations.RotateRight(Unsafe.As<int, uint>(ref hashcode), 31) + jumpDistance >> _shift;
+                    index = BitOperations.RotateRight(hashcode, 31) + jumpDistance >> _shift;
                 }
 
                 jumpDistance += 1;
@@ -359,10 +357,10 @@ namespace Faster.Map
         public bool Remove(TKey key)
         {
             //Get object identity hashcode
-            var hashcode = key.GetHashCode();
+            var hashcode = (uint)key.GetHashCode();
 
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
-            uint index = (uint)hashcode * GoldenRatio >> _shift;
+            uint index = hashcode * GoldenRatio >> _shift;
 
             uint jumpDistance = 1;
 
@@ -395,7 +393,7 @@ namespace Faster.Map
                     // adding jumpdistance to the index will prevent endless loops.
                     // Every time this code block is entered jumpdistance will be different hence the index will be different too
                     // thus it will always look for an empty spot
-                    index = BitOperations.RotateRight(Unsafe.As<int, uint>(ref hashcode), 31) + jumpDistance >> _shift;
+                    index = BitOperations.RotateRight(hashcode, 31) + jumpDistance >> _shift;
                 }
 
                 jumpDistance += 1;
@@ -414,10 +412,10 @@ namespace Faster.Map
         public bool Contains(TKey key)
         {
             //Get object identity hashcode
-            var hashcode = key.GetHashCode();
+            var hashcode = (uint) key.GetHashCode();
 
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
-            uint index = (uint)hashcode * GoldenRatio >> _shift;
+            uint index = hashcode * GoldenRatio >> _shift;
 
             uint jumpDistance = 1;
 
@@ -447,7 +445,7 @@ namespace Faster.Map
                     // adding jumpdistance to the index will prevent endless loops.
                     // Every time this code block is entered jumpdistance will be different hence the index will be different too
                     // thus it will always look for an empty spot
-                    index = BitOperations.RotateRight(Unsafe.As<int, uint>(ref hashcode), 31) + jumpDistance >> _shift;
+                    index = BitOperations.RotateRight(hashcode, 31) + jumpDistance >> _shift;
                 }
 
                 jumpDistance += 1;
@@ -464,7 +462,7 @@ namespace Faster.Map
             for (var i = 0; i < denseMap._entries.Length; ++i)
             {
                 var info = denseMap._metadata[i];
-                if (info == _emptyBucket)
+                if (info < 0)
                 {
                     continue;
                 }
@@ -530,9 +528,9 @@ namespace Faster.Map
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void EmplaceInternal(Entry<TKey, TValue> entry)
         {
-            var hashcode = entry.Key.GetHashCode();
+            var hashcode = (uint)entry.Key.GetHashCode();
 
-            uint index = (uint)hashcode * GoldenRatio >> _shift;
+            uint index = hashcode * GoldenRatio >> _shift;
 
             // Get 7 high bits
             var h2 = hashcode & _bitmask;
@@ -547,7 +545,7 @@ namespace Faster.Map
                 //Empty spot, add entry
                 if (metadata == _emptyBucket)
                 {
-                    metadata = Unsafe.As<int, sbyte>(ref h2);
+                    metadata = Unsafe.As<long, sbyte>(ref h2);
                     _entries[index] = entry;
                     return;
                 }
@@ -568,7 +566,7 @@ namespace Faster.Map
                     // adding jumpdistance to the index will prevent endless loops.
                     // Every time this code block is entered jumpdistance will be different hence the index will be different too
                     // thus it will always look for an empty spot
-                    index = BitOperations.RotateRight(Unsafe.As<int, uint>(ref hashcode), 31) + jumpDistance >> _shift;
+                    index = BitOperations.RotateRight(hashcode, 31) + jumpDistance >> _shift;
                 }
 
                 ++jumpDistance;
@@ -599,8 +597,8 @@ namespace Faster.Map
 
             for (var i = 0; i < oldEntries.Length; ++i)
             {
-                var info = oldInfo[i];
-                if (info == _emptyBucket)
+                var m = oldInfo[i];
+                if (m < 0)
                 {
                     continue;
                 }
