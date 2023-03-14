@@ -2,6 +2,7 @@
 using System.Runtime.InteropServices;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Running;
+using Faster.Map.Core;
 
 namespace Faster.Map.Benchmark
 {
@@ -9,7 +10,9 @@ namespace Faster.Map.Benchmark
     {
         static void Main(string[] args)
         {
-            BenchmarkRunner.Run<GetBenchmark>(new DebugInProcessConfig());
+
+            // BenchmarkRunner.Run<AddBenchmark>(new DebugBuildConfig());
+            BenchmarkRunner.Run<AddAndResizeBenchmark>();
 
             // BenchmarkRunner.Run<GetBenchmark>();
             // 

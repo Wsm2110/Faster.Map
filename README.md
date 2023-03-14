@@ -65,15 +65,15 @@ InvocationCount=1  UnrollFactor=1
 |--------------- |----------:|----------:|----------:|
 | SlimDictionary | 14.041 ms | 0.1952 ms | 0.1731 ms |
 |     Dictionary | 16.712 ms | 0.3339 ms | 0.8000 ms |
-|   DenseMapSIMD | 7.272 ms  | 0.0748 ms  | 0.0700 ms| 
-|       DenseMap | 12.45 ms  | 0.254 ms   | 0.303 ms |
+|   DenseMapSIMD | 7.272 ms  | 0.0748 ms | 0.0700 ms | 
+|       DenseMap | 11.94 ms  | 0.087 ms  | 0.077 ms  |
 |        FastMap |  9.577 ms | 0.1660 ms | 0.1386 ms |
 
 ### Adding a million keys
 |         Method |      Mean |     Error |    StdDev |
 |--------------- |----------:|----------:|----------:|
 |   DenseMapSIMD | 6.454 ms  | 0.1265 ms  | 0.2467 ms|
-|       DenseMap | 12.58 ms  | 0.774 ms   | 2.281 ms |
+|       DenseMap | 9.396 ms  | 0.1877 ms | 0.2374 ms |
 |        FastMap | 28.681 ms | 0.5674 ms | 0.6968 ms |
 |     Dictionary | 16.298 ms | 0.3254 ms | 0.7477 ms |
 | DictionarySlim | 29.161 ms | 0.5290 ms | 0.4417 ms |
@@ -85,7 +85,7 @@ InvocationCount=1  UnrollFactor=1
 |   Dictionary   | 19.102 ms | 0.3739 ms | 0.7023 ms |
 | DenseMapSIMD   |  7.913 ms | 0.0811 ms | 0.0677 ms |
 |      FastMap   |  9.953 ms | 0.1157 ms | 0.1082 ms |
-|     DenseMap   | 12.95 ms  | 0.249 ms | 0.306 ms   |
+| DenseMap       | 12.17 ms  | 0.161 ms  |  0.142 ms |
 
 ### Removing a million keys
 |         Method |      Mean |     Error |    StdDev |
@@ -94,13 +94,13 @@ InvocationCount=1  UnrollFactor=1
 |     Dictionary | 19.58 ms | 0.328 ms | 0.403 ms |
 |        FastMap | 15.88 ms | 0.291 ms | 0.272 ms |
 |   DenseMapSIMD | 12.63 ms | 0.247 ms | 0.362 ms |
-|       DenseMap | 14.25 ms | 0.304 ms | 0.635 ms |
+|       DenseMap | 13.52 ms | 0.270 ms | 0.420 ms |
 
 ### Add and resize
 |         Method |     Mean |    Error |   StdDev |   Median |
 |--------------- |----------:|----------:|----------:|----------:|
 |   DenseMapSIMD | 11.81 ms | 0.089 ms | 0.079 ms | 12.55 ms |
-| DenseMap  | 14.08 ms | 0.860 ms | 2.535 ms | 15.60 ms |
+|       DenseMap | 22.28 ms | 0.444 ms | 0.729 ms | 22.78 ms |
 |        FastMap | 42.25 ms | 0.805 ms | 0.988 ms | 42.11 ms |
 |     Dictionary | 34.22 ms | 0.673 ms | 1.007 ms | 34.24 ms |
 | DictionarySlim | 27.08 ms | 0.531 ms | 0.546 ms | 27.11 ms |

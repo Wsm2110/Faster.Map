@@ -141,7 +141,7 @@ namespace Faster.Map
             _length = length == 0 ? 8 : length;
             _loadFactor = loadFactor;
 
-           _length = NextPow2(_length);      
+            _length = NextPow2(_length);
 
             _maxProbeSequenceLength = _loadFactor <= 0.5 ? Log2(_length) : PslLimit(_length);
 
@@ -551,7 +551,7 @@ namespace Faster.Map
                     Swap(ref entry, ref _entries[index]);
                     Swap(ref current, ref _info[index]);
                     continue;
-                }              
+                }
 
                 //increase index
                 info = ref _info[++index];
@@ -661,11 +661,11 @@ namespace Faster.Map
             _length = NextPow2(_length + 1);
 
             _maxProbeSequenceLength = _loadFactor <= 0.5 ? Log2(_length) : PslLimit(_length);
-            _maxlengthBeforeResize = (uint)(_length * _loadFactor);                       
+            _maxlengthBeforeResize = (uint)(_length * _loadFactor);
             _currentProbeSequenceLength = 0;
 
             var oldEntries = _entries.Clone() as Entry<TKey, TValue>[];
-            var oldInfo = _info.Clone() as Metabyte[]; 
+            var oldInfo = _info.Clone() as Metabyte[];
 
             _entries = new Entry<TKey, TValue>[_length + _maxProbeSequenceLength + 1];
             _info = new Metabyte[_length + _maxProbeSequenceLength + 1];

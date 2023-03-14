@@ -104,16 +104,16 @@ namespace Faster.Map
         #region Fields
 
         private sbyte[] _metadata;
-        private const sbyte _empty = 0;
-        private const sbyte _tombstone = -1;
-        private const sbyte _full = 1;
+        private const sbyte _emptyBucket = -126;
+        private const sbyte _tombstone = -125;
 
+        private const sbyte _bitmask = (1 << 7) - 1;
         private Entry<TKey, TValue>[] _entries;
         private uint _length;
         private readonly double _loadFactor;
         private const uint GoldenRatio = 0x9E3779B9; //2654435769;
         private int _shift = 32;
-        private readonly IEqualityComparer<TKey> _keyCompare;
+        private readonly IEqualityComparer<TKey> _comparer;
         private double _maxLookupsBeforeResize;
 
         #endregion
@@ -145,7 +145,7 @@ namespace Faster.Map
         /// <param name="loadFactor">The loadfactor determines when the hashmap will resize(default is 0.5d) i.e size 32 loadfactor 0.5 hashmap will resize at 16</param>
         /// <param name="keyComparer">Used to compare keys to resolve hashcollisions</param>
         public DenseMap(uint length, double loadFactor, IEqualityComparer<TKey> keyComparer)
-        {  
+        {
             //default length is 8
             _length = length;
             _loadFactor = loadFactor;
@@ -165,11 +165,13 @@ namespace Faster.Map
             }
 
             _maxLookupsBeforeResize = (_length * loadFactor);
-            _keyCompare = keyComparer ?? EqualityComparer<TKey>.Default;
+            _comparer = keyComparer ?? EqualityComparer<TKey>.Default;
 
             _shift = _shift - BitOperations.Log2(_length);
             _entries = new Entry<TKey, TValue>[_length];
             _metadata = new sbyte[_length];
+
+            _metadata.AsSpan().Fill(_emptyBucket);
         }
 
         #endregion
@@ -199,29 +201,31 @@ namespace Faster.Map
 
             uint jumpDistance = 1;
 
+            // Get 7 high bits
+            var h2 = hashcode & _bitmask;
+
             do
             {
                 //retrieve infobyte
                 ref var metadata = ref _metadata[index];
-                ref var entry = ref _entries[index];
-
+              
                 //Empty spot, add entry
-                if (metadata == _empty || metadata == _tombstone)
+                if (metadata == _emptyBucket || metadata == _tombstone)
                 {
-                    entry.Value = value;
-                    entry.Key = key;
-
-                    metadata = _full;
+                    _entries[index].Key = key;
+                    _entries[index].Value = value;
+                 
+                    metadata = Unsafe.As<int, sbyte>(ref h2);
 
                     ++Count;
                     return true;
                 }
-
+              
                 //validate hash
-                if (_keyCompare.Equals(key, entry.Key))
+                if (h2 == metadata && _comparer.Equals(key, _entries[index].Key))
                 {
                     return false;
-                }
+                }             
 
                 //Probing is done by incrementing the current bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
                 //So first we jump by 1 group (meaning we just continue our linear scan), then 2 groups (skipping over 1 group), then 3 groups (skipping over 2 groups), and so on.
@@ -259,6 +263,9 @@ namespace Faster.Map
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
+            // Get 7 high bits
+            var h2 = hashcode & _bitmask;
+
             uint jumpDistance = 1;
 
             do
@@ -267,18 +274,18 @@ namespace Faster.Map
                 var metadata = GetArrayVal(_metadata, index);
 
                 //Empty spot, add entry
-                if (metadata == _empty)
+                if (metadata == _emptyBucket)
                 {
                     value = default;
                     return false;
                 }
-
+                
                 var entry = GetArrayVal(_entries, index);
-                if (_keyCompare.Equals(key, entry.Key))
+                if (h2 == metadata && _comparer.Equals(key, entry.Key))
                 {
                     value = entry.Value;
                     return true;
-                }
+                }            
 
                 index += jumpDistance;
 
@@ -309,24 +316,27 @@ namespace Faster.Map
 
             uint jumpDistance = 1;
 
+            // Get 7 high bits
+            var h2 = hashcode & _bitmask;
+
             do
             {
                 //retrieve infobyte
                 var metadata = GetArrayVal(_metadata, index);
 
                 //Empty spot, add entry
-                if (metadata == _empty)
+                if (metadata == _emptyBucket)
                 {
                     return false;
                 }
 
                 ref var entry = ref GetArrayValRef(_entries, index);
-                if (_keyCompare.Equals(key, entry.Key))
+                if (metadata == h2 && _comparer.Equals(key, entry.Key))
                 {
                     entry.Value = value;
                     return true;
                 }
-
+                   
                 index += jumpDistance;
 
                 if (index >= _length)
@@ -358,25 +368,27 @@ namespace Faster.Map
 
             uint jumpDistance = 1;
 
+            var h2 = hashcode & _bitmask;
+
             do
             {
                 //retrieve infobyte
                 ref var metadata = ref GetArrayValRef(_metadata, index);
 
                 //Empty spot, add entry
-                if (metadata == _empty)
+                if (metadata == _emptyBucket)
                 {
                     return false;
-                }
+                }            
 
                 var entry = GetArrayVal(_entries, index);
-                if (_keyCompare.Equals(key, entry.Key))
-                {             
+                if (h2 == metadata && _comparer.Equals(key, entry.Key))
+                {
                     // Set tombstone
                     metadata = _tombstone;
                     --Count;
                     return true;
-                }
+                }             
 
                 index += jumpDistance;
 
@@ -411,22 +423,24 @@ namespace Faster.Map
 
             uint jumpDistance = 1;
 
+            var h2 = hashcode & _bitmask;
+
             do
             {
-                //retrieve infobyte
+                //retrieve h2
                 var metadata = GetArrayVal(_metadata, index);
 
                 //Empty spot
-                if (metadata == _empty)
+                if (metadata == _emptyBucket)
                 {
                     return false;
-                }
+                }             
 
-                ref var entry = ref GetArrayValRef(_entries, index);
-                if (_keyCompare.Equals(key, entry.Key))
-                {                   
+                var entry = GetArrayVal(_entries, index);
+                if (h2 == metadata && _comparer.Equals(key, entry.Key))
+                {
                     return true;
-                }
+                }               
 
                 index += jumpDistance;
 
@@ -452,7 +466,7 @@ namespace Faster.Map
             for (var i = 0; i < denseMap._entries.Length; ++i)
             {
                 var info = denseMap._metadata[i];
-                if (info == _empty)
+                if (info == _emptyBucket)
                 {
                     continue;
                 }
@@ -467,11 +481,8 @@ namespace Faster.Map
         /// </summary>
         public void Clear()
         {
-            for (var i = 0; i < _entries.Length; ++i)
-            {
-                _entries[i] = default;
-                _metadata[i] = default;
-            }
+            Array.Clear(_entries);
+            Array.Fill(_metadata, _emptyBucket);
 
             Count = 0;
         }
@@ -525,24 +536,23 @@ namespace Faster.Map
 
             uint index = (uint)hashcode * GoldenRatio >> _shift;
 
+            // Get 7 high bits
+            var h2 = hashcode & _bitmask;
+
             uint jumpDistance = 1;
 
             do
             {
                 //retrieve infobyte
                 ref var metadata = ref _metadata[index];
-                ref var next = ref _entries[index];
-
+              
                 //Empty spot, add entry
-                if (metadata == _empty)
+                if (metadata == _emptyBucket)
                 {
-                    next = entry;
-
-                    metadata = _full;
-
+                    metadata = Unsafe.As<int, sbyte>(ref h2);
+                    _entries[index] = entry;    
                     return;
                 }
-
 
                 index += jumpDistance;
 
@@ -584,20 +594,20 @@ namespace Faster.Map
 
             var size = Unsafe.As<uint, int>(ref _length);
 
-            _metadata = new sbyte[size];
+            _metadata = GC.AllocateUninitializedArray<sbyte>(size);
             _entries = GC.AllocateUninitializedArray<Entry<TKey, TValue>>(size);
+
+            _metadata.AsSpan().Fill(_emptyBucket);
 
             for (var i = 0; i < oldEntries.Length; ++i)
             {
                 var info = oldInfo[i];
-                if (info == _empty)
+                if (info == _emptyBucket)
                 {
                     continue;
                 }
 
-                var entry = oldEntries[i];
-
-                EmplaceInternal(entry);
+                EmplaceInternal(oldEntries[i]);
             }
         }
 

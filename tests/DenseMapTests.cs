@@ -35,7 +35,7 @@ namespace Faster.Map.Core.Tests
                 var fmap = new DenseMap<uint, uint>(1000000);
 
                 foreach (var k in keys.Take(900000))
-                {   
+                {
                     if (!fmap.Emplace(k, k))
                     {
                         throw new InternalTestFailureException("Error occured while add");
@@ -516,6 +516,20 @@ namespace Faster.Map.Core.Tests
                 }
             }
 
+        }
+
+        [TestMethod]
+        public void AssertRetrievalUsingStrings()
+        {
+            var map = new DenseMap<StringWrapper, StringWrapper>(16, 0.5);
+
+            var s = new StringWrapper("s");
+
+            map.Emplace(s, s);
+
+            map.Get(s, out var result);
+
+            Assert.AreEqual(s, result);
         }
 
     }

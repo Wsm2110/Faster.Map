@@ -8,16 +8,17 @@ using Microsoft.Collections.Extensions;
 namespace Faster.Map.Benchmark
 {
     [MarkdownExporterAttribute.GitHub]
+    [DisassemblyDiagnoser]
     public class AddBenchmark
     {
         #region Fields
 
         //fixed size, dont want to measure resize()
-        FastMap<uint, uint> _fastMap = new FastMap<uint, uint>(2000000); // remove resizing from benchmark hence the 2000000 size
-        DenseMap<uint, uint> _dense = new DenseMap<uint, uint>(2000000);
-        DenseMapSIMD<uint, uint> _denseMap = new DenseMapSIMD<uint, uint>(1000000, 0.9);
-        private Dictionary<uint, uint> dic = new Dictionary<uint, uint>(1000000);
-        private DictionarySlim<uint, uint> _slim = new DictionarySlim<uint, uint>(1000000);
+        FastMap<uint, uint> _fastMap = new FastMap<uint, uint>(); // remove resizing from benchmark hence the 2000000 size
+        DenseMap<uint, uint> _dense = new DenseMap<uint, uint>();
+        DenseMapSIMD<uint, uint> _denseMap = new DenseMapSIMD<uint, uint>();
+        private Dictionary<uint, uint> dic = new Dictionary<uint, uint>();
+        private DictionarySlim<uint, uint> _slim = new DictionarySlim<uint, uint>();
         private uint[] keys;
 
         #endregion
@@ -28,6 +29,8 @@ namespace Faster.Map.Benchmark
         [GlobalSetup]
         public void Add()
         {
+            // System.Diagnostics.Debugger.Launch();
+
             var output = File.ReadAllText("Numbers.txt");
             var splittedOutput = output.Split(',');
 
@@ -68,7 +71,12 @@ namespace Faster.Map.Benchmark
         {
             foreach (var key in keys)
             {
-                _dense.Emplace(key, key);
+                var result = _dense.Emplace(key, key);
+
+                if (result == false)
+                {
+                    throw new InvalidProgramException("fail");
+                }
             }
         }
 

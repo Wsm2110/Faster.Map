@@ -15,8 +15,8 @@ namespace Faster.Map.Benchmark
         #region Fields
      
         FastMap<uint, uint> _fastMap = new FastMap<uint, uint>(); 
-        DenseMap<uint, uint> _dense = new DenseMap<uint, uint>();
-        DenseMapSIMD<uint, uint> _denseMap = new DenseMapSIMD<uint, uint>();
+        DenseMap<uint, uint> _denseMap = new DenseMap<uint, uint>();
+        DenseMapSIMD<uint, uint> _denseMapSimd = new DenseMapSIMD<uint, uint>();
         private Dictionary<uint, uint> dic = new Dictionary<uint, uint>();
         private DictionarySlim<uint, uint> _slim = new DictionarySlim<uint, uint>();
         private uint[] keys;
@@ -46,8 +46,8 @@ namespace Faster.Map.Benchmark
         [IterationCleanup]
         public void ResetMaps()
         {
-            _denseMap = new DenseMapSIMD<uint, uint>();
-            _dense = new DenseMap<uint, uint>();
+            _denseMapSimd = new DenseMapSIMD<uint, uint>();
+            _denseMap = new DenseMap<uint, uint>();
             dic = new Dictionary<uint, uint>();
             _slim = new DictionarySlim<uint, uint>();
             _fastMap = new FastMap<uint, uint>();
@@ -55,23 +55,23 @@ namespace Faster.Map.Benchmark
 
         #region Benchmarks
 
+        //[Benchmark]
+        //public void DenseMapSIMD()
+        //{
+        //    foreach (uint key in keys)
+        //    {
+        //        _denseMapSimd.Emplace(key, key);
+        //    }
+        //}
+
         [Benchmark]
-        public void DenseMapSIMD()
+        public void DenseMap()
         {
-            foreach (uint key in keys)
+            foreach (var key in keys)
             {
                 _denseMap.Emplace(key, key);
             }
         }
-
-        //[Benchmark]
-        //public void DenseMap()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        _denseMapSIMD.Emplace(key, key);
-        //    }
-        //}
 
         //[Benchmark]
         //public void FastMap()
@@ -101,7 +101,6 @@ namespace Faster.Map.Benchmark
         //}
 
         #endregion
-
 
         private static void Shuffle<T>(Random rng, T[] a)
         {

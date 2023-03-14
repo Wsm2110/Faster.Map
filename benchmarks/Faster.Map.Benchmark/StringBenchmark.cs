@@ -9,22 +9,19 @@ using System.Threading.Tasks;
 using Faster.Map.Core;
 
 namespace Faster.Map.Benchmark
-{ 
-
+{
     public class StringBenchmark
     {
-
         #region Fields
 
-
-        DenseMap<string, string> _dense = new DenseMap<string, string>();
-
+        private DenseMap<StringWrapper, string> _dense = new DenseMap<StringWrapper, string>();
         private DenseMapSIMD<StringWrapper, string> _denseMap = new DenseMapSIMD<StringWrapper, string>();
 
-        private Dictionary<string, string> dic = new Dictionary<string, string>();
-        private DictionarySlim<string, string> _slim = new DictionarySlim<string, string>();
-
+        private Dictionary<StringWrapper, string> dic = new Dictionary<StringWrapper, string>();
+        private DictionarySlim<StringWrapper, string> _slim = new DictionarySlim<StringWrapper, string>();
+       
         private StringWrapper[] keys;
+
         #endregion
 
         /// <summary>
@@ -45,12 +42,10 @@ namespace Faster.Map.Benchmark
 
             foreach (var key in keys.Take(900000))
             {
-                dic.Add(key.Value, key.Value);
+                dic.Add(key, key.Value);
                 _denseMap.Emplace(key, key.Value);
-                _dense.Emplace(key.Value, key.Value);
-                //  _fastMap.Emplace(key.ToString(), key.ToString());
-                _slim.GetOrAddValueRef(key.Value);
-            }
+                _dense.Emplace(key, key.Value);             
+                _slim.GetOrAddValueRef(key);            }
 
             //    Shuffle(new Random(), keys);
         }
@@ -70,7 +65,7 @@ namespace Faster.Map.Benchmark
         {
             foreach (var key in keys)
             {
-                _dense.Get(key.ToString(), out var result);
+                _dense.Get(key, out var result);
             }
 
         }
@@ -80,7 +75,7 @@ namespace Faster.Map.Benchmark
         {
             foreach (var key in keys)
             {
-                dic.TryGetValue(key.ToString(), out var result);
+                dic.TryGetValue(key, out var result);
             }
         }
 

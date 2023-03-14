@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using static System.Runtime.InteropServices.JavaScript.JSType;
@@ -22,17 +23,21 @@ namespace Faster.Map.Core
             _hashcode = s.GetHashCode();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override int GetHashCode()
         {
             return _hashcode;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Equals(StringWrapper other)
         {
-            return Value.Equals(other.Value);
+            return string.Equals(Value, other.Value);           
         }
-        public static explicit operator StringWrapper(string s) => new(s);
-        public static implicit operator string(StringWrapper b) => b.Value;
+   
+        public static implicit operator StringWrapper(string s) => new(s);
+
+        public static explicit operator string(StringWrapper b) => b.Value;
 
     }
 }
