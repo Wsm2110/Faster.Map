@@ -71,23 +71,18 @@ namespace Faster.Map.Benchmark
         {
             foreach (var key in keys)
             {
-                var result = _dense.Emplace(key, key);
-
-                if (result == false)
-                {
-                    throw new InvalidProgramException("fail");
-                }
+                 _dense.Emplace(key, key);             
             }
         }
 
-        //[Benchmark]
-        //public void FastMap()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        _fastMap.Emplace(key, key);
-        //    }
-        //}
+        [Benchmark]
+        public void FastMap()
+        {
+            foreach (var key in keys)
+            {
+                _fastMap.Emplace(key, key);
+            }
+        }
 
         //[Benchmark]
         //public void Dictionary()
@@ -108,7 +103,6 @@ namespace Faster.Map.Benchmark
         //}
 
         #endregion
-
 
         private static void Shuffle<T>(Random rng, T[] a)
         {

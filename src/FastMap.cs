@@ -172,17 +172,11 @@ namespace Faster.Map
             }
 
             //Get object identity hashcode
-            var hashcode = key.GetHashCode();
+            var hashcode = (uint)key.GetHashCode();
 
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a
-            uint index = ((uint)hashcode * GoldenRatio) >> _shift;
-
-            //check if key is unique
-            if (ContainsKey(ref hashcode, index))
-            {
-                return false;
-            }
-
+            uint index = hashcode * GoldenRatio >> _shift;
+             
             //Create entry
             Entry<TKey, TValue> fastEntry = default;
             fastEntry.Value = value;
@@ -212,6 +206,11 @@ namespace Faster.Map
                     info = current;
                     ++Count;
                     return true;
+                }
+
+                if (hashcode == fastEntry.Key.GetHashCode()) 
+                {
+                    return false;
                 }
 
                 //Steal from the rich, give to the poor

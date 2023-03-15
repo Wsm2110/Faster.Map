@@ -72,9 +72,9 @@ InvocationCount=1  UnrollFactor=1
 ### Adding a million keys
 |         Method |      Mean |     Error |    StdDev |
 |--------------- |----------:|----------:|----------:|
-|   DenseMapSIMD | 6.454 ms  | 0.1265 ms  | 0.2467 ms|
+|   DenseMapSIMD | 6.454 ms  | 0.1265 ms | 0.2467 ms |
 |       DenseMap | 9.396 ms  | 0.1877 ms | 0.2374 ms |
-|        FastMap | 28.681 ms | 0.5674 ms | 0.6968 ms |
+|  FastMap       | 11.15 ms  | 0.381 ms  | 1.124 ms  |
 |     Dictionary | 16.298 ms | 0.3254 ms | 0.7477 ms |
 | DictionarySlim | 29.161 ms | 0.5290 ms | 0.4417 ms |
 
@@ -101,6 +101,6 @@ InvocationCount=1  UnrollFactor=1
 |--------------- |----------:|----------:|----------:|----------:|
 |   DenseMapSIMD | 11.81 ms | 0.089 ms | 0.079 ms | 12.55 ms |
 |       DenseMap | 22.28 ms | 0.444 ms | 0.729 ms | 22.78 ms |
-|        FastMap | 42.25 ms | 0.805 ms | 0.988 ms | 42.11 ms |
+|       FastMap  | 23.07 ms | 0.450 ms | 0.518 ms | 23.58 m  |
 |     Dictionary | 34.22 ms | 0.673 ms | 1.007 ms | 34.24 ms |
 | DictionarySlim | 27.08 ms | 0.531 ms | 0.546 ms | 27.11 ms |

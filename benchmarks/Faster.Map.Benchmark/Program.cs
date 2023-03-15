@@ -1,8 +1,5 @@
-﻿using System.Diagnostics;
-using System.Runtime.InteropServices;
-using BenchmarkDotNet.Configs;
+﻿using System.Runtime.InteropServices;
 using BenchmarkDotNet.Running;
-using Faster.Map.Core;
 
 namespace Faster.Map.Benchmark
 {

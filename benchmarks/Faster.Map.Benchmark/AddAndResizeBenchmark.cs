@@ -13,8 +13,8 @@ namespace Faster.Map.Benchmark
     public class AddAndResizeBenchmark
     {
         #region Fields
-     
-        FastMap<uint, uint> _fastMap = new FastMap<uint, uint>(); 
+
+        FastMap<uint, uint> _fastMap = new FastMap<uint, uint>();
         DenseMap<uint, uint> _denseMap = new DenseMap<uint, uint>();
         DenseMapSIMD<uint, uint> _denseMapSimd = new DenseMapSIMD<uint, uint>();
         private Dictionary<uint, uint> dic = new Dictionary<uint, uint>();
@@ -73,14 +73,14 @@ namespace Faster.Map.Benchmark
             }
         }
 
-        //[Benchmark]
-        //public void FastMap()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        _fastMap.Emplace(key, key);
-        //    }
-        //}
+        [Benchmark]
+        public void FastMap()
+        {
+            foreach (var key in keys)
+            {
+                _fastMap.Emplace(key, key);
+            }
+        }
 
         //[Benchmark]
         //public void Dictionary()
