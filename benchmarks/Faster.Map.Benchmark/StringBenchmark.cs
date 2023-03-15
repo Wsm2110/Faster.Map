@@ -14,13 +14,13 @@ namespace Faster.Map.Benchmark
     {
         #region Fields
 
-        private DenseMap<StringWrapper, string> _dense = new DenseMap<StringWrapper, string>();
-        private DenseMapSIMD<StringWrapper, string> _denseMap = new DenseMapSIMD<StringWrapper, string>();
+        private DenseMap<string, string> _dense = new DenseMap<string, string>();
+        private DenseMapSIMD<string, string> _denseMap = new DenseMapSIMD<string, string>();
 
-        private Dictionary<StringWrapper, string> dic = new Dictionary<StringWrapper, string>();
-        private DictionarySlim<StringWrapper, string> _slim = new DictionarySlim<StringWrapper, string>();
-       
-        private StringWrapper[] keys;
+        private Dictionary<string, string> dic = new Dictionary<string, string>();
+        private DictionarySlim<string, string> _slim = new DictionarySlim<string, string>();
+
+        private string[] keys;
 
         #endregion
 
@@ -33,22 +33,25 @@ namespace Faster.Map.Benchmark
             var output = File.ReadAllText("Numbers.txt");
             var splittedOutput = output.Split(',');
 
-            keys = new StringWrapper[splittedOutput.Length];
+            keys = new string[splittedOutput.Length];
 
             for (var index = 0; index < splittedOutput.Length; index++)
             {
-                keys[index] = new StringWrapper(splittedOutput[index]);
+                keys[index] = splittedOutput[index];
             }
 
             foreach (var key in keys.Take(900000))
             {
-                dic.Add(key, key.Value);
-                _denseMap.Emplace(key, key.Value);
-                _dense.Emplace(key, key.Value);             
-                _slim.GetOrAddValueRef(key);            }
+                dic.Add(key, key);
+                _denseMap.Emplace(key, key);
+                _dense.Emplace(key, key);
+                _slim.GetOrAddValueRef(key);
+            }
 
             //    Shuffle(new Random(), keys);
         }
+
+
 
 
         [Benchmark]
@@ -76,6 +79,15 @@ namespace Faster.Map.Benchmark
             foreach (var key in keys)
             {
                 dic.TryGetValue(key, out var result);
+            }
+        }
+
+        [Benchmark]
+        public void SlimDictionary()
+        {
+            foreach (var key in keys)
+            {
+                _slim.TryGetValue(key, out var result);
             }
         }
 

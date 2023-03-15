@@ -209,7 +209,7 @@ namespace Faster.Map
             }
 
             // Get object identity hashcode
-            var hashcode =(uint) key.GetHashCode();
+            var hashcode = (uint)key.GetHashCode();
 
             // Get 7 high bits
             var h2 = hashcode & _bitmask;
@@ -238,7 +238,12 @@ namespace Faster.Map
                 while (result != 0)
                 {
                     var offset = BitOperations.TrailingZeroCount(result);
-                    if (_comparer.Equals(_entries[index + offset].Key, key))
+
+                    uint indexAndOffset = index + Unsafe.As<int, uint>(ref offset);
+
+                    var entry = GetArrayVal(_entries, indexAndOffset);
+
+                    if (_comparer.Equals(entry.Key, key))
                     {
                         //duplicate key found
                         return false;
@@ -258,14 +263,17 @@ namespace Faster.Map
                     index += Unsafe.As<int, uint>(ref offset);
 
                     //retrieve entry
-                    ref var current = ref _entries[index];
+                    ref var current = ref GetArrayValRef(_entries, index);
 
                     //set key and value
                     current.Key = key;
                     current.Value = value;
 
+                    ref var metadata = ref GetArrayValRef(_metadata, index);
+
                     // add h2 to metadata
-                    _metadata[index] = Unsafe.As<long, sbyte>(ref h2);
+                    metadata = Unsafe.As<long, sbyte>(ref h2);
+
                     ++Count;
                     return true;
                 }

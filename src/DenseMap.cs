@@ -279,6 +279,7 @@ namespace Faster.Map
                 }
 
                 var entry = GetArrayVal(_entries, index);
+
                 if (h2 == metadata && _comparer.Equals(key, entry.Key))
                 {
                     value = entry.Value;
@@ -433,6 +434,7 @@ namespace Faster.Map
                 }
 
                 var entry = GetArrayVal(_entries, index);
+
                 if (h2 == metadata && _comparer.Equals(key, entry.Key))
                 {
                     return true;
