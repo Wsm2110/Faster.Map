@@ -15,3 +15,4 @@
 /.gitignore
 /benchmarks/Faster.Map.Concurrent.Benchmark/bin/Debug/net7.0
 /benchmarks/Faster.Map.Concurrent.Benchmark/bin/Release/net7.0
+/src/obj
