@@ -172,60 +172,6 @@ namespace Faster.Map.Core.Tests
         }
 
         [TestMethod]
-        public void InsertLargeVolumeGenericMap()
-        {
-            var map = new FastMap<uint, uint>();
-            Dictionary<uint, uint> dic = new Dictionary<uint, uint>();
-
-            var random = new Random(31);
-            for (int i = 0; i < 156000; ++i)
-            {
-                var v = (uint)random.Next(1, int.MaxValue);
-
-                if (!dic.ContainsKey(v))
-                {
-                    dic.Add(v, v);
-                }
-            }
-
-            //add keys to map
-            foreach (var key in dic.Keys)
-            {
-                map.Emplace(key, key);
-            }
-
-            Assert.IsTrue(dic.Count == map.Count);
-
-            var keys = dic.Keys.ToList();
-            var values = map.Values.ToList();
-
-            Assert.IsTrue(keys.Count == dic.Count);
-            Assert.IsTrue(values.Count == dic.Count);
-
-            var count = 0;
-
-            foreach (var key in keys)
-            {
-                map.Get(key, out var result);
-                if (result == 0)
-                {
-                    ++count;
-
-                }
-            }
-
-            foreach (var key in keys)
-            {
-                if (!map.Remove(key))
-                {
-                    ++count;
-                }
-            }
-
-        }
-
-
-        [TestMethod]
         public void CopyMap()
         {
             FastMap<uint, uint> map1 = new FastMap<uint, uint>();

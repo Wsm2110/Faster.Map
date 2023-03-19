@@ -192,7 +192,7 @@ namespace Faster.Map
             }
 
             //Get object identity hashcode
-            var hashcode = (uint) key.GetHashCode();
+            var hashcode = (uint)key.GetHashCode();
 
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = hashcode * GoldenRatio >> _shift;
@@ -308,7 +308,7 @@ namespace Faster.Map
         public bool Update(TKey key, TValue value)
         {
             //Get object identity hashcode
-            var hashcode = (uint) key.GetHashCode();
+            var hashcode = (uint)key.GetHashCode();
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = hashcode * GoldenRatio >> _shift;
             //set initiale jump distance
@@ -413,7 +413,7 @@ namespace Faster.Map
         public bool Contains(TKey key)
         {
             //Get object identity hashcode
-            var hashcode = (uint) key.GetHashCode();
+            var hashcode = (uint)key.GetHashCode();
 
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = hashcode * GoldenRatio >> _shift;
@@ -528,7 +528,7 @@ namespace Faster.Map
         /// <param name="entry">The entry.</param>
         /// <param name="current">The current.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void EmplaceInternal(Entry<TKey, TValue> entry)
+        private void EmplaceInternal(ref Entry<TKey, TValue> entry)
         {
             var hashcode = (uint)entry.Key.GetHashCode();
 
@@ -599,13 +599,13 @@ namespace Faster.Map
 
             for (var i = 0; i < oldEntries.Length; ++i)
             {
-                var m = oldInfo[i];
+                ref var m = ref oldInfo[i];
                 if (m < 0)
                 {
                     continue;
                 }
 
-                EmplaceInternal(oldEntries[i]);
+                EmplaceInternal(ref oldEntries[i]);
             }
         }
 

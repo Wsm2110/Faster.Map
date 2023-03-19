@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using Faster.Map.Core;
 
@@ -26,7 +27,7 @@ namespace Faster.Map
         /// Gets or sets how many elements are stored in the map
         /// </summary>
         /// <value>
-        /// The entry count.
+        /// The metadata count.
         /// </value>
         public int Count { get; private set; }
 
@@ -48,10 +49,10 @@ namespace Faster.Map
         {
             get
             {
-                //iterate backwards so we can remove the current item
-                for (int i = _info.Length - 1; i >= 0; --i)
+                //iterate backwards so we can remove the metadata item
+                for (int i = _metadata.Length - 1; i >= 0; --i)
                 {
-                    if (!_info[i].IsEmpty())
+                    if (!_metadata[i].IsEmpty())
                     {
                         var entry = _entries[i];
                         yield return new KeyValuePair<TKey, TValue>(entry.Key, entry.Value);
@@ -70,10 +71,10 @@ namespace Faster.Map
         {
             get
             {
-                //iterate backwards so we can remove the current item
-                for (int i = _info.Length - 1; i >= 0; --i)
+                //iterate backwards so we can remove the metadata item
+                for (int i = _metadata.Length - 1; i >= 0; --i)
                 {
-                    if (!_info[i].IsEmpty())
+                    if (!_metadata[i].IsEmpty())
                     {
                         yield return _entries[i].Key;
                     }
@@ -91,9 +92,9 @@ namespace Faster.Map
         {
             get
             {
-                for (int i = _info.Length - 1; i >= 0; --i)
+                for (int i = _metadata.Length - 1; i >= 0; --i)
                 {
-                    if (!_info[i].IsEmpty())
+                    if (!_metadata[i].IsEmpty())
                     {
                         yield return _entries[i].Value;
                     }
@@ -105,15 +106,15 @@ namespace Faster.Map
 
         #region Fields
 
-        private Metabyte[] _info;
+        private Metabyte[] _metadata;
         private Entry<TKey, TValue>[] _entries;
         private uint _length;
         private readonly double _loadFactor;
         private const uint GoldenRatio = 0x9E3779B9; //2654435769;
         private int _shift = 32;
-        private uint _maxProbeSequenceLength;
+        private int _maxProbeSequenceLength;
         private byte _currentProbeSequenceLength;
-        private uint _maxlengthBeforeResize;
+        private double _maxlengthBeforeResize;
 
         #endregion
 
@@ -141,15 +142,27 @@ namespace Faster.Map
             _length = length == 0 ? 8 : length;
             _loadFactor = loadFactor;
 
-            _length = NextPow2(_length);
+            if (_length < 8)
+            {
+                _length = 8;
+            }
 
-            _maxProbeSequenceLength = _loadFactor <= 0.5 ? Log2(_length) : PslLimit(_length);
+            if (BitOperations.IsPow2(length))
+            {
+                _length = length;
+            }
+            else
+            {
+                _length = BitOperations.RoundUpToPowerOf2(_length);
+            }
+
+            _maxProbeSequenceLength = _loadFactor <= 0.5 ? BitOperations.Log2(_length) : PslLimit(_length);
 
             _maxlengthBeforeResize = (uint)(_length * loadFactor);
 
-            _shift = _shift - Log2(_length) + 1;
+            _shift = _shift - BitOperations.Log2(_length);
             _entries = new Entry<TKey, TValue>[_length + _maxProbeSequenceLength + 1];
-            _info = new Metabyte[_length + _maxProbeSequenceLength + 1];
+            _metadata = new Metabyte[_length + _maxProbeSequenceLength + 1];
         }
 
         #endregion
@@ -176,65 +189,66 @@ namespace Faster.Map
 
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a
             uint index = hashcode * GoldenRatio >> _shift;
-             
-            //Create entry
-            Entry<TKey, TValue> fastEntry = default;
-            fastEntry.Value = value;
-            fastEntry.Key = key;
+
+            //Create metadata
+            Entry<TKey, TValue> entry = default;
+            entry.Value = value;
+            entry.Key = key;
 
             //Create default info byte
-            Metabyte current = default;
+            Metabyte metadata = default;
 
             //Assign 0 to psl so it wont be seen as empty
-            current.Psl = 0;
+            metadata.Psl = 0;
 
             //retrieve infobyte
-            ref var info = ref _info[index];
 
             do
             {
-                //Increase _current probe sequence
-                if (_currentProbeSequenceLength < current.Psl)
-                {
-                    _currentProbeSequenceLength = current.Psl;
-                }
+                ref var info = ref _metadata[index];
+                ref var currentEntry = ref _entries[index];              
 
-                //Empty spot, add entry
+                //Empty spot, add metadata
                 if (info.IsEmpty())
                 {
-                    _entries[index] = fastEntry;
-                    info = current;
+                    currentEntry = entry;
+                    info = metadata;
+
                     ++Count;
                     return true;
                 }
 
-                if (hashcode == fastEntry.Key.GetHashCode()) 
+                if (hashcode == currentEntry.Key.GetHashCode())
                 {
                     return false;
                 }
 
                 //Steal from the rich, give to the poor
-                if (current.Psl > info.Psl)
+                if (metadata.Psl > info.Psl)
                 {
-                    Swap(ref fastEntry, ref _entries[index]);
-                    Swap(ref current, ref info);
-                    continue;
+                    Swap(ref entry, ref currentEntry);
+                    Swap(ref metadata, ref info);                
                 }
 
                 //max psl is reached, resize
-                if (current.Psl == _maxProbeSequenceLength)
+                if (metadata.Psl == _maxProbeSequenceLength)
                 {
                     ++Count;
                     Resize();
-                    EmplaceInternal(ref fastEntry, ref current);
+                    EmplaceInternal(ref entry, ref metadata);
                     return true;
                 }
 
-                //increase index
-                info = ref _info[++index];
+                ++index;
 
                 //increase probe sequence length
-                ++current.Psl;
+                ++metadata.Psl;
+
+                //Increase _current probe sequence
+                if (_currentProbeSequenceLength < metadata.Psl)
+                {
+                    _currentProbeSequenceLength = metadata.Psl;
+                }
 
             } while (true);
         }
@@ -245,21 +259,21 @@ namespace Faster.Map
         /// <param name="key">The key.</param>
         /// <param name="value">The value.</param>
         /// <returns></returns>
-        [MethodImpl(256)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Get(TKey key, out TValue value)
         {
             //Get object identity hashcode
-            var hashcode = key.GetHashCode();
+            var hashcode = (uint)key.GetHashCode();
 
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
-            uint index = ((uint)hashcode * GoldenRatio) >> _shift;
+            uint index = hashcode * GoldenRatio >> _shift;
 
             //Determine max distance
             var maxDistance = index + _currentProbeSequenceLength;
 
             do
             {
-                //Get entry by ref
+                //Get metadata by ref
                 ref var entry = ref _entries[index];
 
                 //validate hashcode
@@ -278,7 +292,7 @@ namespace Faster.Map
         }
 
         /// <summary>
-        /// Update entry using a key and value
+        /// Update metadata using a key and value
         /// </summary>
         /// <param name="key">The key.</param>
         /// <param name="value">The value.</param>
@@ -310,12 +324,12 @@ namespace Faster.Map
                 //increase index by one and validate if within bounds
             } while (++index <= maxDistance);
 
-            //entry not found
+            //metadata not found
             return false;
         }
 
         /// <summary>
-        /// Removes entry using a backshift removal
+        /// Removes metadata using a backshift removal
         /// </summary>
         /// <param name="key">The key.</param>
         /// <returns>Operation succeeded yes or no</returns>
@@ -338,11 +352,11 @@ namespace Faster.Map
                 //validate hash
                 if (hashcode == entry.Key.GetHashCode())
                 {
-                    //remove entry
+                    //remove metadata
                     entry = default;
                     //remove infobyte
-                    _info[index] = default;
-                    //remove entry from list
+                    _metadata[index] = default;
+                    //remove metadata from list
                     --Count;
                     ShiftRemove(ref index);
                     return true;
@@ -401,7 +415,7 @@ namespace Faster.Map
         {
             for (var i = 0; i < fastMap._entries.Length; i++)
             {
-                var info = fastMap._info[i];
+                var info = fastMap._metadata[i];
                 if (info.IsEmpty())
                 {
                     continue;
@@ -413,7 +427,7 @@ namespace Faster.Map
         }
 
         /// <summary>
-        /// Returns the current index of Tkey
+        /// Returns the metadata index of Tkey
         /// </summary>
         /// <param name="key">The key.</param>
         /// <returns></returns>
@@ -423,7 +437,7 @@ namespace Faster.Map
             var hashcode = key.GetHashCode();
             for (int i = 0; i < _entries.Length; i++)
             {
-                var info = _info[i];
+                var info = _metadata[i];
                 if (info.IsEmpty())
                 {
                     continue;
@@ -446,7 +460,7 @@ namespace Faster.Map
         {
             for (var i = 0; i < _entries.Length; i++)
             {
-                _info[i] = default;
+                _metadata[i] = default;
                 _entries[i] = default;
             }
 
@@ -454,18 +468,18 @@ namespace Faster.Map
         }
 
         /// <summary>
-        /// Gets or sets the entry by using a TKey
+        /// Gets or sets the metadata by using a TKey
         /// </summary>
         /// <value>
         /// </value>
         /// <param name="key">The key.</param>
         /// <returns></returns>
-        /// <exception cref="System.Collections.Generic.KeyNotFoundException">Unable to find entry - {key.GetType().FullName} key - {key.GetHashCode()}
+        /// <exception cref="System.Collections.Generic.KeyNotFoundException">Unable to find metadata - {key.GetType().FullName} key - {key.GetHashCode()}
         /// or
-        /// Unable to find entry - {key.GetType().FullName} key - {key.GetHashCode()}</exception>
-        /// <exception cref="KeyNotFoundException">Unable to find entry - {key.GetType().FullName} key - {key.GetHashCode()}
+        /// Unable to find metadata - {key.GetType().FullName} key - {key.GetHashCode()}</exception>
+        /// <exception cref="KeyNotFoundException">Unable to find metadata - {key.GetType().FullName} key - {key.GetHashCode()}
         /// or
-        /// Unable to find entry - {key.GetType().FullName} key - {key.GetHashCode()}</exception>
+        /// Unable to find metadata - {key.GetType().FullName} key - {key.GetHashCode()}</exception>
         public TValue this[TKey key]
         {
             get
@@ -475,13 +489,13 @@ namespace Faster.Map
                     return result;
                 }
 
-                throw new KeyNotFoundException($"Unable to find entry - {key.GetType().FullName} key - {key.GetHashCode()}");
+                throw new KeyNotFoundException($"Unable to find metadata - {key.GetType().FullName} key - {key.GetHashCode()}");
             }
             set
             {
                 if (!Update(key, value))
                 {
-                    throw new KeyNotFoundException($"Unable to find entry - {key.GetType().FullName} key - {key.GetHashCode()}");
+                    throw new KeyNotFoundException($"Unable to find metadata - {key.GetType().FullName} key - {key.GetHashCode()}");
                 }
             }
         }
@@ -491,56 +505,52 @@ namespace Faster.Map
         #region Private Methods
 
         /// <summary>
-        /// Shift remove will shift all entries backwards until there is an empty entry
+        /// Shift remove will shift all entries backwards until there is an empty metadata
         /// </summary>
         /// <param name="index">The index.</param>
         [MethodImpl(256)]
         private void ShiftRemove(ref uint index)
         {
-            //Get next entry
-            ref var next = ref _info[++index];
+            //Get next metadata
+            ref var next = ref _metadata[++index];
 
             while (!next.IsEmpty() && next.Psl != 0)
             {
                 //decrease next psl by 1
                 next.Psl--;
                 //swap upper info with lower
-                Swap(ref next, ref _info[index - 1]);
-                //swap upper entry with lower
+                Swap(ref next, ref _metadata[index - 1]);
+                //swap upper metadata with lower
                 Swap(ref _entries[index], ref _entries[index - 1]);
                 //increase index by one
-                next = ref _info[++index];
+                next = ref _metadata[++index];
             }
         }
 
         /// <summary>
-        /// Emplaces a new entry without checking for key existence
+        /// Emplaces a new metadata without checking for key existence
         /// </summary>
-        /// <param name="entry">The fast entry.</param>
+        /// <param name="entry">The fast metadata.</param>
         /// <param name="current">The information byte.</param>
         [MethodImpl(256)]
         private void EmplaceInternal(ref Entry<TKey, TValue> entry, ref Metabyte current)
         {
             //get objectidentiy
-            var hashcode = entry.Key.GetHashCode();
+            var hashcode = (uint)entry.Key.GetHashCode();
 
-            uint index = ((uint)hashcode * GoldenRatio) >> _shift;
+            uint index = hashcode * GoldenRatio >> _shift;
 
             //reset psl
             current.Psl = 0;
 
-            ref var info = ref _info[index];
-
             do
-            {
-                if (_currentProbeSequenceLength < current.Psl)
-                {
-                    _currentProbeSequenceLength = current.Psl;
-                }
+            {               
+                ref var info = ref _metadata[index];
 
                 if (info.IsEmpty())
                 {
                     _entries[index] = entry;
+
                     info = current;
                     return;
                 }
@@ -548,15 +558,18 @@ namespace Faster.Map
                 if (current.Psl > info.Psl)
                 {
                     Swap(ref entry, ref _entries[index]);
-                    Swap(ref current, ref _info[index]);
-                    continue;
+                    Swap(ref current, ref _metadata[index]);    
                 }
 
-                //increase index
-                info = ref _info[++index];
-
+                ++index;
                 //increase probe sequence length
                 ++current.Psl;
+
+                if (_currentProbeSequenceLength < current.Psl)
+                {
+                    _currentProbeSequenceLength = current.Psl;
+                }
+
 
             } while (true);
         }
@@ -593,7 +606,7 @@ namespace Faster.Map
         /// <param name="size">The size.</param>
         /// <returns></returns>
         [MethodImpl(256)]
-        private uint PslLimit(uint size)
+        private int PslLimit(uint size)
         {
             switch (size)
             {
@@ -657,17 +670,17 @@ namespace Faster.Map
         private void Resize()
         {
             _shift--;
-            _length = NextPow2(_length + 1);
+            _length = _length * 2;
 
-            _maxProbeSequenceLength = _loadFactor <= 0.5 ? Log2(_length) : PslLimit(_length);
-            _maxlengthBeforeResize = (uint)(_length * _loadFactor);
+            _maxProbeSequenceLength = _loadFactor <= 0.5 ? BitOperations.Log2(_length) : PslLimit(_length);
+            _maxlengthBeforeResize = _length * _loadFactor;
             _currentProbeSequenceLength = 0;
 
-            var oldEntries = _entries.Clone() as Entry<TKey, TValue>[];
-            var oldInfo = _info.Clone() as Metabyte[];
+            var oldEntries = _entries;
+            var oldInfo = _metadata;
 
             _entries = new Entry<TKey, TValue>[_length + _maxProbeSequenceLength + 1];
-            _info = new Metabyte[_length + _maxProbeSequenceLength + 1];
+            _metadata = new Metabyte[_length + _maxProbeSequenceLength + 1];
 
             for (var i = 0; i < oldEntries.Length; ++i)
             {
@@ -682,36 +695,7 @@ namespace Faster.Map
             }
         }
 
-        /// <summary>
-        /// Calculates next power of 2
-        /// </summary>
-        /// <param name="c">The c.</param>
-        /// <returns></returns>
-        ///
-        [MethodImpl(256)]
-        private static uint NextPow2(uint c)
-        {
-            c--;
-            c |= c >> 1;
-            c |= c >> 2;
-            c |= c >> 4;
-            c |= c >> 8;
-            c |= c >> 16;
-            return ++c;
-        }
 
-        // Used for set checking operations (using enumerables) that rely on counting
-        private static byte Log2(uint value)
-        {
-            byte c = 0;
-            while (value > 0)
-            {
-                c++;
-                value >>= 1;
-            }
-
-            return c;
-        }
 
         #endregion
     }
