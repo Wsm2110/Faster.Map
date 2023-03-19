@@ -8,13 +8,14 @@
     <LangVersion>Latest</LangVersion>
     <Authors>Wiljan Ruizendaal</Authors>
     <PackageReleaseNotes>
-     Enable sourcelink
+     Add cross platform support 
+     update fastmap to net7.0
     </PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/Wsm2110/Faster.Map</PackageProjectUrl>
-    <AssemblyVersion>4.1.4</AssemblyVersion>
-    <FileVersion>4.1.4</FileVersion>
+    <AssemblyVersion>4.1.5</AssemblyVersion>
+    <FileVersion>4.1.5</FileVersion>
     <Title>Fastest .net hashmap</Title>
-    <Version>4.1.4</Version>
+    <Version>4.1.5</Version>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Description>incredible fast hashmaps using robinhood hashing or quadratic probing with triangular numbers</Description>
     <RepositoryUrl>https://github.com/Wsm2110/Faster.Map</RepositoryUrl>
