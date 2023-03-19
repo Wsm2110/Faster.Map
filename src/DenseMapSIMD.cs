@@ -150,9 +150,9 @@ namespace Faster.Map
         /// <param name="keyComparer">Used to compare keys to resolve hashcollisions</param>
         public DenseMapSIMD(uint length, double loadFactor, IEqualityComparer<TKey> keyComparer)
         {
-            if (!Sse2.IsSupported)
+            if (!Vector128.IsHardwareAccelerated)
             {
-                throw new NotSupportedException("Simd SSe2 is not supported");
+                throw new NotSupportedException("Your hardware does not support acceleration for 128 bit vectors");
             }
 
             //default length is 16
@@ -228,11 +228,8 @@ namespace Faster.Map
                 //load vector @ index
                 var right = Vector128.LoadUnsafe(ref GetArrayValRef(_metadata, index));
 
-                //compare vectors
-                var comparison = Sse2.CompareEqual(left, right);
-
-                //convert to int bitarray
-                int result = Sse2.MoveMask(comparison);
+                //get a bit sequence for matched hashcodes (h2s)
+                int result = (int)Vector128.Equals(left, right).ExtractMostSignificantBits();
 
                 //Check if key is unique
                 while (result != 0)
@@ -254,7 +251,7 @@ namespace Faster.Map
                 }
 
                 //check for tombstones and empty entries
-                result = Sse2.MoveMask(right);
+                result = (int)right.ExtractMostSignificantBits();
 
                 if (result != 0)
                 {
@@ -335,11 +332,8 @@ namespace Faster.Map
                 //load vector @ index
                 var right = Vector128.LoadUnsafe(ref GetArrayValRef(_metadata, index));
 
-                //compare two vectors
-                var comparison = Sse2.CompareEqual(left, right);
-
-                //get result
-                int result = Sse2.MoveMask(comparison);
+                //get a bit sequence for matched hashcodes (h2s)
+                int result = (int)Vector128.Equals(left, right).ExtractMostSignificantBits();
 
                 //Could be multiple bits which are set
                 while (result != 0)
@@ -361,7 +355,8 @@ namespace Faster.Map
                     result &= ~(1 << offset);
                 }
 
-                result = Sse2.MoveMask(Sse2.CompareEqual(_emptyBucketVector, right));
+                //get a bit sequence for matched empty buckets
+                result = (int)Vector128.Equals(_emptyBucketVector, right).ExtractMostSignificantBits();
 
                 //Contains empty buckets;    
                 if (result != 0)
@@ -428,11 +423,8 @@ namespace Faster.Map
                 //load vector @ index
                 var right = Vector128.LoadUnsafe(ref GetArrayValRef(_metadata, index));
 
-                //compare two vectors
-                var comparison = Sse2.CompareEqual(left, right);
-
-                //get result
-                int result = Sse2.MoveMask(comparison);
+                //get a bit sequence for matched hashcodes (h2s)
+                int result = (int)Vector128.Equals(left, right).ExtractMostSignificantBits();
 
                 //Could be multiple bits which are set
                 while (result != 0)
@@ -453,8 +445,8 @@ namespace Faster.Map
                     result &= ~(1 << offset);
                 }
 
-                comparison = Sse2.CompareEqual(_emptyBucketVector, right);
-                result = Sse2.MoveMask(comparison);
+                //get a bit sequence for matched empty buckets
+                result = (int)Vector128.Equals(_emptyBucketVector, right).ExtractMostSignificantBits();
 
                 if (result != 0)
                 {
@@ -519,10 +511,8 @@ namespace Faster.Map
                 //load vector @ index
                 var right = Vector128.LoadUnsafe(ref GetArrayValRef(_metadata, index));
 
-                var comparison = Sse2.CompareEqual(left, right);
-
-                //get result
-                var result = Sse2.MoveMask(comparison);
+                //get a bit sequence for matched hashcodes (h2s)
+                int result = (int)Vector128.Equals(left, right).ExtractMostSignificantBits();
 
                 //Could be multiple bits which are set
                 while (result != 0)
@@ -545,8 +535,7 @@ namespace Faster.Map
                 }
 
                 //find an empty spot, which means the key is not found
-                comparison = Sse2.CompareEqual(_emptyBucketVector, right);
-                result = Sse2.MoveMask(comparison);
+                result = (int)Vector128.Equals(_emptyBucketVector, right).ExtractMostSignificantBits();
 
                 if (result != 0)
                 {
@@ -611,11 +600,8 @@ namespace Faster.Map
                 //load vector @ index
                 var right = Vector128.LoadUnsafe(ref GetArrayValRef(_metadata, index));
 
-                //compare two vectors
-                var comparison = Sse2.CompareEqual(left, right);
-
-                //get result
-                int result = Sse2.MoveMask(comparison);
+                //get a bit sequence for matched hashcodes (h2s)
+                int result = (int)Vector128.Equals(left, right).ExtractMostSignificantBits();
 
                 //Could be multiple bits which are set
                 while (result != 0)
@@ -635,7 +621,7 @@ namespace Faster.Map
                     result &= ~(1 << offset);
                 }
 
-                result = Sse2.MoveMask(Sse2.CompareEqual(_emptyBucketVector, right));
+                result = (int)Vector128.Equals(_emptyBucketVector, right).ExtractMostSignificantBits();
                 if (result != 0)
                 {
                     //contains empty buckets - break;  
@@ -760,7 +746,7 @@ namespace Faster.Map
             do
             {
                 //check for empty entries
-                int result = Sse2.MoveMask(Vector128.LoadUnsafe(ref GetArrayValRef(_metadata, index)));
+                int result = (int)Vector128.LoadUnsafe(ref GetArrayValRef(_metadata, index)).ExtractMostSignificantBits();
                 if (result != 0)
                 {
                     var offset = BitOperations.TrailingZeroCount(result);
