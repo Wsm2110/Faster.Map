@@ -221,15 +221,15 @@ namespace Faster.Map
             uint index = hashcode * GoldenRatio >> _shift;
 
             //Set initial jumpdistance index
-            uint jumpDistance = 16;
+            uint jumpDistance = 0;
 
             do
             {
                 //load vector @ index
-                var right = Vector128.LoadUnsafe(ref GetArrayValRef(_metadata, index));
+                var right = Vector128.LoadUnsafe(ref GetArrayEntryRef(_metadata, index));
 
                 //get a bit sequence for matched hashcodes (h2s)
-                int result = (int)Vector128.Equals(left, right).ExtractMostSignificantBits();
+                var result = Vector128.Equals(left, right).ExtractMostSignificantBits();
 
                 //Check if key is unique
                 while (result != 0)
@@ -238,7 +238,7 @@ namespace Faster.Map
 
                     uint indexAndOffset = index + Unsafe.As<int, uint>(ref offset);
 
-                    var entry = GetArrayVal(_entries, indexAndOffset);
+                    var entry = GetArrayEntryByVal(_entries, indexAndOffset);
 
                     if (_comparer.Equals(entry.Key, key))
                     {
@@ -247,12 +247,11 @@ namespace Faster.Map
                     }
 
                     //clear bit
-                    result &= ~(1 << offset);
+                    result &= ~(1u << offset);
                 }
 
-                //check for tombstones and empty entries
-                result = (int)right.ExtractMostSignificantBits();
-
+                result = right.ExtractMostSignificantBits();
+                //check for tombstones and empty entries 
                 if (result != 0)
                 {
                     var offset = BitOperations.TrailingZeroCount(result);
@@ -260,13 +259,13 @@ namespace Faster.Map
                     index += Unsafe.As<int, uint>(ref offset);
 
                     //retrieve entry
-                    ref var current = ref GetArrayValRef(_entries, index);
+                    ref var currentEntry = ref GetArrayEntryRef(_entries, index);
 
                     //set key and value
-                    current.Key = key;
-                    current.Value = value;
+                    currentEntry.Key = key;
+                    currentEntry.Value = value;
 
-                    ref var metadata = ref GetArrayValRef(_metadata, index);
+                    ref var metadata = ref GetArrayEntryRef(_metadata, index);
 
                     // add h2 to metadata
                     metadata = Unsafe.As<long, sbyte>(ref h2);
@@ -275,7 +274,7 @@ namespace Faster.Map
                     return true;
                 }
 
-                //Probing is done by incrementing the current bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
+                //Probing is done by incrementing the currentEntry bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
                 //So first we jump by 1 group (meaning we just continue our linear scan), then 2 groups (skipping over 1 group), then 3 groups (skipping over 2 groups), and so on.
                 //Interestingly, this pattern perfectly lines up with our power-of-two size such that we will visit every single bucket exactly once without any repeats(searching is therefore guaranteed to terminate as we always have at least one EMPTY bucket).
                 //Also note that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
@@ -298,7 +297,7 @@ namespace Faster.Map
                     // adding jumpdistance to the index will prevent endless loops.
                     // Every time this code block is entered jumpdistance will be different hence the index will be different too
                     // thus it will always look for an empty spot
-                    index = BitOperations.RotateLeft(hashcode, 31) + jumpDistance >> _shift;
+                    index = Fmix(hashcode + jumpDistance) >> _shift;
                 }
             } while (true);
         }
@@ -325,15 +324,15 @@ namespace Faster.Map
             var left = Vector128.Create(Unsafe.As<long, sbyte>(ref h2));
 
             //Set initial jumpdistance index
-            uint jumpDistance = 16;
+            uint jumpDistance = 0;
 
             do
             {
                 //load vector @ index
-                var right = Vector128.LoadUnsafe(ref GetArrayValRef(_metadata, index));
+                var right = Vector128.LoadUnsafe(ref GetArrayEntryRef(_metadata, index));
 
                 //get a bit sequence for matched hashcodes (h2s)
-                int result = (int)Vector128.Equals(left, right).ExtractMostSignificantBits();
+                var result = Vector128.Equals(left, right).ExtractMostSignificantBits();
 
                 //Could be multiple bits which are set
                 while (result != 0)
@@ -342,7 +341,7 @@ namespace Faster.Map
                     var offset = BitOperations.TrailingZeroCount(result);
 
                     //Get index and eq
-                    var entry = GetArrayVal(_entries, index + Unsafe.As<int, uint>(ref offset));
+                    var entry = GetArrayEntryByVal(_entries, index + Unsafe.As<int, uint>(ref offset));
 
                     //Use EqualityComparer to find proper entry
                     if (_comparer.Equals(entry.Key, key))
@@ -352,20 +351,17 @@ namespace Faster.Map
                     }
 
                     //clear bit
-                    result &= ~(1 << offset);
+                    result &= ~(1u << offset);
                 }
 
-                //get a bit sequence for matched empty buckets
-                result = (int)Vector128.Equals(_emptyBucketVector, right).ExtractMostSignificantBits();
-
                 //Contains empty buckets;    
-                if (result != 0)
+                if (Vector128.Equals(_emptyBucketVector, right).ExtractMostSignificantBits() != 0)
                 {
                     value = default;
                     return false;
                 }
 
-                //Probing is done by incrementing the current bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
+                //Probing is done by incrementing the currentEntry bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
                 //So first we jump by 1 group (meaning we just continue our linear scan), then 2 groups (skipping over 1 group), then 3 groups (skipping over 2 groups), and so on.
                 //Interestingly, this pattern perfectly lines up with our power-of-two size such that we will visit every single bucket exactly once without any repeats(searching is therefore guaranteed to terminate as we always have at least one EMPTY bucket).
                 //Also note that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
@@ -388,7 +384,7 @@ namespace Faster.Map
                     // adding jumpdistance to the index will prevent endless loops.
                     // Every time this code block is entered jumpdistance will be different hence the index will be different too
                     // thus it will always look for an empty spot to back out;
-                    index = BitOperations.RotateLeft(hashcode, 31) + jumpDistance >> _shift;
+                    index = Fmix(hashcode + jumpDistance) >> _shift;
                 }
 
             } while (true);
@@ -421,10 +417,10 @@ namespace Faster.Map
             do
             {
                 //load vector @ index
-                var right = Vector128.LoadUnsafe(ref GetArrayValRef(_metadata, index));
+                var right = Vector128.LoadUnsafe(ref GetArrayEntryRef(_metadata, index));
 
                 //get a bit sequence for matched hashcodes (h2s)
-                int result = (int)Vector128.Equals(left, right).ExtractMostSignificantBits();
+                var result = Vector128.Equals(left, right).ExtractMostSignificantBits();
 
                 //Could be multiple bits which are set
                 while (result != 0)
@@ -442,19 +438,17 @@ namespace Faster.Map
                     }
 
                     //clear bit
-                    result &= ~(1 << offset);
+                    result &= ~(1u << offset);
                 }
 
-                //get a bit sequence for matched empty buckets
-                result = (int)Vector128.Equals(_emptyBucketVector, right).ExtractMostSignificantBits();
-
-                if (result != 0)
+                //get a bit sequence for matched empty buckets                
+                if (Vector128.Equals(_emptyBucketVector, right).ExtractMostSignificantBits() != 0)
                 {
                     //contains empty buckets - break;
                     return false;
                 }
 
-                //Probing is done by incrementing the current bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
+                //Probing is done by incrementing the currentEntry bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
                 //So first we jump by 1 group (meaning we just continue our linear scan), then 2 groups (skipping over 1 group), then 3 groups (skipping over 2 groups), and so on.
                 //Interestingly, this pattern perfectly lines up with our power-of-two size such that we will visit every single bucket exactly once without any repeats(searching is therefore guaranteed to terminate as we always have at least one EMPTY bucket).
                 //Also note that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
@@ -477,7 +471,7 @@ namespace Faster.Map
                     // adding jumpdistance to the index will prevent endless loops.
                     // Every time this code block is entered jumpdistance will be different hence the index will be different too
                     // thus it will always look for an empty spot to back out;
-                    index = BitOperations.RotateLeft(hashcode, 31) + jumpDistance >> _shift;
+                    index = Fmix(hashcode + jumpDistance) >> _shift;
                 }
             }
             while (true);
@@ -504,15 +498,15 @@ namespace Faster.Map
             var left = Vector128.Create(Unsafe.As<long, sbyte>(ref h2));
 
             //Set initial jumpdistance index
-            uint jumpDistance = 16;
+            uint jumpDistance = 0;
 
             do
             {
                 //load vector @ index
-                var right = Vector128.LoadUnsafe(ref GetArrayValRef(_metadata, index));
+                var right = Vector128.LoadUnsafe(ref GetArrayEntryRef(_metadata, index));
 
                 //get a bit sequence for matched hashcodes (h2s)
-                int result = (int)Vector128.Equals(left, right).ExtractMostSignificantBits();
+                var result = Vector128.Equals(left, right).ExtractMostSignificantBits();
 
                 //Could be multiple bits which are set
                 while (result != 0)
@@ -520,30 +514,27 @@ namespace Faster.Map
                     //retrieve offset 
                     var offset = BitOperations.TrailingZeroCount(result);
 
-                    ref var entry = ref _entries[index + offset];
-
-                    if (_comparer.Equals(entry.Key, key))
-                    {
-                        entry = default;
-                        _metadata[index + offset] = _tombstone;
+                    uint indexAndOffset = index + Unsafe.As<int, uint>(ref offset);
+                                       
+                    if (_comparer.Equals(_entries[indexAndOffset].Key, key))
+                    {                       
+                        _metadata[indexAndOffset] = _tombstone;
                         --Count;
                         return true;
                     }
 
                     //clear bit
-                    result &= ~(1 << offset);
+                    result &= ~(1u << offset);
                 }
 
-                //find an empty spot, which means the key is not found
-                result = (int)Vector128.Equals(_emptyBucketVector, right).ExtractMostSignificantBits();
-
-                if (result != 0)
+                //find an empty spot, which means the key is not found             
+                if (Vector128.Equals(_emptyBucketVector, right).ExtractMostSignificantBits() != 0)
                 {
                     //contains empty buckets - break;
                     return false;
                 }
 
-                //Probing is done by incrementing the current bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
+                //Probing is done by incrementing the currentEntry bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
                 //So first we jump by 1 group (meaning we just continue our linear scan), then 2 groups (skipping over 1 group), then 3 groups (skipping over 2 groups), and so on.
                 //Interestingly, this pattern perfectly lines up with our power-of-two size such that we will visit every single bucket exactly once without any repeats(searching is therefore guaranteed to terminate as we always have at least one EMPTY bucket).
                 //Also note that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
@@ -566,7 +557,7 @@ namespace Faster.Map
                     // adding jumpdistance to the index will prevent endless loops.
                     // Every time this code block is entered jumpdistance will be different hence the index will be different too
                     // thus it will always look for an empty spot to back out;
-                    index = BitOperations.RotateLeft(hashcode, 31) + jumpDistance >> _shift;
+                    index = Fmix(hashcode + jumpDistance) >> _shift;
                 }
 
             } while (true);
@@ -593,15 +584,15 @@ namespace Faster.Map
             var left = Vector128.Create(Unsafe.As<long, sbyte>(ref h2));
 
             //Set initial jumpdistance index
-            uint jumpDistance = 16;
+            uint jumpDistance = 0;
 
             do
             {
                 //load vector @ index
-                var right = Vector128.LoadUnsafe(ref GetArrayValRef(_metadata, index));
+                var right = Vector128.LoadUnsafe(ref GetArrayEntryRef(_metadata, index));
 
                 //get a bit sequence for matched hashcodes (h2s)
-                int result = (int)Vector128.Equals(left, right).ExtractMostSignificantBits();
+                var result = Vector128.Equals(left, right).ExtractMostSignificantBits();
 
                 //Could be multiple bits which are set
                 while (result != 0)
@@ -618,17 +609,16 @@ namespace Faster.Map
                     }
 
                     //clear bit
-                    result &= ~(1 << offset);
+                    result &= ~(1u << offset);
                 }
 
-                result = (int)Vector128.Equals(_emptyBucketVector, right).ExtractMostSignificantBits();
-                if (result != 0)
+                if (Vector128.Equals(_emptyBucketVector, right).ExtractMostSignificantBits() != 0)
                 {
                     //contains empty buckets - break;  
                     return false;
                 }
 
-                //Probing is done by incrementing the current bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
+                //Probing is done by incrementing the currentEntry bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
                 //So first we jump by 1 group (meaning we just continue our linear scan), then 2 groups (skipping over 1 group), then 3 groups (skipping over 2 groups), and so on.
                 //Interestingly, this pattern perfectly lines up with our power-of-two size such that we will visit every single bucket exactly once without any repeats(searching is therefore guaranteed to terminate as we always have at least one EMPTY bucket).
                 //Also note that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
@@ -651,9 +641,8 @@ namespace Faster.Map
                     // adding jumpdistance to the index will prevent endless loops.
                     // Every time this code block is entered jumpdistance will be different hence the index will be different too
                     // thus it will always look for an empty spot to back out;
-                    index = BitOperations.RotateLeft(hashcode, 31) + jumpDistance >> _shift;
+                    index = Fmix(hashcode + jumpDistance) >> _shift;
                 }
-
             } while (true);
         }
 
@@ -731,9 +720,6 @@ namespace Faster.Map
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void EmplaceInternal(Entry<TKey, TValue> entry, sbyte h2)
         {
-            // Note this method is mostly mirrored in DenseMapSIMD.Emplace()
-            // If you make any changes here, make sure to keep that version in sync as well.
-
             //expensive if hashcode is slow, or when it`s not cached like strings
             var hashcode = (uint)entry.Key.GetHashCode();
 
@@ -741,12 +727,12 @@ namespace Faster.Map
             uint index = hashcode * GoldenRatio >> _shift;
 
             //Set initial jumpdistance index
-            uint jumpDistance = 16;
+            uint jumpDistance = 0;
 
             do
             {
                 //check for empty entries
-                int result = (int)Vector128.LoadUnsafe(ref GetArrayValRef(_metadata, index)).ExtractMostSignificantBits();
+                var result = Vector128.LoadUnsafe(ref GetArrayEntryRef(_metadata, index)).ExtractMostSignificantBits();
                 if (result != 0)
                 {
                     var offset = BitOperations.TrailingZeroCount(result);
@@ -761,23 +747,6 @@ namespace Faster.Map
                 //Calculate jumpDistance
                 jumpDistance += 16;
                 index += jumpDistance;
-
-                if (index >= _length)
-                {
-                    // hashing to the top region of this hashmap always had some drawbacks
-                    // even when the table was half full the table would resize when the last 16 slots were full
-                    // and the jumpdistance exceeded the length of the array. this is not intended
-                    // 
-                    // when the index exceeds the length, which means all groups of 16 near the upper region of the map are full
-                    // reset the index and try probing again from the start this will enforce a secure and trustable hashmap which will always
-                    // resize when we reach a 90% load
-                    // Note these entries will not be properly cache alligned but in the end its well worth it
-                    //                   
-                    // adding jumpdistance to the index will prevent endless loops.
-                    // Every time this code block is entered jumpdistance will be different hence the index will be different too
-                    // thus it will always look for an empty spot to back out;
-                    index = BitOperations.RotateLeft(hashcode, 31) + jumpDistance >> _shift;
-                }
 
             } while (true);
         }
@@ -816,7 +785,7 @@ namespace Faster.Map
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static T GetArrayVal<T>(T[] array, uint index)
+        private static T GetArrayEntryByVal<T>(T[] array, uint index)
         {
 #if DEBUG
             return array[index];
@@ -827,7 +796,7 @@ namespace Faster.Map
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ref T GetArrayValRef<T>(T[] array, uint index)
+        private static ref T GetArrayEntryRef<T>(T[] array, uint index)
         {
 #if DEBUG
             return ref array[index];
@@ -836,6 +805,16 @@ namespace Faster.Map
             return ref Unsafe.Add(ref arr0, index);
 #endif
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static uint Fmix(uint h)
+        {
+            // pipelining friendly algorithm
+            h = (h ^ (h >> 16)) * 0x85ebca6b;
+            h = (h ^ (h >> 13)) * 0xc2b2ae35;
+            return h ^ (h >> 16);
+        }
+
 
         #endregion
     }

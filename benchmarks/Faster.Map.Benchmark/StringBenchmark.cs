@@ -4,9 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Faster.Map.Core;
 
 namespace Faster.Map.Benchmark
 {
@@ -15,12 +12,13 @@ namespace Faster.Map.Benchmark
         #region Fields
 
         private DenseMap<string, string> _dense = new DenseMap<string, string>();
-        private DenseMapSIMD<string, string> _denseMap = new DenseMapSIMD<string, string>();
+        private DenseMapSIMD<string, string> _denseMapSIMD = new DenseMapSIMD<string, string>();
 
         private Dictionary<string, string> dic = new Dictionary<string, string>();
         private DictionarySlim<string, string> _slim = new DictionarySlim<string, string>();
 
         private string[] keys;
+        private int _length = 900000;
 
         #endregion
 
@@ -33,17 +31,17 @@ namespace Faster.Map.Benchmark
             var output = File.ReadAllText("Numbers.txt");
             var splittedOutput = output.Split(',');
 
-            keys = new string[splittedOutput.Length];
+            keys = new string[_length];
 
-            for (var index = 0; index < splittedOutput.Length; index++)
+            for (var index = 0; index < _length; index++)
             {
                 keys[index] = splittedOutput[index];
             }
 
-            foreach (var key in keys.Take(900000))
+            foreach (var key in keys)
             {
                 dic.Add(key, key);
-                _denseMap.Emplace(key, key);
+                _denseMapSIMD.Emplace(key, key);
                 _dense.Emplace(key, key);
                 _slim.GetOrAddValueRef(key);
             }
@@ -59,7 +57,7 @@ namespace Faster.Map.Benchmark
         {
             foreach (var key in keys)
             {
-                _denseMap.Get(key, out var result);
+                _denseMapSIMD.Get(key, out var result);
             }
         }
 

@@ -32,20 +32,20 @@ namespace Faster.Map.Benchmark
             var output = File.ReadAllText("Numbers.txt");
             var splittedOutput = output.Split(',');
 
-            keys = new uint[splittedOutput.Length];
+            keys = new uint[_length];
 
-            for (var index = 0; index < splittedOutput.Length; index++)
+            for (var index = 0; index < _length; index++)
             {
                 keys[index] = uint.Parse(splittedOutput[index]);
             }
 
-            foreach (var key in keys.Take(_length))
+            foreach (var key in keys)
             {
-              //  dic.Add(key, key);
-              //  _denseMapSIMD.Emplace(key, key);
-              //  _fastMap.Emplace(key, key);
+                dic.Add(key, key);
+                _denseMapSIMD.Emplace(key, key);
+                _fastMap.Emplace(key, key);
                 _denseMap.Emplace(key, key);
-             //   _slim.GetOrAddValueRef(key);
+                _slim.GetOrAddValueRef(key);
             }
 
             // Shuffle(new Random(), keys);
@@ -102,25 +102,23 @@ namespace Faster.Map.Benchmark
         //    }
         //}
 
-        //[Benchmark]
-        //public void DenseMapSIMD()
-        //{
-        //    for (int i = 0; i < _length; ++i)
-        //    {
-        //        uint key = keys[i];
-        //        _denseMapSIMD.Remove(key);
-        //    }
-        //}
-
         [Benchmark]
-        public void DenseMap()
+        public void DenseMapSIMD()
         {
-            for (int i = 0; i < _length; ++i)
+            foreach (var key in keys)
             {
-                uint key = keys[i];
-                _denseMap.Remove(key);
+                _denseMapSIMD.Remove(key);
             }
         }
+
+        //[Benchmark]
+        //public void DenseMap()
+        //{
+        //    foreach (var key in keys)
+        //    {
+        //        _denseMap.Remove(key);
+        //    }
+        //}
 
         #endregion
 

@@ -1,4 +1,5 @@
 ﻿using System.Runtime.InteropServices;
+using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Running;
 
 namespace Faster.Map.Benchmark

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Microsoft.Collections.Extensions;
+using System.Diagnostics;
 
 namespace Faster.Map.Benchmark
 {
@@ -24,6 +25,7 @@ namespace Faster.Map.Benchmark
         private DictionarySlim<uint, uint> _slim = new DictionarySlim<uint, uint>();
 
         private uint[] keys;
+        private uint _length = 900000;
 
         #endregion
 
@@ -33,39 +35,48 @@ namespace Faster.Map.Benchmark
         [GlobalSetup]
         public void Setup()
         {
+          
             var output = File.ReadAllText("Numbers.txt");
             var splittedOutput = output.Split(',');
 
-            keys = new uint[splittedOutput.Length];
+            keys = new uint[_length];
 
-            for (var index = 0; index < splittedOutput.Length; index++)
+            for (var index = 0; index < _length; index++)
             {
                 keys[index] = uint.Parse(splittedOutput[index]);
             }
 
-            foreach (var key in keys.Take(900000))
+            foreach (var key in keys)
             {
-                //dic.Add(key, key);
-                //_denseMapSIMD.Emplace(key, key);
+                dic.Add(key, key);
+                _denseMapSIMD.Emplace(key, key);
                 _denseMap.Emplace(key, key);
-                //_fastMap.Emplace(key, key);
-                //_slim.GetOrAddValueRef(key);
+                _fastMap.Emplace(key, key);
+                _slim.GetOrAddValueRef(key);
             }
 
             //    Shuffle(new Random(), keys);
         }
 
- 
-
 
         [Benchmark]
-        public void DenseMap()
+        public void DenseMapSIMD()
         {
             foreach (var key in keys)
             {
-                _denseMap.Get(key, out var result);
+                _denseMapSIMD.Get(key, out var result);
             }
         }
+
+
+        //[Benchmark]
+        //public void DenseMap()
+        //{
+        //    foreach (var key in keys)
+        //    {
+        //        _denseMap.Get(key, out var result);
+        //    }
+        //}
 
         //[Benchmark]
         //public void FastMap()

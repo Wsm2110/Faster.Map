@@ -2,15 +2,12 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Linq.Expressions;
-using System.Threading;
 using BenchmarkDotNet.Attributes;
 using Microsoft.Collections.Extensions;
 
 namespace Faster.Map.Benchmark
 {
     [MarkdownExporterAttribute.GitHub]
-    // [SimpleJob(RunStrategy.Monitoring, 1, 10, 50)]
     public class UpdateBenchmark
     {
         #region Fields
@@ -33,25 +30,23 @@ namespace Faster.Map.Benchmark
         [GlobalSetup]
         public void Setup()
         {
-
             var output = File.ReadAllText("Numbers.txt");
             var splittedOutput = output.Split(',');
 
-            keys = new uint[splittedOutput.Length];
+            keys = new uint[_length];
 
-            for (var index = 0; index < splittedOutput.Length; index++)
+            for (var index = 0; index < _length; index++)
             {
                 keys[index] = uint.Parse(splittedOutput[index]);
             }
 
-            foreach (var key in keys.Take(_length))
+            foreach (var key in keys)
             {
-                //   dic.Add(key, key);
-                //  _denseMapSIMD.Emplace(key, key);
+                dic.Add(key, key);
+                _denseMapSIMD.Emplace(key, key);
                 _denseMap.Emplace(key, key);
-                //  _fastMap.Emplace(key, key);
-                //  _slim.GetOrAddValueRef(key);
-
+                _fastMap.Emplace(key, key);
+                _slim.GetOrAddValueRef(key);
             }
 
             // Shuffle(new Random(), keys);
@@ -89,14 +84,14 @@ namespace Faster.Map.Benchmark
         //    }
         //}
 
-        //[Benchmark]
-        //public void DenseMapSIMD()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        _denseMapSIMD.Update(key, 222);
-        //    }
-        //}
+        [Benchmark]
+        public void DenseMapSIMD()
+        {
+            foreach (var key in keys)
+            {
+                _denseMapSIMD.Update(key, 222);
+            }
+        }
 
         //[Benchmark]
         //public void FastMap()
@@ -107,14 +102,14 @@ namespace Faster.Map.Benchmark
         //    }
         //}
 
-        [Benchmark]
-        public void DenseMap()
-        {
-            for (uint i = 0; i < _length; i++)
-            {
-                _denseMap.Update(keys[i], 222);
-            }          
-        }
+        //[Benchmark]
+        //public void DenseMap()
+        //{
+        //    for (uint i = 0; i < _length; i++)
+        //    {
+        //        _denseMap.Update(keys[i], 222);
+        //    }
+        //}
 
         #endregion
     }
