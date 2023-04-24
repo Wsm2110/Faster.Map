@@ -175,7 +175,7 @@ namespace Faster.Map
         /// <param name="key">The key.</param>
         /// <param name="value">The value.</param>
         /// <returns></returns>
-        [MethodImpl(256)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Emplace(TKey key, TValue value)
         {
             //Resize if loadfactor is reached
@@ -206,7 +206,7 @@ namespace Faster.Map
             do
             {
                 ref var info = ref _metadata[index];
-                ref var currentEntry = ref _entries[index];              
+                ref var currentEntry = ref _entries[index];
 
                 //Empty spot, add metadata
                 if (info.IsEmpty())
@@ -227,7 +227,7 @@ namespace Faster.Map
                 if (metadata.Psl > info.Psl)
                 {
                     Swap(ref entry, ref currentEntry);
-                    Swap(ref metadata, ref info);                
+                    Swap(ref metadata, ref info);
                 }
 
                 //max psl is reached, resize
@@ -237,6 +237,93 @@ namespace Faster.Map
                     Resize();
                     EmplaceInternal(ref entry, ref metadata);
                     return true;
+                }
+
+                ++index;
+
+                //increase probe sequence length
+                ++metadata.Psl;
+
+                //Increase _current probe sequence
+                if (_currentProbeSequenceLength < metadata.Psl)
+                {
+                    _currentProbeSequenceLength = metadata.Psl;
+                }
+
+            } while (true);
+        }
+
+        /// <summary>
+        /// 
+        /// Tries to emplace a key-value pair into the map
+        ///
+        /// If the map already contains this key, update the existing KeyValuePair
+        ///
+        /// </summary>
+        /// <param name="key">The key.</param>
+        /// <param name="value">The value.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void EmplaceOrUpdate(TKey key, TValue value)
+        {
+            //Resize if loadfactor is reached
+            if (Count >= _maxlengthBeforeResize)
+            {
+                Resize();
+            }
+
+            //Get object identity hashcode
+            var hashcode = (uint)key.GetHashCode();
+
+            // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a
+            uint index = hashcode * GoldenRatio >> _shift;
+
+            //Create metadata
+            Entry<TKey, TValue> entry = default;
+            entry.Value = value;
+            entry.Key = key;
+
+            //Create default info byte
+            Metabyte metadata = default;
+
+            //Assign 0 to psl so it wont be seen as empty
+            metadata.Psl = 0;
+
+            do
+            {
+                ref var info = ref _metadata[index];
+                ref var currentEntry = ref _entries[index];
+
+                //Empty spot, add metadata
+                if (info.IsEmpty())
+                {
+                    currentEntry = entry;
+                    info = metadata;
+
+                    ++Count;
+                    return;
+                }
+                
+                if (hashcode == currentEntry.Key.GetHashCode())
+                {  
+                    // Update existing value
+                    currentEntry.Value = value;
+                    return;
+                }
+
+                //Steal from the rich, give to the poor
+                if (metadata.Psl > info.Psl)
+                {
+                    Swap(ref entry, ref currentEntry);
+                    Swap(ref metadata, ref info);
+                }
+
+                //max psl is reached, resize
+                if (metadata.Psl == _maxProbeSequenceLength)
+                {
+                    ++Count;
+                    Resize();
+                    EmplaceInternal(ref entry, ref metadata);
+                    return;
                 }
 
                 ++index;
@@ -544,7 +631,7 @@ namespace Faster.Map
             current.Psl = 0;
 
             do
-            {               
+            {
                 ref var info = ref _metadata[index];
 
                 if (info.IsEmpty())
@@ -558,7 +645,7 @@ namespace Faster.Map
                 if (current.Psl > info.Psl)
                 {
                     Swap(ref entry, ref _entries[index]);
-                    Swap(ref current, ref _metadata[index]);    
+                    Swap(ref current, ref _metadata[index]);
                 }
 
                 ++index;

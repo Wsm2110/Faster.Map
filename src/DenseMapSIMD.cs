@@ -2,19 +2,21 @@
 using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using System.Runtime.Intrinsics.X86;
+using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 using Faster.Map.Core;
-using System.Runtime.InteropServices;
 
 namespace Faster.Map
 {
     /// <summary>
     /// This hashmap uses the following
-    /// - Open addressing
+    /// - open-addressing
     /// - Quadratic probing 
-    /// - loadfactor by default is 0.9 while maintaining an incredible speed
-    /// - fibonacci hashing
+    /// - Loadfactor by default is 0.9 while maintaining an incredible speed
+    /// - Fibonacci hashing
+    /// - Searches in parallel using SIMD
+    /// - First-come-first-serve collision resolution    
+    /// - Tombstones to avoid backshifts
     /// </summary>
     public class DenseMapSIMD<TKey, TValue>
     {
@@ -194,7 +196,9 @@ namespace Faster.Map
         #region Public Methods
 
         /// <summary>
+        /// 
         /// Insert a key and value in the hashmap
+        ///
         /// </summary>
         /// <param name="key">The key.</param>
         /// <param name="value">The value.</param>
@@ -303,11 +307,124 @@ namespace Faster.Map
         }
 
         /// <summary>
-        /// Gets the value with the corresponding key
+        /// 
+        /// Tries to emplace a key-value pair into the map
+        ///
+        /// If the map already contains this key, update the existing KeyValuePair
+        ///
         /// </summary>
         /// <param name="key">The key.</param>
         /// <param name="value">The value.</param>
-        /// <returns></returns>       
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void EmplaceOrUpdate(TKey key, TValue value)
+        {
+            //Resize if loadfactor is reached
+            if (Count > _maxLookupsBeforeResize)
+            {
+                Resize();
+            }
+
+            // Get object identity hashcode
+            var hashcode = (uint)key.GetHashCode();
+
+            // Get 7 high bits
+            var h2 = hashcode & _bitmask;
+
+            //Create vector of the 7 high bits
+            var left = Vector128.Create(Unsafe.As<long, sbyte>(ref h2));
+
+            // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
+            uint index = hashcode * GoldenRatio >> _shift;
+
+            //Set initial jumpdistance index
+            uint jumpDistance = 0;
+
+            do
+            {
+                //load vector @ index
+                var right = Vector128.LoadUnsafe(ref GetArrayEntryRef(_metadata, index));
+
+                //get a bit sequence for matched hashcodes (h2s)
+                var result = Vector128.Equals(left, right).ExtractMostSignificantBits();
+
+                //Check if key is unique
+                while (result != 0)
+                {
+                    var offset = BitOperations.TrailingZeroCount(result);
+
+                    uint indexAndOffset = index + Unsafe.As<int, uint>(ref offset);
+
+                    ref var entry = ref GetArrayEntryRef(_entries, indexAndOffset);
+
+                    if (_comparer.Equals(entry.Key, key))
+                    {
+                        //Key found, update existing key
+                        entry.Value = value;
+                        return;
+                    }
+
+                    //clear bit
+                    result &= ~(1u << offset);
+                }
+
+                result = right.ExtractMostSignificantBits();
+                //check for tombstones and empty entries 
+                if (result != 0)
+                {
+                    var offset = BitOperations.TrailingZeroCount(result);
+                    //calculate proper index
+                    index += Unsafe.As<int, uint>(ref offset);
+
+                    //retrieve entry
+                    ref var currentEntry = ref GetArrayEntryRef(_entries, index);
+
+                    //set key and value
+                    currentEntry.Key = key;
+                    currentEntry.Value = value;
+
+                    ref var metadata = ref GetArrayEntryRef(_metadata, index);
+
+                    // add h2 to metadata
+                    metadata = Unsafe.As<long, sbyte>(ref h2);
+
+                    ++Count;
+                    return;
+                }
+
+                //Probing is done by incrementing the currentEntry bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
+                //So first we jump by 1 group (meaning we just continue our linear scan), then 2 groups (skipping over 1 group), then 3 groups (skipping over 2 groups), and so on.
+                //Interestingly, this pattern perfectly lines up with our power-of-two size such that we will visit every single bucket exactly once without any repeats(searching is therefore guaranteed to terminate as we always have at least one EMPTY bucket).
+                //Also note that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
+                //Also note that we expect to almost never actually probe, since that’s WIDTH(16) non-EMPTY buckets we need to fail to find our key in.
+
+                jumpDistance += 16;
+                index += jumpDistance;
+
+                if (index > _length)
+                {
+                    // hashing to the top region of this hashmap always had some drawbacks
+                    // even when the table was half full the table would resize when the last 16 slots were full
+                    // and the jumpdistance exceeded the length of the array. this is not intended
+                    // 
+                    // when the index exceeds the length, which means all groups of 16 near the upper region of the map are full
+                    // reset the index and try probing again from the start this will enforce a secure and trustable hashmap which will always
+                    // resize when we reach a 90% load
+                    // Note these entries will not be properly cache alligned but in the end its well worth it
+                    //
+                    // adding jumpdistance to the index will prevent endless loops.
+                    // Every time this code block is entered jumpdistance will be different hence the index will be different too
+                    // thus it will always look for an empty spot
+                    index = Fmix(hashcode + jumpDistance) >> _shift;
+                }
+            } while (true);
+        }
+        
+        /// <summary>
+        /// Tries to find the key in the map
+        /// </summary>
+        /// <param name="key">The key.</param>
+        /// <param name="value">The value.</param>
+        /// <returns>Returns false if the key is not found</returns>       
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Get(TKey key, out TValue value)
         {
@@ -341,7 +458,7 @@ namespace Faster.Map
                     var offset = BitOperations.TrailingZeroCount(result);
 
                     //Get index and eq
-                    var entry = GetArrayEntryByVal(_entries, index + Unsafe.As<int, uint>(ref offset));
+                    ref var entry = ref GetArrayEntryRef(_entries, index + Unsafe.As<int, uint>(ref offset));
 
                     //Use EqualityComparer to find proper entry
                     if (_comparer.Equals(entry.Key, key))
@@ -391,7 +508,7 @@ namespace Faster.Map
         }
 
         /// <summary>
-        /// Updates the value of a specific key
+        /// Tries to find the key in the map and updates the value
         /// </summary>
         /// <param name="key"></param>
         /// <param name="value"></param>
@@ -515,9 +632,9 @@ namespace Faster.Map
                     var offset = BitOperations.TrailingZeroCount(result);
 
                     uint indexAndOffset = index + Unsafe.As<int, uint>(ref offset);
-                                       
+
                     if (_comparer.Equals(_entries[indexAndOffset].Key, key))
-                    {                       
+                    {
                         _metadata[indexAndOffset] = _tombstone;
                         --Count;
                         return true;
@@ -665,7 +782,7 @@ namespace Faster.Map
         }
 
         /// <summary>
-        /// Clears this instance.
+        /// Removes all entries from this map and sets the count to 0
         /// </summary>
         public void Clear()
         {
