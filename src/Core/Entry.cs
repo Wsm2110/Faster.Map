@@ -18,7 +18,7 @@ namespace Faster.Map.Core
         /// <value>
         /// The key.
         /// </value>
-        public TKey Key { get; set; }
+        public TKey Key;
 
         /// <summary>
         /// Gets or sets the value.
@@ -26,7 +26,6 @@ namespace Faster.Map.Core
         /// <value>
         /// The value.
         /// </value>
-        public TValue Value { get; set; }
-
+        public TValue Value;
     }
 }
