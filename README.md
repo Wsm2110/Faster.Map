@@ -19,6 +19,12 @@ Faster.Map provides 3 unique hashmaps:
    The default loadfactor is 0.9. This allows us to store 15% more entries than a dictionary while maintaining incredible speed.
    This hashmap is fast and i mean mindblowing fast.
 
+ ## Tested on platforms:
+* x86
+* x64
+* arm
+* arm64
+
  ## Examples    
   ### Default Example
 ```C#
