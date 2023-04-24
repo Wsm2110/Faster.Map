@@ -534,7 +534,7 @@ namespace Faster.Map.Core.Tests
             //assert
             Assert.AreEqual(count, 4);
         }
-        
+
         [TestMethod]
         public void AssertValueEnumerator()
         {
@@ -556,7 +556,7 @@ namespace Faster.Map.Core.Tests
             //assert
             Assert.AreEqual(count, 4);
         }
-        
+
         [TestMethod]
         public void AssertEntriesEnumerator()
         {
@@ -588,11 +588,76 @@ namespace Faster.Map.Core.Tests
             //act
             map.EmplaceOrUpdate(1, 1);
             map.EmplaceOrUpdate(1, 2);
-            
+
             map.Get(1, out var result);
 
             //assert
             Assert.AreEqual(2, result);
+        }
+
+        [TestMethod]
+        public void AssertGetOrAddValueRefAddsDefaultValue()
+        {
+            //assign
+            var map = new DenseMapSIMD<int, int>(16, 0.5);
+
+            //act
+            ref var value = ref map.GetOrAddValueRef(1);
+
+            //assert
+            Assert.AreEqual(0, value);
+        }
+
+        [TestMethod]
+        public void AssertGetOrAddValueRefAddsEntryInMapIfKeyIsNotFound()
+        {
+            //assign
+            var map = new DenseMapSIMD<int, int>(16, 0.5);
+
+            //act
+            ref var value = ref map.GetOrAddValueRef(1);
+
+            value = 100;
+
+            map.Get(1, out var result);
+
+            //assert
+            Assert.AreEqual(100, result);
+        }
+
+        [TestMethod]
+        public void AssertGetOrAddValueRefAddsAndRemoveShouldLeaveTombstone()
+        {
+            //assign
+            var map = new DenseMapSIMD<int, int>(16, 0.5);
+
+            //act
+            ref var value = ref map.GetOrAddValueRef(1);
+
+            value = 100;
+
+            map.Remove(1);
+
+            var result2 = map.Get(1, out var result);
+            //assert
+            Assert.AreEqual(0, result);
+            Assert.AreEqual(false, result2);
+        }
+
+        [TestMethod]
+        public void AssertGetOrAddValueBasicExampleWorksAsIntended()
+        {
+            //assign
+             var counterMap = new DenseMapSIMD<uint, uint>(16, 0.5);
+             ref var counter = ref counterMap.GetOrAddValueRef(1);
+            
+             //act
+             ++counter;
+
+             counterMap.Get(1, out var result);
+
+             //assert
+             Assert.AreEqual(1u, result);
         }
 
     }
