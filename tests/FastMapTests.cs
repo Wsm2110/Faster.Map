@@ -372,5 +372,22 @@ namespace Faster.Map.Core.Tests
             Assert.IsTrue(faster.Count == 0);
         }
 
+        [TestMethod]
+        public void AssertEmplaceOrUdateReturnsUpdatedValue()
+        {
+            //assign
+            var map = new FastMap<int, int>(16, 0.5);
+
+            //act
+            map.EmplaceOrUpdate(1, 1);
+            map.EmplaceOrUpdate(1, 2);
+
+            map.Get(1, out var result);
+
+            //assert
+            Assert.AreEqual(2, result);
+        }
+
+
     }
 }

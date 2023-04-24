@@ -1,12 +1,8 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Numerics;
-using System.Runtime.Intrinsics.X86;
-using System.Security.Cryptography;
 
 namespace Faster.Map.Core.Tests
 {
@@ -521,7 +517,7 @@ namespace Faster.Map.Core.Tests
         public void AssertKeyEnumerator()
         {
             //assign
-            var map = new DenseMap<uint, uint>(16, 0.5);
+            var map = new DenseMapSIMD<uint, uint>(16, 0.5);
 
             //act
             map.Emplace(1, 1);
@@ -538,13 +534,12 @@ namespace Faster.Map.Core.Tests
             //assert
             Assert.AreEqual(count, 4);
         }
-
-
+        
         [TestMethod]
         public void AssertValueEnumerator()
         {
             //assign
-            var map = new DenseMap<uint, uint>(16, 0.5);
+            var map = new DenseMapSIMD<uint, uint>(16, 0.5);
 
             //act
             map.Emplace(1, 1);
@@ -561,13 +556,12 @@ namespace Faster.Map.Core.Tests
             //assert
             Assert.AreEqual(count, 4);
         }
-
-
+        
         [TestMethod]
         public void AssertEntriesEnumerator()
         {
             //assign
-            var map = new DenseMap<uint, uint>(16, 0.5);
+            var map = new DenseMapSIMD<uint, uint>(16, 0.5);
 
             //act
             map.Emplace(1, 1);
@@ -583,6 +577,22 @@ namespace Faster.Map.Core.Tests
 
             //assert
             Assert.AreEqual(count, 4);
+        }
+
+        [TestMethod]
+        public void AssertEmplaceOrUdateReturnsUpdatedValue()
+        {
+            //assign
+            var map = new DenseMapSIMD<int, int>(16, 0.5);
+
+            //act
+            map.EmplaceOrUpdate(1, 1);
+            map.EmplaceOrUpdate(1, 2);
+            
+            map.Get(1, out var result);
+
+            //assert
+            Assert.AreEqual(2, result);
         }
 
     }

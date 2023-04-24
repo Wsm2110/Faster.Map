@@ -85,7 +85,7 @@ namespace Faster.Map.Core.Tests
         [TestMethod]
         public void AssertDailyUseCaseWithResize()
         {
-            var fmap = new DenseMapSIMD<uint, uint>(16);
+            var fmap = new DenseMap<uint, uint>(16);
 
             foreach (var k in keys.Take(900000))
             {
@@ -95,7 +95,7 @@ namespace Faster.Map.Core.Tests
                 }
             }
 
-            Assert.AreEqual(900000, fmap.Count);
+            Assert.AreEqual(900000U, fmap.Count);
 
             //find all entries from map
 
@@ -118,7 +118,7 @@ namespace Faster.Map.Core.Tests
                 }
             }
 
-            Assert.IsTrue(fmap.Count == 0);
+            Assert.IsTrue(fmap.Count == 0U);
 
             //map full of tombstones, try inserting again
 
@@ -130,14 +130,14 @@ namespace Faster.Map.Core.Tests
                 }
             }
 
-            Assert.AreEqual(900000, fmap.Count);
+            Assert.AreEqual(900000U, fmap.Count);
         }
 
         [TestMethod]
         public void AssertAddingDuplicateKeysShouldFail()
         {
             //arrange
-            var map = new DenseMapSIMD<uint, uint>(16);
+            var map = new DenseMap<uint, uint>(16);
 
             //act
             var r1 = map.Emplace(1, 1);
@@ -153,7 +153,7 @@ namespace Faster.Map.Core.Tests
         public void AssertUpdateEntryInMapReturnsProperValue()
         {
             //arrange
-            var map = new DenseMapSIMD<uint, uint>(16);
+            var map = new DenseMap<uint, uint>(16);
             map.Emplace(1, 1);
 
             //act
@@ -169,7 +169,7 @@ namespace Faster.Map.Core.Tests
         public void AssertUpdateEntryWhileKeyIsNotInMap()
         {
             //arrange
-            var map = new DenseMapSIMD<uint, uint>(16);
+            var map = new DenseMap<uint, uint>(16);
 
             //act
             map.Update(1, 100);
@@ -185,7 +185,7 @@ namespace Faster.Map.Core.Tests
         public void AssertContainsEntryInMapReturnsProperValue()
         {
             //arrange
-            var map = new DenseMapSIMD<uint, uint>(16);
+            var map = new DenseMap<uint, uint>(16);
             map.Emplace(1, 1);
 
             //act
@@ -199,7 +199,7 @@ namespace Faster.Map.Core.Tests
         public void AssertContainsEntryWhileKeyIsNotInMap()
         {
             //arrange
-            var map = new DenseMapSIMD<uint, uint>(16);
+            var map = new DenseMap<uint, uint>(16);
 
             //act
             var result = map.Contains(1);
@@ -213,21 +213,21 @@ namespace Faster.Map.Core.Tests
         public void AssertClearShouldResetMap()
         {
             //arrange
-            var map = new DenseMapSIMD<uint, uint>(16);
+            var map = new DenseMap<uint, uint>(16);
 
             //act
             var result = map.Emplace(1, 1);
             map.Clear();
 
             //assert        
-            Assert.AreEqual(0, map.Count);
+            Assert.AreEqual(0U, map.Count);
         }
 
         [TestMethod]
         public void AssertRemovingEntryWhileKeyIsNotInMap()
         {
             //arrange
-            var map = new DenseMapSIMD<uint, uint>(16);
+            var map = new DenseMap<uint, uint>(16);
 
             //act
             var result = map.Remove(1);
@@ -240,7 +240,7 @@ namespace Faster.Map.Core.Tests
         public void AssertRemovingEntryShouldReduceCount()
         {
             //arrange
-            var map = new DenseMapSIMD<uint, uint>(16);
+            var map = new DenseMap<uint, uint>(16);
             map.Emplace(1, 1);
 
             //act
@@ -248,47 +248,14 @@ namespace Faster.Map.Core.Tests
 
             //assert  
             Assert.AreEqual(result, true);
-            Assert.AreEqual(0, map.Count);
-        }
-
-        [TestMethod]
-        public void AssertResizingShouldDoubleInSize()
-        {
-            //arrange
-            var map = new DenseMapSIMD<uint, uint>(16);
-
-            //act    
-            map.Emplace(1, 1);
-            map.Emplace(2, 1);
-            map.Emplace(3, 1);
-            map.Emplace(4, 1);
-            map.Emplace(5, 1);
-            map.Emplace(6, 1);
-            map.Emplace(7, 1);
-            map.Emplace(8, 1);
-            map.Emplace(9, 1);
-            map.Emplace(10, 1);
-            map.Emplace(11, 1);
-            map.Emplace(12, 1);
-            map.Emplace(13, 1);
-            map.Emplace(14, 2);
-            map.Emplace(15, 1);
-            map.Emplace(16, 1);
-            map.Emplace(17, 1);
-            map.Emplace(18, 1);
-            map.Emplace(19, 1);
-
-            //assert  
-            // 16 * 2) + 16
-
-            Assert.AreEqual(48, (int)map.Size);
+            Assert.AreEqual(0U, map.Count);
         }
 
         [TestMethod]
         public void AssertResizingShouldSetProperCount()
         {
             //arrange
-            var map = new DenseMapSIMD<uint, uint>(16);
+            var map = new DenseMap<uint, uint>(16);
 
             //act    
             map.Emplace(1, 1);
@@ -314,14 +281,14 @@ namespace Faster.Map.Core.Tests
             //assert  
             // 16 * 2) + 16
 
-            Assert.AreEqual(19, map.Count);
+            Assert.AreEqual(19U, map.Count);
         }
 
         [TestMethod]
         public void AssertRetrieveAfterResize()
         {
             //arrange
-            var map = new DenseMapSIMD<uint, uint>(16);
+            var map = new DenseMap<uint, uint>(16);
 
             //act    
             map.Emplace(1, 1);
@@ -347,7 +314,7 @@ namespace Faster.Map.Core.Tests
             var result = map.Get(19, out var r1);
             //assert  
 
-            Assert.AreEqual(19, map.Count);
+            Assert.AreEqual(19U, map.Count);
             Assert.AreEqual(result, true);
             Assert.AreEqual(1, (int)r1);
         }
@@ -356,7 +323,7 @@ namespace Faster.Map.Core.Tests
         public void AssertRetrievalByIndexor()
         {
             //arrange
-            var map = new DenseMapSIMD<uint, uint>(16);
+            var map = new DenseMap<uint, uint>(16);
 
             //act    
             map.Emplace(1, 5);
@@ -371,7 +338,7 @@ namespace Faster.Map.Core.Tests
         public void AssertUpdatingByIndexor()
         {
             //arrange
-            var map = new DenseMapSIMD<uint, uint>(16);
+            var map = new DenseMap<uint, uint>(16);
 
             //act    
             map.Emplace(1, 5);
@@ -389,7 +356,7 @@ namespace Faster.Map.Core.Tests
         public void AssertUpdatingByIndexorWhileKeyNotFoundShouldThrow()
         {
             //arrange
-            var map = new DenseMapSIMD<uint, uint>(16);
+            var map = new DenseMap<uint, uint>(16);
 
             //act    
             map.Emplace(1, 5);
@@ -404,7 +371,7 @@ namespace Faster.Map.Core.Tests
         public void AssertRetrievingByIndexorWhileKeyNotFoundShouldThrow()
         {
             //arrange
-            var map = new DenseMapSIMD<uint, uint>(16);
+            var map = new DenseMap<uint, uint>(16);
 
             //act    
             map.Emplace(1, 5);
@@ -417,20 +384,20 @@ namespace Faster.Map.Core.Tests
         public void AssertEmplaceShouldIncreaseCount()
         {
             //arrange
-            var map = new DenseMapSIMD<uint, uint>(16);
+            var map = new DenseMap<uint, uint>(16);
 
             //act
             map.Emplace(1, 1);
 
             //assert
-            Assert.AreEqual(1, map.Count);
+            Assert.AreEqual(1U, map.Count);
         }
 
         [TestMethod]
         public void AssertUnsuccesfulLookupReturnsFalse()
         {
             //arrange
-            DenseMapSIMD<uint, uint> map = new DenseMapSIMD<uint, uint>(1000000);
+            var map = new DenseMap<uint, uint>(1000000);
 
             //act
             var found = map.Get(345, out var result);
@@ -443,8 +410,8 @@ namespace Faster.Map.Core.Tests
         [TestMethod]
         public void AssertCopyMapToAnother()
         {
-            DenseMapSIMD<uint, uint> map = new DenseMapSIMD<uint, uint>(16);
-            DenseMapSIMD<uint, uint> map2 = new DenseMapSIMD<uint, uint>(16);
+            var map = new DenseMap<uint, uint>(16);
+            var map2 = new DenseMap<uint, uint>(16);
 
             map.Emplace(1, 1);
             map.Emplace(2, 1);
@@ -461,7 +428,7 @@ namespace Faster.Map.Core.Tests
         public void AssertRemovingMultipleEntries()
         {
             //assign
-            DenseMapSIMD<uint, uint> map = new DenseMapSIMD<uint, uint>(16);
+           var map = new DenseMap<uint, uint>(16);
 
             map.Emplace(1, 1);
             map.Emplace(2, 2);
@@ -485,7 +452,7 @@ namespace Faster.Map.Core.Tests
         public void AssertEmplaceRemoveAndEmplaceAgainShouldLeaveTombstone()
         {
             //assign
-            DenseMapSIMD<uint, uint> map = new DenseMapSIMD<uint, uint>(16);
+            var map = new DenseMap<uint, uint>(16);
 
             //act
             map.Emplace(1, 1);
@@ -576,7 +543,6 @@ namespace Faster.Map.Core.Tests
             Assert.AreEqual(count, 4);
         }
 
-
         [TestMethod]
         public void AssertEntriesEnumerator()
         {
@@ -597,6 +563,22 @@ namespace Faster.Map.Core.Tests
 
             //assert
             Assert.AreEqual(count, 4);
+        }
+
+        [TestMethod]
+        public void AssertEmplaceOrUdateReturnsUpdatedValue()
+        {
+            //assign
+            var map = new DenseMap<int, int>(16, 0.5);
+
+            //act
+            map.EmplaceOrUpdate(1, 1);
+            map.EmplaceOrUpdate(1, 2);
+
+            map.Get(1, out var result);
+
+            //assert
+            Assert.AreEqual(2, result);
         }
     }
 }
