@@ -8,7 +8,7 @@
     <LangVersion>Latest</LangVersion>
     <Authors>Wiljan Ruizendaal</Authors>
     <PackageReleaseNotes>
-     Minor Api changes. Added EmplaceOrUpdate to the api. Addding an entry without knowing if it already exists requires one lookup instead of two 
+      Minor bugfixes
     </PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/Wsm2110/Faster.Map</PackageProjectUrl>
     <AssemblyVersion>4.1.6</AssemblyVersion>

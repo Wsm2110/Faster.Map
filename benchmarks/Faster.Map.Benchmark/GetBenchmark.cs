@@ -11,6 +11,8 @@ namespace Faster.Map.Benchmark
 
     [MarkdownExporterAttribute.GitHub]
     [DisassemblyDiagnoser]
+    [MemoryDiagnoser]
+
     // [SimpleJob(RunStrategy.Monitoring, 1, 10, 50)]
     public class GetBenchmark
     {

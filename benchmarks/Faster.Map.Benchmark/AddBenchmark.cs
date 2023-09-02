@@ -9,6 +9,7 @@ namespace Faster.Map.Benchmark
 {
     [MarkdownExporterAttribute.GitHub]
     [DisassemblyDiagnoser]
+    [MemoryDiagnoser]
     public class AddBenchmark
     {
         #region Fields

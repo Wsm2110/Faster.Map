@@ -170,8 +170,7 @@ namespace Faster.Map
             {
                 _length = 16;
             }
-
-            if (BitOperations.IsPow2(length))
+            else if (BitOperations.IsPow2(_length))
             {
                 _length = length;
             }
@@ -207,7 +206,7 @@ namespace Faster.Map
         public bool Emplace(TKey key, TValue value)
         {
             //Resize if loadfactor is reached
-            if (Count > _maxLookupsBeforeResize)
+            if (Count >= _maxLookupsBeforeResize)
             {
                 Resize();
             }
@@ -991,6 +990,23 @@ namespace Faster.Map
                 jumpDistance += 16;
                 index += jumpDistance;
 
+                if (index > _length)
+                {
+                    // hashing to the top region of this hashmap always had some drawbacks
+                    // even when the table was half full the table would resize when the last 16 slots were full
+                    // and the jumpdistance exceeded the length of the array. this is not intended
+                    // 
+                    // when the index exceeds the length, which means all groups of 16 near the upper region of the map are full
+                    // reset the index and try probing again from the start this will enforce a secure and trustable hashmap which will always
+                    // resize when we reach a 90% load
+                    // Note these entries will not be properly cache alligned but in the end its well worth it
+                    //
+                    // adding jumpdistance to the index will prevent endless loops.
+                    // Every time this code block is entered jumpdistance will be different hence the index will be different too
+                    // thus it will always look for an empty spot
+                    index = Fmix(hashcode + jumpDistance) >> _shift;
+                }
+
             } while (true);
         }
 
@@ -1017,6 +1033,7 @@ namespace Faster.Map
 
             for (var i = 0; i < oldEntries.Length; ++i)
             {
+
                 var m = oldMetadata[i];
                 if (m < 0)
                 {
