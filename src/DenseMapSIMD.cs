@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 using Faster.Map.Core;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Faster.Map
 {
@@ -115,11 +116,11 @@ namespace Faster.Map
         private const uint GoldenRatio = 0x9E3779B9; //2654435769;
         private uint _length;
 
-        private int _shift = 32;
+        private byte _shift = 32;
         private double _maxLookupsBeforeResize;
         private readonly double _loadFactor;
         private readonly IEqualityComparer<TKey> _comparer;
-        private const sbyte _bitmask = (1 << 7) - 1;
+        private const sbyte _bitmask = 0b0111_1111; //127
 
 
         #endregion
@@ -182,7 +183,8 @@ namespace Faster.Map
             _maxLookupsBeforeResize = (uint)(_length * _loadFactor);
             _comparer = keyComparer ?? EqualityComparer<TKey>.Default;
 
-            _shift = _shift - BitOperations.Log2(_length);
+            _shift = (byte)(_shift - BitOperations.Log2(_length));
+
             _entries = new Entry<TKey, TValue>[_length + 16];
             _metadata = new sbyte[_length + 16];
 
@@ -203,7 +205,7 @@ namespace Faster.Map
         /// <param name="value">The value.</param>
         /// <returns>returns false if key already exists</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Emplace(TKey key, TValue value)
+        public bool Add(TKey key, TValue value)
         {
             //Resize if loadfactor is reached
             if (Count >= _maxLookupsBeforeResize)
@@ -218,30 +220,28 @@ namespace Faster.Map
             var h2 = hashcode & _bitmask;
 
             //Create vector of the 7 high bits
-            var left = Vector128.Create(Unsafe.As<long, sbyte>(ref h2));
+            var target = Vector128.Create(Unsafe.As<long, sbyte>(ref h2));
 
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = hashcode * GoldenRatio >> _shift;
 
             //Set initial jumpdistance index
-            uint jumpDistance = 0;
+            uint jumpDistance = 16;
 
             do
             {
                 //load vector @ index
-                var right = Vector128.LoadUnsafe(ref GetArrayEntryRef(_metadata, index));
+                var source = Vector128.LoadUnsafe(ref FindEntry(_metadata, index));
 
                 //get a bit sequence for matched hashcodes (h2s)
-                var result = Vector128.Equals(left, right).ExtractMostSignificantBits();
+                var bitPos = Vector128.Equals(target, source).ExtractMostSignificantBits();
 
                 //Check if key is unique
-                while (result != 0)
+                while (bitPos != 0)
                 {
-                    var offset = BitOperations.TrailingZeroCount(result);
+                    var offset = BitOperations.TrailingZeroCount(bitPos);
 
-                    uint indexAndOffset = index + Unsafe.As<int, uint>(ref offset);
-
-                    var entry = GetArrayEntryByVal(_entries, indexAndOffset);
+                    var entry = FindEntry(_entries, index + Unsafe.As<int, uint>(ref offset));
 
                     if (_comparer.Equals(entry.Key, key))
                     {
@@ -250,25 +250,25 @@ namespace Faster.Map
                     }
 
                     //clear bit
-                    result &= ~(1u << offset);
+                    bitPos &= ~(1u << offset);
                 }
 
-                result = right.ExtractMostSignificantBits();
+                bitPos = source.ExtractMostSignificantBits();
                 //check for tombstones and empty entries 
-                if (result != 0)
+                if (bitPos != 0)
                 {
-                    var offset = BitOperations.TrailingZeroCount(result);
+                    var offset = BitOperations.TrailingZeroCount(bitPos);
                     //calculate proper index
                     index += Unsafe.As<int, uint>(ref offset);
 
                     //retrieve entry
-                    ref var currentEntry = ref GetArrayEntryRef(_entries, index);
+                    ref var currentEntry = ref FindEntry(_entries, index);
 
                     //set key and value
                     currentEntry.Key = key;
                     currentEntry.Value = value;
 
-                    ref var metadata = ref GetArrayEntryRef(_metadata, index);
+                    ref var metadata = ref FindEntry(_metadata, index);
 
                     // add h2 to metadata
                     metadata = Unsafe.As<long, sbyte>(ref h2);
@@ -326,7 +326,7 @@ namespace Faster.Map
         /// <param name="key">The key.</param>
         /// <param name="value">The value.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void EmplaceOrUpdate(TKey key, TValue value)
+        public void AddOrUpdate(TKey key, TValue value)
         {
             //Resize if loadfactor is reached
             if (Count > _maxLookupsBeforeResize)
@@ -352,7 +352,7 @@ namespace Faster.Map
             do
             {
                 //load vector @ index
-                var right = Vector128.LoadUnsafe(ref GetArrayEntryRef(_metadata, index));
+                var right = Vector128.LoadUnsafe(ref FindEntry(_metadata, index));
 
                 //get a bit sequence for matched hashcodes (h2s)
                 var result = Vector128.Equals(left, right).ExtractMostSignificantBits();
@@ -364,7 +364,7 @@ namespace Faster.Map
 
                     uint indexAndOffset = index + Unsafe.As<int, uint>(ref offset);
 
-                    ref var entry = ref GetArrayEntryRef(_entries, indexAndOffset);
+                    ref var entry = ref FindEntry(_entries, indexAndOffset);
 
                     if (_comparer.Equals(entry.Key, key))
                     {
@@ -386,13 +386,13 @@ namespace Faster.Map
                     index += Unsafe.As<int, uint>(ref offset);
 
                     //retrieve entry
-                    ref var currentEntry = ref GetArrayEntryRef(_entries, index);
+                    ref var currentEntry = ref FindEntry(_entries, index);
 
                     //set key and value
                     currentEntry.Key = key;
                     currentEntry.Value = value;
 
-                    ref var metadata = ref GetArrayEntryRef(_metadata, index);
+                    ref var metadata = ref FindEntry(_metadata, index);
 
                     // add h2 to metadata
                     metadata = Unsafe.As<long, sbyte>(ref h2);
@@ -444,31 +444,30 @@ namespace Faster.Map
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = hashcode * GoldenRatio >> _shift;
 
-            // Get 7 high bits
-            var h2 = hashcode & _bitmask;
+            var h2 = hashcode & 0b01111111;
 
             //Create vector of the 7 high bits
-            var left = Vector128.Create(Unsafe.As<long, sbyte>(ref h2));
+            var target = Vector128.Create(Unsafe.As<uint, sbyte>(ref h2));
 
             //Set initial jumpdistance index
-            uint jumpDistance = 0;
+            uint jumpDistance = 16;
 
             do
             {
                 //load vector @ index
-                var right = Vector128.LoadUnsafe(ref GetArrayEntryRef(_metadata, index));
+                var source = Vector128.LoadUnsafe(ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(_metadata), index));
 
                 //get a bit sequence for matched hashcodes (h2s)
-                var result = Vector128.Equals(left, right).ExtractMostSignificantBits();
+                var bitPos = Vector128.Equals(target, source).ExtractMostSignificantBits();
 
                 //Could be multiple bits which are set
-                while (result != 0)
+                while (bitPos != 0)
                 {
                     //Retrieve offset 
-                    var offset = BitOperations.TrailingZeroCount(result);
+                    var offset = BitOperations.TrailingZeroCount(bitPos);
 
                     //Get index and eq
-                    ref var entry = ref GetArrayEntryRef(_entries, index + Unsafe.As<int, uint>(ref offset));
+                    ref var entry = ref FindEntry(_entries, index + Unsafe.As<int, byte>(ref offset));
 
                     //Use EqualityComparer to find proper entry
                     if (_comparer.Equals(entry.Key, key))
@@ -478,11 +477,11 @@ namespace Faster.Map
                     }
 
                     //clear bit
-                    result &= ~(1u << offset);
+                    bitPos = ResetLowestSetBit(bitPos);
                 }
 
                 //Contains empty buckets;    
-                if (Vector128.Equals(_emptyBucketVector, right).ExtractMostSignificantBits() != 0)
+                if (Vector128.EqualsAny(_emptyBucketVector, source))
                 {
                     value = default;
                     return false;
@@ -511,12 +510,12 @@ namespace Faster.Map
                     // adding jumpdistance to the index will prevent endless loops.
                     // Every time this code block is entered jumpdistance will be different hence the index will be different too
                     // thus it will always look for an empty spot to back out;
-                    index = Fmix(hashcode + jumpDistance) >> _shift;
+                    index = Fmix((uint)hashcode + jumpDistance) >> _shift;
                 }
 
             } while (true);
         }
-        
+
         /// <summary>
         /// Gets the value for the specified key, or, if the key is not present,
         /// adds an entry and returns the value by ref. This makes it possible to
@@ -555,7 +554,7 @@ namespace Faster.Map
             do
             {
                 //load vector @ index
-                var right = Vector128.LoadUnsafe(ref GetArrayEntryRef(_metadata, index));
+                var right = Vector128.LoadUnsafe(ref FindEntry(_metadata, index));
 
                 //get a bit sequence for matched hashcodes (h2s)
                 var result = Vector128.Equals(left, right).ExtractMostSignificantBits();
@@ -567,7 +566,7 @@ namespace Faster.Map
                     var offset = BitOperations.TrailingZeroCount(result);
 
                     //Get index and eq
-                    ref var entry = ref GetArrayEntryRef(_entries, index + Unsafe.As<int, uint>(ref offset));
+                    ref var entry = ref FindEntry(_entries, index + Unsafe.As<int, uint>(ref offset));
 
                     //Use EqualityComparer to find proper entry
                     if (_comparer.Equals(entry.Key, key))
@@ -588,19 +587,19 @@ namespace Faster.Map
                     index += Unsafe.As<int, uint>(ref offset);
 
                     //retrieve entry
-                    ref var currentEntry = ref GetArrayEntryRef(_entries, index);
+                    ref var currentEntry = ref FindEntry(_entries, index);
 
                     //set key and value
                     currentEntry.Key = key;
                     currentEntry.Value = default;
 
-                    ref var metadata = ref GetArrayEntryRef(_metadata, index);
+                    ref var metadata = ref FindEntry(_metadata, index);
 
                     // add h2 to metadata
                     metadata = Unsafe.As<long, sbyte>(ref h2);
 
                     ++Count;
-                    
+
                     return ref currentEntry.Value;
                 }
 
@@ -632,7 +631,7 @@ namespace Faster.Map
 
             } while (true);
         }
-        
+
         /// <summary>
         /// Tries to find the key in the map and updates the value
         /// </summary>
@@ -660,7 +659,7 @@ namespace Faster.Map
             do
             {
                 //load vector @ index
-                var right = Vector128.LoadUnsafe(ref GetArrayEntryRef(_metadata, index));
+                var right = Vector128.LoadUnsafe(ref FindEntry(_metadata, index));
 
                 //get a bit sequence for matched hashcodes (h2s)
                 var result = Vector128.Equals(left, right).ExtractMostSignificantBits();
@@ -746,7 +745,7 @@ namespace Faster.Map
             do
             {
                 //load vector @ index
-                var right = Vector128.LoadUnsafe(ref GetArrayEntryRef(_metadata, index));
+                var right = Vector128.LoadUnsafe(ref FindEntry(_metadata, index));
 
                 //get a bit sequence for matched hashcodes (h2s)
                 var result = Vector128.Equals(left, right).ExtractMostSignificantBits();
@@ -832,7 +831,7 @@ namespace Faster.Map
             do
             {
                 //load vector @ index
-                var right = Vector128.LoadUnsafe(ref GetArrayEntryRef(_metadata, index));
+                var right = Vector128.LoadUnsafe(ref FindEntry(_metadata, index));
 
                 //get a bit sequence for matched hashcodes (h2s)
                 var result = Vector128.Equals(left, right).ExtractMostSignificantBits();
@@ -903,7 +902,7 @@ namespace Faster.Map
                 }
 
                 var entry = denseMap._entries[i];
-                Emplace(entry.Key, entry.Value);
+                Add(entry.Key, entry.Value);
             }
         }
 
@@ -960,7 +959,7 @@ namespace Faster.Map
         /// </summary>
         /// <param name="entry">The entry.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void EmplaceInternal(Entry<TKey, TValue> entry, sbyte h2)
+        private void AddInternal(Entry<TKey, TValue> entry, sbyte h2)
         {
             //expensive if hashcode is slow, or when it`s not cached like strings
             var hashcode = (uint)entry.Key.GetHashCode();
@@ -969,12 +968,12 @@ namespace Faster.Map
             uint index = hashcode * GoldenRatio >> _shift;
 
             //Set initial jumpdistance index
-            uint jumpDistance = 0;
+            uint jumpDistance = 16;
 
             do
             {
                 //check for empty entries
-                var result = Vector128.LoadUnsafe(ref GetArrayEntryRef(_metadata, index)).ExtractMostSignificantBits();
+                var result = Vector128.LoadUnsafe(ref FindEntry(_metadata, index)).ExtractMostSignificantBits();
                 if (result != 0)
                 {
                     var offset = BitOperations.TrailingZeroCount(result);
@@ -1040,23 +1039,12 @@ namespace Faster.Map
                     continue;
                 }
 
-                EmplaceInternal(oldEntries[i], m);
+                AddInternal(oldEntries[i], m);
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static T GetArrayEntryByVal<T>(T[] array, uint index)
-        {
-#if DEBUG
-            return array[index];
-#else
-            ref var arr0 = ref MemoryMarshal.GetArrayDataReference(array);
-            return Unsafe.Add(ref arr0, index);
-#endif
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ref T GetArrayEntryRef<T>(T[] array, uint index)
+        private static ref T FindEntry<T>(T[] array, uint index)
         {
 #if DEBUG
             return ref array[index];
@@ -1066,10 +1054,22 @@ namespace Faster.Map
 #endif
         }
 
+        /// <summary>
+        /// Reset the lowest significant bit in the given value
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static uint ResetLowestSetBit(uint value)
+        {
+            // It's lowered to BLSR on x86
+            return value & (value - 1);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static uint RotateLeft(uint value, int offset) => (value << offset) | (value >> (32 - offset));
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static uint Fmix(uint h)
         {
-            // pipelining friendly algorithm
             h = (h ^ (h >> 16)) * 0x85ebca6b;
             h = (h ^ (h >> 13)) * 0xc2b2ae35;
             return h ^ (h >> 16);

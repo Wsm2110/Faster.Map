@@ -9,7 +9,7 @@ namespace Faster.Map.Core
     /// <typeparam name="TKey">The type of the key.</typeparam>
     /// <typeparam name="TValue">The type of the value.</typeparam>
     [DebuggerDisplay("hashcode  {Key.GetHashCode() }")]
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    [StructLayout(LayoutKind.Sequential)]
     public struct Entry<TKey, TValue>
     {
         /// <summary>

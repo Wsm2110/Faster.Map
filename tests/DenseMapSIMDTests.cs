@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 
 namespace Faster.Map.Core.Tests
 {
@@ -13,7 +14,8 @@ namespace Faster.Map.Core.Tests
 
         [TestInitialize]
         public void Setup()
-        {
+        {  
+
             var output = File.ReadAllText("Numbers.txt");
             var splittedOutput = output.Split(',');
 
@@ -34,7 +36,7 @@ namespace Faster.Map.Core.Tests
 
             foreach (var k in keys.Take(900000))
             {
-                if (!fmap.Emplace(k, k))
+                if (!fmap.Add(k, k))
                 {
                     throw new InternalTestFailureException("Error occured while add");
                 }
@@ -69,7 +71,7 @@ namespace Faster.Map.Core.Tests
 
             foreach (var k in keys.Take(900000))
             {
-                if (!fmap.Emplace(k, k))
+                if (!fmap.Add(k, k))
                 {
                     throw new InternalTestFailureException("Error occured while removing");
                 }
@@ -86,7 +88,7 @@ namespace Faster.Map.Core.Tests
 
             foreach (var k in keys.Take(900000))
             {
-                if (!fmap.Emplace(k, k))
+                if (!fmap.Add(k, k))
                 {
                     throw new InternalTestFailureException("Error occured while add");
                 }
@@ -121,7 +123,7 @@ namespace Faster.Map.Core.Tests
 
             foreach (var k in keys.Take(900000))
             {
-                if (!fmap.Emplace(k, k))
+                if (!fmap.Add(k, k))
                 {
                     throw new InternalTestFailureException("Error occured while removing");
                 }
@@ -137,9 +139,9 @@ namespace Faster.Map.Core.Tests
             var map = new DenseMapSIMD<uint, uint>(16);
 
             //act
-            var r1 = map.Emplace(1, 1);
+            var r1 = map.Add(1, 1);
 
-            var r2 = map.Emplace(1, 2);
+            var r2 = map.Add(1, 2);
 
             //assert
             Assert.AreEqual(r1, true);
@@ -151,7 +153,7 @@ namespace Faster.Map.Core.Tests
         {
             //arrange
             var map = new DenseMapSIMD<uint, uint>(16);
-            map.Emplace(1, 1);
+            map.Add(1, 1);
 
             //act
             map.Update(1, 100);
@@ -183,7 +185,7 @@ namespace Faster.Map.Core.Tests
         {
             //arrange
             var map = new DenseMapSIMD<uint, uint>(16);
-            map.Emplace(1, 1);
+            map.Add(1, 1);
 
             //act
             var result = map.Contains(1);
@@ -213,7 +215,7 @@ namespace Faster.Map.Core.Tests
             var map = new DenseMapSIMD<uint, uint>(16);
 
             //act
-            var result = map.Emplace(1, 1);
+            var result = map.Add(1, 1);
             map.Clear();
 
             //assert        
@@ -238,7 +240,7 @@ namespace Faster.Map.Core.Tests
         {
             //arrange
             var map = new DenseMapSIMD<uint, uint>(16);
-            map.Emplace(1, 1);
+            map.Add(1, 1);
 
             //act
             var result = map.Remove(1);
@@ -255,25 +257,25 @@ namespace Faster.Map.Core.Tests
             var map = new DenseMapSIMD<uint, uint>(16);
 
             //act    
-            map.Emplace(1, 1);
-            map.Emplace(2, 1);
-            map.Emplace(3, 1);
-            map.Emplace(4, 1);
-            map.Emplace(5, 1);
-            map.Emplace(6, 1);
-            map.Emplace(7, 1);
-            map.Emplace(8, 1);
-            map.Emplace(9, 1);
-            map.Emplace(10, 1);
-            map.Emplace(11, 1);
-            map.Emplace(12, 1);
-            map.Emplace(13, 1);
-            map.Emplace(14, 2);
-            map.Emplace(15, 1);
-            map.Emplace(16, 1);
-            map.Emplace(17, 1);
-            map.Emplace(18, 1);
-            map.Emplace(19, 1);
+            map.Add(1, 1);
+            map.Add(2, 1);
+            map.Add(3, 1);
+            map.Add(4, 1);
+            map.Add(5, 1);
+            map.Add(6, 1);
+            map.Add(7, 1);
+            map.Add(8, 1);
+            map.Add(9, 1);
+            map.Add(10, 1);
+            map.Add(11, 1);
+            map.Add(12, 1);
+            map.Add(13, 1);
+            map.Add(14, 2);
+            map.Add(15, 1);
+            map.Add(16, 1);
+            map.Add(17, 1);
+            map.Add(18, 1);
+            map.Add(19, 1);
 
             //assert  
             // 16 * 2) + 16
@@ -288,25 +290,25 @@ namespace Faster.Map.Core.Tests
             var map = new DenseMapSIMD<uint, uint>(16);
 
             //act    
-            map.Emplace(1, 1);
-            map.Emplace(2, 1);
-            map.Emplace(3, 1);
-            map.Emplace(4, 1);
-            map.Emplace(5, 1);
-            map.Emplace(6, 1);
-            map.Emplace(7, 1);
-            map.Emplace(8, 1);
-            map.Emplace(9, 1);
-            map.Emplace(10, 1);
-            map.Emplace(11, 1);
-            map.Emplace(12, 1);
-            map.Emplace(13, 1);
-            map.Emplace(14, 2);
-            map.Emplace(15, 1);
-            map.Emplace(16, 1);
-            map.Emplace(17, 1);
-            map.Emplace(18, 1);
-            map.Emplace(19, 1);
+            map.Add(1, 1);
+            map.Add(2, 1);
+            map.Add(3, 1);
+            map.Add(4, 1);
+            map.Add(5, 1);
+            map.Add(6, 1);
+            map.Add(7, 1);
+            map.Add(8, 1);
+            map.Add(9, 1);
+            map.Add(10, 1);
+            map.Add(11, 1);
+            map.Add(12, 1);
+            map.Add(13, 1);
+            map.Add(14, 2);
+            map.Add(15, 1);
+            map.Add(16, 1);
+            map.Add(17, 1);
+            map.Add(18, 1);
+            map.Add(19, 1);
 
             //assert  
             // 16 * 2) + 16
@@ -321,25 +323,25 @@ namespace Faster.Map.Core.Tests
             var map = new DenseMapSIMD<uint, uint>(16);
 
             //act    
-            map.Emplace(1, 1);
-            map.Emplace(2, 1);
-            map.Emplace(3, 1);
-            map.Emplace(4, 1);
-            map.Emplace(5, 1);
-            map.Emplace(6, 1);
-            map.Emplace(7, 1);
-            map.Emplace(8, 1);
-            map.Emplace(9, 1);
-            map.Emplace(10, 1);
-            map.Emplace(11, 1);
-            map.Emplace(12, 1);
-            map.Emplace(13, 1);
-            map.Emplace(14, 2);
-            map.Emplace(15, 1);
-            map.Emplace(16, 1);
-            map.Emplace(17, 1);
-            map.Emplace(18, 1);
-            map.Emplace(19, 1);
+            map.Add(1, 1);
+            map.Add(2, 1);
+            map.Add(3, 1);
+            map.Add(4, 1);
+            map.Add(5, 1);
+            map.Add(6, 1);
+            map.Add(7, 1);
+            map.Add(8, 1);
+            map.Add(9, 1);
+            map.Add(10, 1);
+            map.Add(11, 1);
+            map.Add(12, 1);
+            map.Add(13, 1);
+            map.Add(14, 2);
+            map.Add(15, 1);
+            map.Add(16, 1);
+            map.Add(17, 1);
+            map.Add(18, 1);
+            map.Add(19, 1);
 
             var result = map.Get(19, out var r1);
             //assert  
@@ -356,7 +358,7 @@ namespace Faster.Map.Core.Tests
             var map = new DenseMapSIMD<uint, uint>(16);
 
             //act    
-            map.Emplace(1, 5);
+            map.Add(1, 5);
 
             var result = map[1];
 
@@ -371,7 +373,7 @@ namespace Faster.Map.Core.Tests
             var map = new DenseMapSIMD<uint, uint>(16);
 
             //act    
-            map.Emplace(1, 5);
+            map.Add(1, 5);
 
             map[1] = 10;
 
@@ -389,7 +391,7 @@ namespace Faster.Map.Core.Tests
             var map = new DenseMapSIMD<uint, uint>(16);
 
             //act    
-            map.Emplace(1, 5);
+            map.Add(1, 5);
 
             //throws
             map[5] = 10;
@@ -404,7 +406,7 @@ namespace Faster.Map.Core.Tests
             var map = new DenseMapSIMD<uint, uint>(16);
 
             //act    
-            map.Emplace(1, 5);
+            map.Add(1, 5);
 
             //throws
             var x = map[5];
@@ -417,7 +419,7 @@ namespace Faster.Map.Core.Tests
             var map = new DenseMapSIMD<uint, uint>(16);
 
             //act
-            map.Emplace(1, 1);
+            map.Add(1, 1);
 
             //assert
             Assert.AreEqual(1, map.Count);
@@ -443,11 +445,11 @@ namespace Faster.Map.Core.Tests
             DenseMapSIMD<uint, uint> map = new DenseMapSIMD<uint, uint>(16);
             DenseMapSIMD<uint, uint> map2 = new DenseMapSIMD<uint, uint>(16);
 
-            map.Emplace(1, 1);
-            map.Emplace(2, 1);
+            map.Add(1, 1);
+            map.Add(2, 1);
 
-            map2.Emplace(3, 1);
-            map2.Emplace(4, 1);
+            map2.Add(3, 1);
+            map2.Add(4, 1);
 
             map.Copy(map2);
 
@@ -460,10 +462,10 @@ namespace Faster.Map.Core.Tests
             //assign
             DenseMapSIMD<uint, uint> map = new DenseMapSIMD<uint, uint>(16);
 
-            map.Emplace(1, 1);
-            map.Emplace(2, 2);
-            map.Emplace(3, 3);
-            map.Emplace(4, 4);
+            map.Add(1, 1);
+            map.Add(2, 2);
+            map.Add(3, 3);
+            map.Add(4, 4);
 
             //act
 
@@ -479,15 +481,33 @@ namespace Faster.Map.Core.Tests
         }
 
         [TestMethod]
+        public void AssertRemovingMultipleEntriesShouldResultInReuseOfTombstones()
+        {
+            //assign
+            DenseMapSIMD<uint, uint> map = new DenseMapSIMD<uint, uint>(16);
+
+            map.Add(1, 1);
+            map.Add(13, 2); 
+            map.Add(16, 3);
+            map.Add(111, 4);
+            //act
+            map.Remove(1);
+            //assert
+            map.Add(1, 1);
+
+            Assert.IsTrue(map.Count == 4);
+        }
+
+        [TestMethod]
         public void AssertEmplaceRemoveAndEmplaceAgainShouldLeaveTombstone()
         {
             //assign
             DenseMapSIMD<uint, uint> map = new DenseMapSIMD<uint, uint>(16);
 
             //act
-            map.Emplace(1, 1);
+            map.Add(1, 1);
             map.Remove(1);
-            map.Emplace(1, 2);
+            map.Add(1, 2);
 
             //assert
             map.Get(1, out var result);
@@ -505,7 +525,7 @@ namespace Faster.Map.Core.Tests
 
                 foreach (var k in keys.Take(900000))
                 {
-                    if (!map.Emplace(k, k))
+                    if (!map.Add(k, k))
                     {
                         throw new InternalTestFailureException("Error occured while add");
                     }
@@ -520,10 +540,10 @@ namespace Faster.Map.Core.Tests
             var map = new DenseMapSIMD<uint, uint>(16, 0.5);
 
             //act
-            map.Emplace(1, 1);
-            map.Emplace(2, 2);
-            map.Emplace(3, 2);
-            map.Emplace(4, 2);
+            map.Add(1, 1);
+            map.Add(2, 2);
+            map.Add(3, 2);
+            map.Add(4, 2);
 
             var count = 0;
             foreach (var item in map.Keys)
@@ -542,10 +562,10 @@ namespace Faster.Map.Core.Tests
             var map = new DenseMapSIMD<uint, uint>(16, 0.5);
 
             //act
-            map.Emplace(1, 1);
-            map.Emplace(2, 2);
-            map.Emplace(3, 2);
-            map.Emplace(4, 2);
+            map.Add(1, 1);
+            map.Add(2, 2);
+            map.Add(3, 2);
+            map.Add(4, 2);
 
             var count = 0;
             foreach (var item in map.Values)
@@ -564,10 +584,10 @@ namespace Faster.Map.Core.Tests
             var map = new DenseMapSIMD<uint, uint>(16, 0.5);
 
             //act
-            map.Emplace(1, 1);
-            map.Emplace(2, 2);
-            map.Emplace(3, 2);
-            map.Emplace(4, 2);
+            map.Add(1, 1);
+            map.Add(2, 2);
+            map.Add(3, 2);
+            map.Add(4, 2);
 
             var count = 0;
             foreach (var item in map.Entries)
@@ -586,8 +606,8 @@ namespace Faster.Map.Core.Tests
             var map = new DenseMapSIMD<int, int>(16, 0.5);
 
             //act
-            map.EmplaceOrUpdate(1, 1);
-            map.EmplaceOrUpdate(1, 2);
+            map.AddOrUpdate(1, 1);
+            map.AddOrUpdate(1, 2);
 
             map.Get(1, out var result);
 
@@ -694,11 +714,11 @@ namespace Faster.Map.Core.Tests
             Assert.IsTrue(keysList.Contains(missingKey), "Sanity check failed");
 
             var keysSet = new DenseMapSIMD<long, long>(190);
-            keysSet.Emplace(0L, 0L);
+            keysSet.Add(0L, 0L);
 
             foreach (var key in keysList)
             {
-                keysSet.Emplace(key, key);
+                keysSet.Add(key, key);
 
                 if (key == missingKey)
                 {
@@ -715,7 +735,7 @@ namespace Faster.Map.Core.Tests
         public void AssertAdjustCapacity()
         {
             var fmap = new DenseMapSIMD<long, long>(1);
-            fmap.Emplace(0L, 0L);
+            fmap.Add(0L, 0L);
 
             var r = fmap.Contains(1);
 

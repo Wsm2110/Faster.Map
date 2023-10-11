@@ -62,7 +62,7 @@ namespace Faster.Map.Benchmark
         {
             foreach (uint key in keys)
             {
-                _denseMapSIMD.Emplace(key, key);
+                _denseMapSIMD.Add(key, key);
             }
         }
 

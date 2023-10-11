@@ -3,8 +3,8 @@
   <PropertyGroup>
     <ImplicitUsings>false</ImplicitUsings>
     <Nullable>disable</Nullable>
-    <LangVersion>Latest</LangVersion>
-    <TargetFrameworks>net7.0</TargetFrameworks>
+    <LangVersion>preview</LangVersion>
+    <TargetFrameworks>net8.0</TargetFrameworks>
     <LangVersion>Latest</LangVersion>
     <Authors>Wiljan Ruizendaal</Authors>
     <PackageReleaseNotes>
