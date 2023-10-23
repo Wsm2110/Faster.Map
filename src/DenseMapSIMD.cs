@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 using Faster.Map.Core;
-using static System.Runtime.InteropServices.JavaScript.JSType;
+using Microsoft.Win32;
 
 namespace Faster.Map
 {
@@ -118,6 +118,7 @@ namespace Faster.Map
 
         private byte _shift = 32;
         private double _maxLookupsBeforeResize;
+        private uint _lengthMinusOne;
         private readonly double _loadFactor;
         private readonly IEqualityComparer<TKey> _comparer;
         private const sbyte _bitmask = 0b0111_1111; //127
@@ -190,6 +191,8 @@ namespace Faster.Map
 
             //fill metadata with emptybucket info
             Array.Fill(_metadata, _emptyBucket);
+
+            _lengthMinusOne = _length - 1;
         }
 
         #endregion
@@ -205,7 +208,7 @@ namespace Faster.Map
         /// <param name="value">The value.</param>
         /// <returns>returns false if key already exists</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Add(TKey key, TValue value)
+        public bool Emplace(TKey key, TValue value)
         {
             //Resize if loadfactor is reached
             if (Count >= _maxLookupsBeforeResize)
@@ -215,32 +218,25 @@ namespace Faster.Map
 
             // Get object identity hashcode
             var hashcode = (uint)key.GetHashCode();
-
             // Get 7 high bits
-            var h2 = hashcode & _bitmask;
-
+            var h2 = hashcode & 0B01111111;
             //Create vector of the 7 high bits
-            var target = Vector128.Create(Unsafe.As<long, sbyte>(ref h2));
-
+            var target = Vector128.Create(Unsafe.As<uint, sbyte>(ref h2));
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = hashcode * GoldenRatio >> _shift;
-
             //Set initial jumpdistance index
-            uint jumpDistance = 16;
+            uint jumpDistance = 0;
 
-            do
+            while (true)
             {
-                //load vector @ index
+                //Load vector @ index
                 var source = Vector128.LoadUnsafe(ref FindEntry(_metadata, index));
-
-                //get a bit sequence for matched hashcodes (h2s)
-                var bitPos = Vector128.Equals(target, source).ExtractMostSignificantBits();
-
+                //Get a bit sequence for matched hashcodes (h2s)
+                var mask = Vector128.Equals(source, target).ExtractMostSignificantBits();
                 //Check if key is unique
-                while (bitPos != 0)
+                while (mask != 0)
                 {
-                    var offset = BitOperations.TrailingZeroCount(bitPos);
-
+                    var offset = BitOperations.TrailingZeroCount(mask);
                     var entry = FindEntry(_entries, index + Unsafe.As<int, uint>(ref offset));
 
                     if (_comparer.Equals(entry.Key, key))
@@ -250,16 +246,18 @@ namespace Faster.Map
                     }
 
                     //clear bit
-                    bitPos &= ~(1u << offset);
+                    mask = ResetLowestSetBit(mask);
                 }
-
-                bitPos = source.ExtractMostSignificantBits();
+              
+                mask = source.ExtractMostSignificantBits();
                 //check for tombstones and empty entries 
-                if (bitPos != 0)
+                if (mask != 0)
                 {
-                    var offset = BitOperations.TrailingZeroCount(bitPos);
+                    var offset = BitOperations.TrailingZeroCount(mask);
                     //calculate proper index
                     index += Unsafe.As<int, uint>(ref offset);
+
+                    FindEntry(_metadata, index) = Unsafe.As<uint, sbyte>(ref h2);
 
                     //retrieve entry
                     ref var currentEntry = ref FindEntry(_entries, index);
@@ -267,12 +265,7 @@ namespace Faster.Map
                     //set key and value
                     currentEntry.Key = key;
                     currentEntry.Value = value;
-
-                    ref var metadata = ref FindEntry(_metadata, index);
-
-                    // add h2 to metadata
-                    metadata = Unsafe.As<long, sbyte>(ref h2);
-
+                   
                     ++Count;
                     return true;
                 }
@@ -285,24 +278,8 @@ namespace Faster.Map
 
                 jumpDistance += 16;
                 index += jumpDistance;
-
-                if (index > _length)
-                {
-                    // hashing to the top region of this hashmap always had some drawbacks
-                    // even when the table was half full the table would resize when the last 16 slots were full
-                    // and the jumpdistance exceeded the length of the array. this is not intended
-                    // 
-                    // when the index exceeds the length, which means all groups of 16 near the upper region of the map are full
-                    // reset the index and try probing again from the start this will enforce a secure and trustable hashmap which will always
-                    // resize when we reach a 90% load
-                    // Note these entries will not be properly cache alligned but in the end its well worth it
-                    //
-                    // adding jumpdistance to the index will prevent endless loops.
-                    // Every time this code block is entered jumpdistance will be different hence the index will be different too
-                    // thus it will always look for an empty spot
-                    index = Fmix(hashcode + jumpDistance) >> _shift;
-                }
-            } while (true);
+                index = index & _length - 1;
+            }
         }
 
         /// <summary>
@@ -450,24 +427,24 @@ namespace Faster.Map
             var target = Vector128.Create(Unsafe.As<uint, sbyte>(ref h2));
 
             //Set initial jumpdistance index
-            uint jumpDistance = 16;
+            uint jumpDistance = 0;
 
-            do
+            while (true)
             {
                 //load vector @ index
                 var source = Vector128.LoadUnsafe(ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(_metadata), index));
 
                 //get a bit sequence for matched hashcodes (h2s)
-                var bitPos = Vector128.Equals(target, source).ExtractMostSignificantBits();
+                var mask = Vector128.Equals(target, source).ExtractMostSignificantBits();
 
                 //Could be multiple bits which are set
-                while (bitPos != 0)
+                while (mask > 0)
                 {
                     //Retrieve offset 
-                    var offset = BitOperations.TrailingZeroCount(bitPos);
+                    var bitPos = BitOperations.TrailingZeroCount(mask);
 
                     //Get index and eq
-                    ref var entry = ref FindEntry(_entries, index + Unsafe.As<int, byte>(ref offset));
+                    var entry = FindEntry(_entries, index + Unsafe.As<int, byte>(ref bitPos));
 
                     //Use EqualityComparer to find proper entry
                     if (_comparer.Equals(entry.Key, key))
@@ -477,11 +454,11 @@ namespace Faster.Map
                     }
 
                     //clear bit
-                    bitPos = ResetLowestSetBit(bitPos);
+                    mask = ResetLowestSetBit(mask);
                 }
 
-                //Contains empty buckets;    
-                if (Vector128.EqualsAny(_emptyBucketVector, source))
+                //Contains empty buckets    
+                if (Vector128.Equals(source, target).ExtractMostSignificantBits() > 0)
                 {
                     value = default;
                     return false;
@@ -492,28 +469,10 @@ namespace Faster.Map
                 //Interestingly, this pattern perfectly lines up with our power-of-two size such that we will visit every single bucket exactly once without any repeats(searching is therefore guaranteed to terminate as we always have at least one EMPTY bucket).
                 //Also note that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
                 //Also note that we expect to almost never actually probe, since that’s WIDTH(16) non-EMPTY buckets we need to fail to find our key in.
-
                 jumpDistance += 16;
-                index += jumpDistance;
-
-                if (index >= _length)
-                {
-                    // hashing to the top region of this hashmap always had some drawbacks
-                    // even when the table was half full the table would resize when the last 16 slots were full
-                    // and the jumpdistance exceeded the length of the array. this is not intended
-                    // 
-                    // when the index exceeds the length, which means all groups of 16 near the upper region of the map are full
-                    // reset the index and try probing again from the start this will enforce a secure and trustable hashmap which will always
-                    // resize when we reach a 90% load
-                    // Note these entries will not be properly cache alligned but in the end its well worth it
-                    //                                    
-                    // adding jumpdistance to the index will prevent endless loops.
-                    // Every time this code block is entered jumpdistance will be different hence the index will be different too
-                    // thus it will always look for an empty spot to back out;
-                    index = Fmix((uint)hashcode + jumpDistance) >> _shift;
-                }
-
-            } while (true);
+                index += jumpDistance;                
+                index = index & _lengthMinusOne;
+            }
         }
 
         /// <summary>
@@ -902,7 +861,7 @@ namespace Faster.Map
                 }
 
                 var entry = denseMap._entries[i];
-                Add(entry.Key, entry.Value);
+                Emplace(entry.Key, entry.Value);
             }
         }
 
@@ -954,59 +913,35 @@ namespace Faster.Map
 
         #region Private Methods
 
-        /// <summary>
-        /// Emplaces a new entry without checking for key existence. Keys have already been checked and are unique
-        /// </summary>
-        /// <param name="entry">The entry.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void AddInternal(Entry<TKey, TValue> entry, sbyte h2)
+        uint ones32(uint x)
         {
-            //expensive if hashcode is slow, or when it`s not cached like strings
-            var hashcode = (uint)entry.Key.GetHashCode();
+            /* 32-bit recursive reduction using SWAR...
+           but first step is mapping 2-bit values
+           into sum of 2 1-bit values in sneaky way
+        */
+            x -= (x >> 1) & 0x55555555;
+            x = ((x >> 2) & 0x33333333) + (x & 0x33333333);
+            x = (((x >> 4) + x) & 0x0f0f0f0f);
+            x += (x >> 8);
+            x += (x >> 16);
+            return (x & 0x0000003f);
+        }
 
-            //calculate index by using object identity * fibonaci followed by a shift
-            uint index = hashcode * GoldenRatio >> _shift;
+        const long k1 = 0x5555555555555555;
+        const long k2 = 0x3333333333333333;
+        const long kf = 0x0101010101010101;
+        const long k4 = 0x0f0f0f0f0f0f0f0f;
 
-            //Set initial jumpdistance index
-            uint jumpDistance = 16;
 
-            do
-            {
-                //check for empty entries
-                var result = Vector128.LoadUnsafe(ref FindEntry(_metadata, index)).ExtractMostSignificantBits();
-                if (result != 0)
-                {
-                    var offset = BitOperations.TrailingZeroCount(result);
 
-                    index += Unsafe.As<int, uint>(ref offset);
-
-                    _metadata[index] = h2;
-                    _entries[index] = entry;
-                    return;
-                }
-
-                //Calculate jumpDistance
-                jumpDistance += 16;
-                index += jumpDistance;
-
-                if (index > _length)
-                {
-                    // hashing to the top region of this hashmap always had some drawbacks
-                    // even when the table was half full the table would resize when the last 16 slots were full
-                    // and the jumpdistance exceeded the length of the array. this is not intended
-                    // 
-                    // when the index exceeds the length, which means all groups of 16 near the upper region of the map are full
-                    // reset the index and try probing again from the start this will enforce a secure and trustable hashmap which will always
-                    // resize when we reach a 90% load
-                    // Note these entries will not be properly cache alligned but in the end its well worth it
-                    //
-                    // adding jumpdistance to the index will prevent endless loops.
-                    // Every time this code block is entered jumpdistance will be different hence the index will be different too
-                    // thus it will always look for an empty spot
-                    index = Fmix(hashcode + jumpDistance) >> _shift;
-                }
-
-            } while (true);
+        int popCount(long x)
+        {
+            x = x - ((x >> 1) & k1); /* put count of each 2 bits into those 2 bits */
+            x = (x & k2) + ((x >> 2) & k2); /* put count of each 4 bits into those 4 bits */
+            x = (x + (x >> 4)) & k4; /* put count of each 8 bits into those 8 bits */
+            x = (x * kf) >> 56; /* returns 8 most significant bits of x + (x<<8) + (x<<16) + (x<<24) + ...  */
+            return (int)x;
         }
 
         /// <summary>
@@ -1018,6 +953,7 @@ namespace Faster.Map
 
             //next power of 2
             _length = _length * 2;
+            _lengthMinusOne = _length - 1;
             _maxLookupsBeforeResize = _length * _loadFactor;
 
             var oldEntries = _entries;
@@ -1025,21 +961,47 @@ namespace Faster.Map
 
             var size = Unsafe.As<uint, int>(ref _length) + 16;
 
-            _metadata = GC.AllocateUninitializedArray<sbyte>(size);
+            _metadata = GC.AllocateArray<sbyte>(size);
             _entries = GC.AllocateUninitializedArray<Entry<TKey, TValue>>(size);
 
             _metadata.AsSpan().Fill(_emptyBucket);
 
-            for (var i = 0; i < oldEntries.Length; ++i)
+            for (uint i = 0; i < oldEntries.Length; ++i)
             {
-
-                var m = oldMetadata[i];
-                if (m < 0)
+                var h2 = FindEntry(oldMetadata, i);
+                if (h2 < 0)
                 {
                     continue;
                 }
 
-                AddInternal(oldEntries[i], m);
+                var entry = FindEntry(oldEntries, i);
+
+                //expensive if hashcode is slow, or when it`s not cached like strings
+                var hashcode = (uint)entry.Key.GetHashCode();
+                //calculate index by using object identity * fibonaci followed by a shift
+                uint index = hashcode * GoldenRatio >> _shift;
+                //Set initial jumpdistance index
+                uint jumpDistance = 0;
+
+                while (true)
+                {
+                    //check for empty entries
+                    var result = Vector128.LoadUnsafe(ref FindEntry(_metadata, index)).ExtractMostSignificantBits();
+                    if (result != 0)
+                    {
+                        var offset = BitOperations.TrailingZeroCount(result);
+
+                        index += Unsafe.As<int, uint>(ref offset);
+
+                        FindEntry(_metadata, index) = h2;
+                        FindEntry(_entries, index) = entry;
+                        break;
+                    }
+
+                    jumpDistance += 16;
+                    index += jumpDistance;
+                    index = index & _lengthMinusOne;
+                }
             }
         }
 
@@ -1066,6 +1028,22 @@ namespace Faster.Map
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static uint RotateLeft(uint value, int offset) => (value << offset) | (value >> (32 - offset));
+
+        uint msb32(uint x)
+        {
+            x |= (x >> 1);
+            x |= (x >> 2);
+            x |= (x >> 4);
+            x |= (x >> 8);
+            x |= (x >> 16);
+            return (x & ~(x >> 1));
+        }
+
+        uint tzc(uint x)
+        {
+            var s = (x & -x) - 1;
+            return ones32(Unsafe.As<long, uint>(ref s));
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static uint Fmix(uint h)

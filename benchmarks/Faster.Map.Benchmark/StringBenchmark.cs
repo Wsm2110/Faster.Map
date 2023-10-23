@@ -41,7 +41,7 @@ namespace Faster.Map.Benchmark
             foreach (var key in keys)
             {
                 dic.Add(key, key);
-                _denseMapSIMD.Add(key, key);
+                _denseMapSIMD.Emplace(key, key);
                 _dense.Emplace(key, key);
                 _slim.GetOrAddValueRef(key);
             }
