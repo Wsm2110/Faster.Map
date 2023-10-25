@@ -1,4 +1,5 @@
 ﻿using BenchmarkDotNet.Attributes;
+using Faster.Map.Experimental;
 using Microsoft.Collections.Extensions;
 using System;
 using System.Collections.Generic;
@@ -15,7 +16,7 @@ namespace Faster.Map.Benchmark
         #region Fields
 
         FastMap<uint, uint> _fastMap = new FastMap<uint, uint>();
-        DenseMap<uint, uint> _denseMap = new DenseMap<uint, uint>();
+        QuadMap<uint, uint> _denseMap = new QuadMap<uint, uint>();
         DenseMapSIMD<uint, uint> _denseMapSimd = new DenseMapSIMD<uint, uint>();
         private Dictionary<uint, uint> dic = new Dictionary<uint, uint>();
         private DictionarySlim<uint, uint> _slim = new DictionarySlim<uint, uint>();
@@ -47,7 +48,7 @@ namespace Faster.Map.Benchmark
         public void ResetMaps()
         {
             _denseMapSimd = new DenseMapSIMD<uint, uint>();
-            _denseMap = new DenseMap<uint, uint>();
+            _denseMap = new QuadMap<uint, uint>();
             dic = new Dictionary<uint, uint>();
             _slim = new DictionarySlim<uint, uint>();
             _fastMap = new FastMap<uint, uint>();

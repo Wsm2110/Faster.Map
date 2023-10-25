@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using BenchmarkDotNet.Attributes;
+using Faster.Map.Experimental;
 using Microsoft.Collections.Extensions;
 
 namespace Faster.Map.Benchmark
@@ -49,10 +50,10 @@ namespace Faster.Map.Benchmark
         public void ResetMaps()
         {
             _denseMapSIMD.Clear();
-            //_dense.Clear();
-            //dic.Clear();
-            //_slim.Clear();
-            //_fastMap.Clear();
+            _dense.Clear();
+            dic.Clear();
+            _slim.Clear();
+            _fastMap.Clear();
         }
 
         #region Benchmarks
@@ -66,41 +67,41 @@ namespace Faster.Map.Benchmark
             }
         }
 
-        //[Benchmark]
-        //public void DenseMap()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        _dense.Emplace(key, key);
-        //    }
-        //}
+        [Benchmark]
+        public void DenseMap()
+        {
+            foreach (var key in keys)
+            {
+                _dense.Emplace(key, key);
+            }
+        }
 
-        //[Benchmark]
-        //public void FastMap()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        _fastMap.Emplace(key, key);
-        //    }
-        //}
+        [Benchmark]
+        public void FastMap()
+        {
+            foreach (var key in keys)
+            {
+                _fastMap.Emplace(key, key);
+            }
+        }
 
-        //[Benchmark]
-        //public void Dictionary()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        dic.Add(key, key);
-        //    }
-        //}
+        [Benchmark]
+        public void Dictionary()
+        {
+            foreach (var key in keys)
+            {
+                dic.Add(key, key);
+            }
+        }
 
-        //[Benchmark]
-        //public void DictionarySlim()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        _slim.GetOrAddValueRef(key);
-        //    }
-        //}
+        [Benchmark]
+        public void DictionarySlim()
+        {
+            foreach (var key in keys)
+            {
+                _slim.GetOrAddValueRef(key);
+            }
+        }
 
         #endregion
 

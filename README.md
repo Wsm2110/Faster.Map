@@ -57,23 +57,21 @@ private DenseMapSIMD<uint, uint> _map = new DenseMapSIMD<uint, uint>(16);
 
 ``` ini
 
-BenchmarkDotNet=v0.13.1, OS=Windows 10.0.22621
+BenchmarkDotNet v0.13.8, Windows 11 (10.0.22621.2428/22H2/2022Update/SunValley2)
 12th Gen Intel Core i5-12500H, 1 CPU, 16 logical and 12 physical cores
-.NET SDK=7.0.101
-  [Host]     : .NET 7.0.1 (7.0.122.56804), X64 RyuJIT
-  Job-HLVSMK : .NET 7.0.1 (7.0.122.56804), X64 RyuJIT
-
-InvocationCount=1  UnrollFactor=1  
-
+.NET SDK 8.0.100-rc.1.23463.5
+  [Host]     : .NET 8.0.0 (8.0.23.41904), X64 RyuJIT AVX2
+  DefaultJob : .NET 8.0.0 (8.0.23.41904), X64 RyuJIT AVX2
 
 ### Retrieving a million random generated keys
-|         Method |      Mean |     Error |    StdDev |
-|--------------- |----------:|----------:|----------:|
-|   DenseMapSIMD |  6.224 ms | 0.0860 ms | 0.0762 ms |    
-|       DenseMap | 11.873 ms | 0.1705 ms | 0.1595 ms |    
-|        FastMap |  7.775 ms | 0.1016 ms | 0.0901 ms |    
-| SlimDictionary | 12.174 ms | 0.1368 ms | 0.1279 ms |    
-|     Dictionary | 14.816 ms | 0.2798 ms | 0.3331 ms |    
+
+| Method         | Mean      | Error     | StdDev    | Code Size | Allocated |
+|--------------- |----------:|----------:|----------:|----------:|----------:|
+| DenseMapSIMD   |  5.191 ms | 0.0668 ms | 0.0592 ms |     276 B |       6 B |
+| DenseMap       |  9.600 ms | 0.1915 ms | 0.3689 ms |     247 B |      12 B |
+| FastMap        | 15.392 ms | 0.2994 ms | 0.5399 ms |     119 B |      12 B |
+| SlimDictionary |  9.589 ms | 0.1804 ms | 0.1687 ms |     393 B |      12 B |
+| Dictionary     | 12.271 ms | 0.1204 ms | 0.1006 ms |     407 B |      12 B |   
 
 ### Adding a million keys
 |         Method |     Mean |    Error |   StdDev |   Median |

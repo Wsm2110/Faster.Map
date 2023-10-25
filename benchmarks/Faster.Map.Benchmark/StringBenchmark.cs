@@ -1,4 +1,5 @@
 ﻿using BenchmarkDotNet.Attributes;
+using Faster.Map.Experimental;
 using Microsoft.Collections.Extensions;
 using System;
 using System.Collections.Generic;
@@ -11,7 +12,7 @@ namespace Faster.Map.Benchmark
     {
         #region Fields
 
-        private DenseMap<string, string> _dense = new DenseMap<string, string>();
+        private QuadMap<string, string> _dense = new QuadMap<string, string>();
         private DenseMapSIMD<string, string> _denseMapSIMD = new DenseMapSIMD<string, string>();
 
         private Dictionary<string, string> dic = new Dictionary<string, string>();

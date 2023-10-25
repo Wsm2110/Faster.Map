@@ -669,7 +669,7 @@ namespace Faster.Map.Core.Tests
             var map = new DenseMapSIMD<int, int>(16, 0.5);
 
             //act
-            ref var value = ref map.GetOrAddValueRef(1);
+            ref var value = ref map.GetOrAdd(1);
 
             //assert
             Assert.AreEqual(0, value);
@@ -682,7 +682,7 @@ namespace Faster.Map.Core.Tests
             var map = new DenseMapSIMD<int, int>(16, 0.5);
 
             //act
-            ref var value = ref map.GetOrAddValueRef(1);
+            ref var value = ref map.GetOrAdd(1);
 
             value = 100;
 
@@ -699,7 +699,7 @@ namespace Faster.Map.Core.Tests
             var map = new DenseMapSIMD<int, int>(16, 0.5);
 
             //act
-            ref var value = ref map.GetOrAddValueRef(1);
+            ref var value = ref map.GetOrAdd(1);
 
             value = 100;
 
@@ -716,7 +716,7 @@ namespace Faster.Map.Core.Tests
         {
             //assign
             var counterMap = new DenseMapSIMD<uint, uint>(16, 0.5);
-            ref var counter = ref counterMap.GetOrAddValueRef(1);
+            ref var counter = ref counterMap.GetOrAdd(1);
 
             //act
             ++counter;

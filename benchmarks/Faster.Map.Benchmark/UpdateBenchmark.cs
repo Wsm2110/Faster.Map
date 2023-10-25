@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using BenchmarkDotNet.Attributes;
+using Faster.Map.Experimental;
 using Microsoft.Collections.Extensions;
 
 namespace Faster.Map.Benchmark
@@ -66,23 +67,23 @@ namespace Faster.Map.Benchmark
 
         #region Benchmarks
 
-        //[Benchmark]
-        //public void UpdateSlim()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        _slim.GetOrAddValueRef(key) = 222;
-        //    }
-        //}
+        [Benchmark]
+        public void UpdateSlim()
+        {
+            foreach (var key in keys)
+            {
+                _slim.GetOrAddValueRef(key) = 222;
+            }
+        }
 
-        //[Benchmark]
-        //public void Dictionary()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        dic[key] = 222;
-        //    }
-        //}
+        [Benchmark]
+        public void Dictionary()
+        {
+            foreach (var key in keys)
+            {
+                dic[key] = 222;
+            }
+        }
 
         [Benchmark]
         public void DenseMapSIMD()
@@ -93,23 +94,23 @@ namespace Faster.Map.Benchmark
             }
         }
 
-        //[Benchmark]
-        //public void FastMap()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        _fastMap.Update(key, 222);
-        //    }
-        //}
+        [Benchmark]
+        public void FastMap()
+        {
+            foreach (var key in keys)
+            {
+                _fastMap.Update(key, 222);
+            }
+        }
 
-        //[Benchmark]
-        //public void DenseMap()
-        //{
-        //    for (uint i = 0; i < _length; i++)
-        //    {
-        //        _denseMap.Update(keys[i], 222);
-        //    }
-        //}
+        [Benchmark]
+        public void DenseMap()
+        {
+            for (uint i = 0; i < _length; i++)
+            {
+                _denseMap.Update(keys[i], 222);
+            }
+        }
 
         #endregion
     }

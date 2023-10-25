@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using BenchmarkDotNet.Attributes;
+using Faster.Map.Experimental;
 using Microsoft.Collections.Extensions;
 
 namespace Faster.Map.Benchmark
@@ -75,32 +76,32 @@ namespace Faster.Map.Benchmark
 
         #region Benchmarks
 
-        //[Benchmark]
-        //public void SlimDictionary()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        _slim.Remove(key);
-        //    }
-        //}
+        [Benchmark]
+        public void SlimDictionary()
+        {
+            foreach (var key in keys)
+            {
+                _slim.Remove(key);
+            }
+        }
 
-        //[Benchmark]
-        //public void Dictionary()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        dic.Remove(key, out var result);
-        //    }
-        //}
+        [Benchmark]
+        public void Dictionary()
+        {
+            foreach (var key in keys)
+            {
+                dic.Remove(key, out var result);
+            }
+        }
 
-        //[Benchmark]
-        //public void FastMap()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        _fastMap.Remove(key);
-        //    }
-        //}
+        [Benchmark]
+        public void FastMap()
+        {
+            foreach (var key in keys)
+            {
+                _fastMap.Remove(key);
+            }
+        }
 
         [Benchmark]
         public void DenseMapSIMD()
@@ -111,14 +112,14 @@ namespace Faster.Map.Benchmark
             }
         }
 
-        //[Benchmark]
-        //public void DenseMap()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        _denseMap.Remove(key);
-        //    }
-        //}
+        [Benchmark]
+        public void DenseMap()
+        {
+            foreach (var key in keys)
+            {
+                _denseMap.Remove(key);
+            }
+        }
 
         #endregion
 

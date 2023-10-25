@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using Microsoft.Collections.Extensions;
 using System.Diagnostics;
+using Faster.Map.Experimental;
 
 namespace Faster.Map.Benchmark
 {
@@ -71,41 +72,41 @@ namespace Faster.Map.Benchmark
         }
 
 
-        //[Benchmark]
-        //public void DenseMap()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        _denseMap.Get(key, out var result);
-        //    }
-        //}
+        [Benchmark]
+        public void DenseMap()
+        {
+            foreach (var key in keys)
+            {
+                _denseMap.Get(key, out var result);
+            }
+        }
 
-        //[Benchmark]
-        //public void FastMap()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        _fastMap.Get(key, out var result);
-        //    }
-        //}
+        [Benchmark]
+        public void FastMap()
+        {
+            foreach (var key in keys)
+            {
+                _fastMap.Get(key, out var result);
+            }
+        }
 
-        //[Benchmark]
-        //public void SlimDictionary()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        _slim.GetOrAddValueRef(key);
-        //    }
-        //}
+        [Benchmark]
+        public void SlimDictionary()
+        {
+            foreach (var key in keys)
+            {
+                _slim.GetOrAddValueRef(key);
+            }
+        }
 
-        //[Benchmark]
-        //public void Dictionary()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        dic.TryGetValue(key, out var result);
-        //    }
-        //}
+        [Benchmark]
+        public void Dictionary()
+        {
+            foreach (var key in keys)
+            {
+                dic.TryGetValue(key, out var result);
+            }
+        }
 
     }
 }
