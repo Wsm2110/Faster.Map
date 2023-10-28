@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace Faster.Map.Core
@@ -10,8 +11,9 @@ namespace Faster.Map.Core
     /// <typeparam name="TValue">The type of the value.</typeparam>
     [DebuggerDisplay("hashcode  {Key.GetHashCode() }")]
     [StructLayout(LayoutKind.Sequential)]
-    public struct Entry<TKey, TValue>
+    public struct EntryTwo<TKey, TValue>
     {
+        public int Hashcode;
         /// <summary>
         /// Gets or sets the key.
         /// </summary>
@@ -28,6 +30,4 @@ namespace Faster.Map.Core
         /// </value>
         public TValue Value;
     }
-
-
 }

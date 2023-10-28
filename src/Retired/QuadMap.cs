@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Faster.Map.Core;
 
-namespace Faster.Map
+namespace Faster.Map.Old
 {
     /// <summary>
     /// This hashmap uses the following
@@ -14,7 +14,7 @@ namespace Faster.Map
     /// Fibonacci hashing
     /// Default loadfactor is 0.5
     /// </summary>
-    public class DenseMap<TKey, TValue>
+    public class QuadMap<TKey, TValue>
     {
         #region Properties
 
@@ -122,20 +122,20 @@ namespace Faster.Map
         /// <summary>
         /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class.
         /// </summary>
-        public DenseMap() : this(8, 0.5d, EqualityComparer<TKey>.Default) { }
+        public QuadMap() : this(8, 0.5d, EqualityComparer<TKey>.Default) { }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class.
         /// </summary>
         /// <param name="length">The length of the hashmap. Will always take the closest power of two</param>
-        public DenseMap(uint length) : this(length, 0.5d, EqualityComparer<TKey>.Default) { }
+        public QuadMap(uint length) : this(length, 0.5d, EqualityComparer<TKey>.Default) { }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class.
         /// </summary>
         /// <param name="length">The length of the hashmap. Will always take the closest power of two</param>
         /// <param name="loadFactor">The loadfactor determines when the hashmap will resize(default is 0.5d) i.e size 32 loadfactor 0.5 hashmap will resize at 16</param>
-        public DenseMap(uint length, double loadFactor) : this(length, loadFactor, EqualityComparer<TKey>.Default) { }
+        public QuadMap(uint length, double loadFactor) : this(length, loadFactor, EqualityComparer<TKey>.Default) { }
 
         /// <summary>
         /// Initializes a new instance of class.
@@ -143,7 +143,7 @@ namespace Faster.Map
         /// <param name="length">The length of the hashmap. Will always take the closest power of two</param>
         /// <param name="loadFactor">The loadfactor determines when the hashmap will resize(default is 0.5d) i.e size 32 loadfactor 0.5 hashmap will resize at 16</param>
         /// <param name="keyComparer">Used to compare keys to resolve hashcollisions</param>
-        public DenseMap(uint length, double loadFactor, IEqualityComparer<TKey> keyComparer)
+        public QuadMap(uint length, double loadFactor, IEqualityComparer<TKey> keyComparer)
         {
             //default length is 8
             _length = length;
@@ -163,7 +163,7 @@ namespace Faster.Map
                 _length = BitOperations.RoundUpToPowerOf2(_length);
             }
 
-            _maxLookupsBeforeResize = (_length * loadFactor);
+            _maxLookupsBeforeResize = _length * loadFactor;
             _comparer = keyComparer ?? EqualityComparer<TKey>.Default;
 
             _shift = _shift - BitOperations.Log2(_length);
@@ -301,7 +301,7 @@ namespace Faster.Map
                 if (h2 == metadata && _comparer.Equals(key, entry.Key))
                 {
                     // Update existing value
-                    entry.Value = value;                
+                    entry.Value = value;
                     return;
                 }
 
@@ -362,7 +362,7 @@ namespace Faster.Map
                 jumpDistance += 1;
                 index += jumpDistance;
                 index = index & _lengthMinusOne;
-            } 
+            }
         }
 
         /// <summary>
@@ -523,7 +523,7 @@ namespace Faster.Map
         /// Copies entries from one map to another
         /// </summary>
         /// <param name="denseMap">The map.</param>
-        public void Copy(DenseMap<TKey, TValue> denseMap)
+        public void Copy(QuadMap<TKey, TValue> denseMap)
         {
             for (var i = 0; i < denseMap._entries.Length; ++i)
             {

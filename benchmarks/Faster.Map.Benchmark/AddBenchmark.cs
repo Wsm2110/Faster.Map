@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using BenchmarkDotNet.Attributes;
-using Faster.Map.Experimental;
 using Microsoft.Collections.Extensions;
 
 namespace Faster.Map.Benchmark
@@ -16,9 +15,7 @@ namespace Faster.Map.Benchmark
         #region Fields
 
         //fixed size, dont want to measure resize()
-        FastMap<uint, uint> _fastMap = new FastMap<uint, uint>(1000000); // remove resizing from benchmark hence the 2000000 size
         DenseMap<uint, uint> _dense = new DenseMap<uint, uint>(1000000);
-        DenseMapSIMD<uint, uint> _denseMapSIMD = new DenseMapSIMD<uint, uint>(1000000);
         private Dictionary<uint, uint> dic = new Dictionary<uint, uint>(1000000);
         private DictionarySlim<uint, uint> _slim = new DictionarySlim<uint, uint>(1000000);
         private uint[] keys;
@@ -42,30 +39,20 @@ namespace Faster.Map.Benchmark
             for (var index = 0; index < _length; index++)
             {
                 keys[index] = uint.Parse(splittedOutput[index]);
-            }           
+            }
             //  Shuffle(new Random(), keys);
         }
 
         [IterationCleanup]
         public void ResetMaps()
-        {
-            _denseMapSIMD.Clear();
+        {           
             _dense.Clear();
             dic.Clear();
-            _slim.Clear();
-            _fastMap.Clear();
+            _slim.Clear();         
         }
 
         #region Benchmarks
-
-        [Benchmark]
-        public void DenseMapSIMD()
-        {
-            foreach (uint key in keys)
-            {
-                _denseMapSIMD.Emplace(key, key);
-            }
-        }
+            
 
         [Benchmark]
         public void DenseMap()
@@ -74,16 +61,7 @@ namespace Faster.Map.Benchmark
             {
                 _dense.Emplace(key, key);
             }
-        }
-
-        [Benchmark]
-        public void FastMap()
-        {
-            foreach (var key in keys)
-            {
-                _fastMap.Emplace(key, key);
-            }
-        }
+        }       
 
         [Benchmark]
         public void Dictionary()

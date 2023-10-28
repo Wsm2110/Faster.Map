@@ -1,12 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Numerics;
-using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 using Faster.Map.Core;
-using Microsoft.Win32;
 
 namespace Faster.Map
 {
@@ -20,7 +18,7 @@ namespace Faster.Map
     /// - First-come-first-serve collision resolution    
     /// - Tombstones to avoid backshifts
     /// </summary>
-    public class DenseMapSIMD<TKey, TValue>
+    public class DenseMap<TKey, TValue>
     {
         #region Properties
 
@@ -130,22 +128,22 @@ namespace Faster.Map
         #region Constructor
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="DenseMapSIMD{TKey,TValue}"/> class.
+        /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class.
         /// </summary>
-        public DenseMapSIMD() : this(16, 0.90, EqualityComparer<TKey>.Default) { }
+        public DenseMap() : this(16, 0.90, EqualityComparer<TKey>.Default) { }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="DenseMapSIMD{TKey,TValue}"/> class.
+        /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class.
         /// </summary>
         /// <param name="length">The length of the hashmap. Will always take the closest power of two</param>
-        public DenseMapSIMD(uint length) : this(length, 0.90, EqualityComparer<TKey>.Default) { }
+        public DenseMap(uint length) : this(length, 0.90, EqualityComparer<TKey>.Default) { }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="DenseMapSIMD{TKey,TValue}"/> class.
+        /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class.
         /// </summary>
         /// <param name="length">The length of the hashmap. Will always take the closest power of two</param>
         /// <param name="loadFactor">The loadfactor determines when the hashmap will resize(default is 0.9d)</param>
-        public DenseMapSIMD(uint length, double loadFactor) : this(length, loadFactor, EqualityComparer<TKey>.Default) { }
+        public DenseMap(uint length, double loadFactor) : this(length, loadFactor, EqualityComparer<TKey>.Default) { }
 
         /// <summary>
         /// Initializes a new instance of class.
@@ -153,7 +151,7 @@ namespace Faster.Map
         /// <param name="length">The length of the hashmap. Will always take the closest power of two</param>
         /// <param name="loadFactor">The loadfactor determines when the hashmap will resize(default is 0.9d)</param>
         /// <param name="keyComparer">Used to compare keys to resolve hashcollisions</param>
-        public DenseMapSIMD(uint length, double loadFactor, IEqualityComparer<TKey> keyComparer)
+        public DenseMap(uint length, double loadFactor, IEqualityComparer<TKey> keyComparer)
         {
             if (!Vector128.IsHardwareAccelerated)
             {
@@ -231,14 +229,14 @@ namespace Faster.Map
             while (true)
             {
                 //Load vector @ index
-                var source = Vector128.LoadUnsafe(ref FindEntry(_metadata, index));
+                var source = Vector128.LoadUnsafe(ref Find(_metadata, index));
                 //Get a bit sequence for matched hashcodes (h2s)
                 var mask = Vector128.Equals(source, target).ExtractMostSignificantBits();
                 //Check if key is unique
                 while (mask != 0)
                 {
                     var offset = BitOperations.TrailingZeroCount(mask);
-                    var entry = FindEntry(_entries, index + Unsafe.As<int, uint>(ref offset));
+                    var entry = Find(_entries, index + Unsafe.As<int, uint>(ref offset));
 
                     if (_comparer.Equals(entry.Key, key))
                     {
@@ -258,10 +256,10 @@ namespace Faster.Map
                     //calculate proper index
                     index += Unsafe.As<int, uint>(ref offset);
 
-                    FindEntry(_metadata, index) = Unsafe.As<uint, sbyte>(ref h2);
+                    Find(_metadata, index) = Unsafe.As<uint, sbyte>(ref h2);
 
                     //retrieve entry
-                    ref var currentEntry = ref FindEntry(_entries, index);
+                    ref var currentEntry = ref Find(_entries, index);
 
                     //set key and value
                     currentEntry.Key = key;
@@ -292,8 +290,8 @@ namespace Faster.Map
         ///
         /// var map = new DenseMapSIMD<uint, uint>(16, 0.5);
         ///
-        /// map.EmplaceOrUpdate(1, 50);
-        /// map.EmplaceOrUpdate(1, 60);
+        /// map.AddOrUpdate(1, 50);
+        /// map.AddOrUpdate(1, 60);
         ///
         /// var result = map.Get(1, out var result)
         ///
@@ -325,14 +323,14 @@ namespace Faster.Map
             while (true)
             {
                 //load vector @ index
-                var source = Vector128.LoadUnsafe(ref FindEntry(_metadata, index));
+                var source = Vector128.LoadUnsafe(ref Find(_metadata, index));
                 //get a bit sequence for matched hashcodes (h2s)
                 var mask = Vector128.Equals(target, source).ExtractMostSignificantBits();
                 //Check if key is unique
                 while (mask != 0)
                 {
                     var bitPos = BitOperations.TrailingZeroCount(mask);
-                    ref var entry = ref FindEntry(_entries, index + Unsafe.As<int, uint>(ref bitPos));
+                    ref var entry = ref Find(_entries, index + Unsafe.As<int, uint>(ref bitPos));
 
                     if (_comparer.Equals(entry.Key, key))
                     {
@@ -354,13 +352,13 @@ namespace Faster.Map
                     index += Unsafe.As<int, uint>(ref offset);
 
                     //retrieve entry
-                    ref var currentEntry = ref FindEntry(_entries, index);
+                    ref var currentEntry = ref Find(_entries, index);
 
                     //set key and value
                     currentEntry.Key = key;
                     currentEntry.Value = value;
 
-                    ref var metadata = ref FindEntry(_metadata, index);
+                    ref var metadata = ref Find(_metadata, index);
 
                     // add h2 to metadata
                     metadata = Unsafe.As<uint, sbyte>(ref h2);
@@ -412,7 +410,7 @@ namespace Faster.Map
                     //Retrieve offset 
                     var bitPos = BitOperations.TrailingZeroCount(mask);
                     //Get index and eq
-                    var entry = FindEntry(_entries, index + Unsafe.As<int, byte>(ref bitPos));
+                    var entry = Find(_entries, index + Unsafe.As<int, byte>(ref bitPos));
                     //Use EqualityComparer to find proper entry
                     if (_comparer.Equals(entry.Key, key))
                     {
@@ -476,7 +474,7 @@ namespace Faster.Map
             while (true)
             {
                 //load vector @ index
-                var source = Vector128.LoadUnsafe(ref FindEntry(_metadata, index));
+                var source = Vector128.LoadUnsafe(ref Find(_metadata, index));
                 //get a bit sequence for matched hashcodes (h2s)
                 var mask = Vector128.Equals(target, source).ExtractMostSignificantBits();
                 //Could be multiple bits which are set
@@ -486,7 +484,7 @@ namespace Faster.Map
                     var bitPos = BitOperations.TrailingZeroCount(mask);
 
                     //Get index and eq
-                    ref var entry = ref FindEntry(_entries, index + Unsafe.As<int, uint>(ref bitPos));
+                    ref var entry = ref Find(_entries, index + Unsafe.As<int, uint>(ref bitPos));
 
                     //Use EqualityComparer to find proper entry
                     if (_comparer.Equals(entry.Key, key))
@@ -507,13 +505,13 @@ namespace Faster.Map
                     index += Unsafe.As<int, uint>(ref offset);
 
                     //retrieve entry
-                    ref var currentEntry = ref FindEntry(_entries, index);
+                    ref var currentEntry = ref Find(_entries, index);
 
                     //set key and value
                     currentEntry.Key = key;
                     currentEntry.Value = default;
 
-                    ref var metadata = ref FindEntry(_metadata, index);
+                    ref var metadata = ref Find(_metadata, index);
 
                     // add h2 to metadata
                     metadata = Unsafe.As<uint, sbyte>(ref h2);
@@ -558,7 +556,7 @@ namespace Faster.Map
             while (true)
             {
                 //load vector @ index
-                var source = Vector128.LoadUnsafe(ref FindEntry(_metadata, index));
+                var source = Vector128.LoadUnsafe(ref Find(_metadata, index));
 
                 //get a bit sequence for matched hashcodes (h2s)
                 var mask = Vector128.Equals(source, target).ExtractMostSignificantBits();
@@ -570,7 +568,7 @@ namespace Faster.Map
                     var offset = BitOperations.TrailingZeroCount(mask);
 
                     //get index and eq
-                    ref var entry = ref FindEntry(_entries, index + Unsafe.As<int, uint>(ref offset));
+                    ref var entry = ref Find(_entries, index + Unsafe.As<int, uint>(ref offset));
 
                     if (_comparer.Equals(entry.Key, key))
                     {
@@ -624,7 +622,7 @@ namespace Faster.Map
             while (true)
             {
                 //load vector @ index
-                var source = Vector128.LoadUnsafe(ref FindEntry(_metadata, index));
+                var source = Vector128.LoadUnsafe(ref Find(_metadata, index));
                 //get a bit sequence for matched hashcodes (h2s)
                 var mask = Vector128.Equals(target, source).ExtractMostSignificantBits();
                 //Could be multiple bits which are set
@@ -633,9 +631,9 @@ namespace Faster.Map
                     //retrieve offset 
                     var bitPos = BitOperations.TrailingZeroCount(mask);
 
-                    if (_comparer.Equals(FindEntry(_entries, index + Unsafe.As<int, uint>(ref bitPos)).Key, key))
+                    if (_comparer.Equals(Find(_entries, index + Unsafe.As<int, uint>(ref bitPos)).Key, key))
                     {
-                        FindEntry(_metadata, index + Unsafe.As<int, uint>(ref bitPos)) = _tombstone;
+                        Find(_metadata, index + Unsafe.As<int, uint>(ref bitPos)) = _tombstone;
                         --Count;
                         return true;
                     }
@@ -684,7 +682,7 @@ namespace Faster.Map
             while (true)
             {
                 //load vector @ index
-                var source = Vector128.LoadUnsafe(ref FindEntry(_metadata, index));
+                var source = Vector128.LoadUnsafe(ref Find(_metadata, index));
                 //get a bit sequence for matched hashcodes (h2s)
                 var mask = Vector128.Equals(target, source).ExtractMostSignificantBits();
                 //Could be multiple bits which are set
@@ -692,7 +690,7 @@ namespace Faster.Map
                 {
                     //retrieve offset 
                     var bitPos = BitOperations.TrailingZeroCount(mask);
-                    if (_comparer.Equals(FindEntry(_entries, index + Unsafe.As<int, uint>(ref bitPos)).Key, key))
+                    if (_comparer.Equals(Find(_entries, index + Unsafe.As<int, uint>(ref bitPos)).Key, key))
                     {
                         return true;
                     }
@@ -722,7 +720,7 @@ namespace Faster.Map
         /// Copies entries from one map to another
         /// </summary>
         /// <param name="denseMap">The map.</param>
-        public void Copy(DenseMapSIMD<TKey, TValue> denseMap)
+        public void Copy(DenseMap<TKey, TValue> denseMap)
         {
             for (var i = 0; i < denseMap._entries.Length; ++i)
             {
@@ -784,37 +782,6 @@ namespace Faster.Map
 
         #region Private Methods
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        uint ones32(uint x)
-        {
-            /* 32-bit recursive reduction using SWAR...
-           but first step is mapping 2-bit values
-           into sum of 2 1-bit values in sneaky way
-        */
-            x -= (x >> 1) & 0x55555555;
-            x = ((x >> 2) & 0x33333333) + (x & 0x33333333);
-            x = (((x >> 4) + x) & 0x0f0f0f0f);
-            x += (x >> 8);
-            x += (x >> 16);
-            return (x & 0x0000003f);
-        }
-
-        const long k1 = 0x5555555555555555;
-        const long k2 = 0x3333333333333333;
-        const long kf = 0x0101010101010101;
-        const long k4 = 0x0f0f0f0f0f0f0f0f;
-
-
-
-        int popCount(long x)
-        {
-            x = x - ((x >> 1) & k1); /* put count of each 2 bits into those 2 bits */
-            x = (x & k2) + ((x >> 2) & k2); /* put count of each 4 bits into those 4 bits */
-            x = (x + (x >> 4)) & k4; /* put count of each 8 bits into those 8 bits */
-            x = (x * kf) >> 56; /* returns 8 most significant bits of x + (x<<8) + (x<<16) + (x<<24) + ...  */
-            return (int)x;
-        }
-
         /// <summary>
         /// Resizes this instance.
         /// </summary>     
@@ -839,13 +806,13 @@ namespace Faster.Map
 
             for (uint i = 0; i < oldEntries.Length; ++i)
             {
-                var h2 = FindEntry(oldMetadata, i);
+                var h2 = Find(oldMetadata, i);
                 if (h2 < 0)
                 {
                     continue;
                 }
 
-                var entry = FindEntry(oldEntries, i);
+                var entry = Find(oldEntries, i);
 
                 //expensive if hashcode is slow, or when it`s not cached like strings
                 var hashcode = (uint)entry.Key.GetHashCode();
@@ -857,15 +824,15 @@ namespace Faster.Map
                 while (true)
                 {
                     //check for empty entries
-                    var result = Vector128.LoadUnsafe(ref FindEntry(_metadata, index)).ExtractMostSignificantBits();
+                    var result = Vector128.LoadUnsafe(ref Find(_metadata, index)).ExtractMostSignificantBits();
                     if (result != 0)
                     {
                         var offset = BitOperations.TrailingZeroCount(result);
 
                         index += Unsafe.As<int, uint>(ref offset);
 
-                        FindEntry(_metadata, index) = h2;
-                        FindEntry(_entries, index) = entry;
+                        Find(_metadata, index) = h2;
+                        Find(_entries, index) = entry;
                         break;
                     }
 
@@ -877,7 +844,7 @@ namespace Faster.Map
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ref T FindEntry<T>(T[] array, uint index)
+        private static ref T Find<T>(T[] array, uint index)
         {
 #if DEBUG
             return ref array[index];

@@ -4,7 +4,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using Faster.Map.Core;
 
-namespace Faster.Map
+namespace Faster.Map.Retired
 {
     /// <summary>
     /// This hashmap uses the following
@@ -302,9 +302,9 @@ namespace Faster.Map
                     ++Count;
                     return;
                 }
-                
+
                 if (hashcode == currentEntry.Key.GetHashCode())
-                {  
+                {
                     // Update existing value
                     currentEntry.Value = value;
                     return;
@@ -561,7 +561,7 @@ namespace Faster.Map
         /// </value>
         /// <param name="key">The key.</param>
         /// <returns></returns>
-        /// <exception cref="System.Collections.Generic.KeyNotFoundException">Unable to find metadata - {key.GetType().FullName} key - {key.GetHashCode()}
+        /// <exception cref="KeyNotFoundException">Unable to find metadata - {key.GetType().FullName} key - {key.GetHashCode()}
         /// or
         /// Unable to find metadata - {key.GetType().FullName} key - {key.GetHashCode()}</exception>
         /// <exception cref="KeyNotFoundException">Unable to find metadata - {key.GetType().FullName} key - {key.GetHashCode()}

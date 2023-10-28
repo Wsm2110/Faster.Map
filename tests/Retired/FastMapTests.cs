@@ -1,10 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
+using Faster.Map.Retired;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-namespace Faster.Map.Core.Tests
+namespace Faster.Map.Core.Tests.Retired
 {
     [TestClass]
     public class FastMapTests

@@ -1,5 +1,4 @@
 ﻿using BenchmarkDotNet.Attributes;
-using Faster.Map.Experimental;
 using Microsoft.Collections.Extensions;
 using System;
 using System.Collections.Generic;
@@ -12,9 +11,7 @@ namespace Faster.Map.Benchmark
     {
         #region Fields
 
-        private QuadMap<string, string> _dense = new QuadMap<string, string>();
-        private DenseMapSIMD<string, string> _denseMapSIMD = new DenseMapSIMD<string, string>();
-
+        private DenseMap<string, string> _denseMap = new DenseMap<string, string>();
         private Dictionary<string, string> dic = new Dictionary<string, string>();
         private DictionarySlim<string, string> _slim = new DictionarySlim<string, string>();
 
@@ -42,8 +39,7 @@ namespace Faster.Map.Benchmark
             foreach (var key in keys)
             {
                 dic.Add(key, key);
-                _denseMapSIMD.Emplace(key, key);
-                _dense.Emplace(key, key);
+                _denseMap.Emplace(key, key);           
                 _slim.GetOrAddValueRef(key);
             }
 
@@ -54,23 +50,15 @@ namespace Faster.Map.Benchmark
 
 
         [Benchmark]
-        public void DenseMapSIMD()
-        {
-            foreach (var key in keys)
-            {
-                _denseMapSIMD.Get(key, out var result);
-            }
-        }
-
-        [Benchmark]
         public void DenseMap()
         {
             foreach (var key in keys)
             {
-                _dense.Get(key, out var result);
+                _denseMap.Get(key, out var result);
             }
-
         }
+
+    
 
         [Benchmark]
         public void Dictionary()

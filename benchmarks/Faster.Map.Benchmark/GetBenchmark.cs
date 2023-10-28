@@ -5,26 +5,24 @@ using System.IO;
 using System.Linq;
 using Microsoft.Collections.Extensions;
 using System.Diagnostics;
-using Faster.Map.Experimental;
+using BenchmarkDotNet.Exporters.Csv;
+using BenchmarkDotNet.Exporters;
 
 namespace Faster.Map.Benchmark
 {
 
     [MarkdownExporterAttribute.GitHub]
-    [DisassemblyDiagnoser]
-    [MemoryDiagnoser]
-
-    // [SimpleJob(RunStrategy.Monitoring, 1, 10, 50)]
+   // [DisassemblyDiagnoser]
+    [MemoryDiagnoser]  
+    //[CsvMeasurementsExporter]
+    //[RPlotExporter]
+    //// [SimpleJob(RunStrategy.Monitoring, 1, 10, 50)]
     public class GetBenchmark
     {
         #region Fields
 
-        FastMap<uint, uint> _fastMap = new FastMap<uint, uint>();
-        DenseMap<uint, uint> _denseMap = new DenseMap<uint, uint>(16, 0.5);
-
-        private DenseMapSIMD<uint, uint> _denseMapSIMD = new DenseMapSIMD<uint, uint>();
-
-        private Dictionary<uint, uint> dic = new Dictionary<uint, uint>();
+        DenseMap<uint, uint> _denseMap = new DenseMap<uint, uint>();
+        private Dictionary<uint, uint> dictionary = new Dictionary<uint, uint>();
         private DictionarySlim<uint, uint> _slim = new DictionarySlim<uint, uint>();
 
         private uint[] keys;
@@ -38,39 +36,27 @@ namespace Faster.Map.Benchmark
         [GlobalSetup]
         public void Setup()
         {
-          
+
             var output = File.ReadAllText("Numbers.txt");
             var splittedOutput = output.Split(',');
 
-            keys = new uint[_length];
+            keys = new uint[Length];
 
-            for (var index = 0; index < _length; index++)
+            for (var index = 0; index < Length; index++)
             {
                 keys[index] = uint.Parse(splittedOutput[index]);
             }
 
             foreach (var key in keys)
             {
-                dic.Add(key, key);
-                _denseMapSIMD.Emplace(key, key);
+                dictionary.Add(key, key);
                 _denseMap.Emplace(key, key);
-                _fastMap.Emplace(key, key);
                 _slim.GetOrAddValueRef(key);
             }
-
-            //    Shuffle(new Random(), keys);
         }
 
-
-        [Benchmark]
-        public void DenseMapSIMD()
-        {
-            foreach (var key in keys)
-            {
-                _denseMapSIMD.Get(key, out var result);
-            }
-        }
-
+        [ParamsAttribute(900000)]
+        public int Length { get; set; }
 
         [Benchmark]
         public void DenseMap()
@@ -78,15 +64,6 @@ namespace Faster.Map.Benchmark
             foreach (var key in keys)
             {
                 _denseMap.Get(key, out var result);
-            }
-        }
-
-        [Benchmark]
-        public void FastMap()
-        {
-            foreach (var key in keys)
-            {
-                _fastMap.Get(key, out var result);
             }
         }
 
@@ -104,7 +81,7 @@ namespace Faster.Map.Benchmark
         {
             foreach (var key in keys)
             {
-                dic.TryGetValue(key, out var result);
+                dictionary.TryGetValue(key, out var result);
             }
         }
 

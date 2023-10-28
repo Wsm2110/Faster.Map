@@ -1,5 +1,7 @@
 ﻿using System.Runtime.InteropServices;
 using BenchmarkDotNet.Configs;
+using BenchmarkDotNet.Exporters.Csv;
+using BenchmarkDotNet.Exporters;
 using BenchmarkDotNet.Running;
 
 namespace Faster.Map.Benchmark
@@ -9,15 +11,17 @@ namespace Faster.Map.Benchmark
         static void Main(string[] args)
         {
 
-            // BenchmarkRunner.Run<AddBenchmark>(new DebugBuildConfig());
+          
+
+            BenchmarkRunner.Run<AddAndResizeBenchmark>();
             //   BenchmarkRunner.Run<AddBenchmark>();
             //   BenchmarkRunner.Run<UpdateBenchmark>();
             //    BenchmarkRunner.Run<RemoveBenchmark>();
 
-             BenchmarkRunner.Run<GetBenchmark>();
+            // BenchmarkRunner.Run<RemoveBenchmark>();
             // 
             // BenchmarkRunner.Run<AddBenchmark>();
-            // BenchmarkRunner.Run<GetBenchmark>();
+           //  BenchmarkRunner.Run<GetBenchmark>();
             // BenchmarkRunner.Run<RemoveBenchmark>();
             // BenchmarkRunner.Run<UpdateBenchmark>();
         }
