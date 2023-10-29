@@ -217,9 +217,9 @@ namespace Faster.Map
 
             // Get object identity hashcode
             var hashcode = (uint)key.GetHashCode();
-            // Get 7 high bits
+            // GEt 7 low bits
             var h2 = H2(hashcode); 
-            //Create vector of the 7 high bits
+            //Create vector of the 7 low bits
             var target = Vector128.Create(Unsafe.As<uint, sbyte>(ref h2));
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = hashcode * GoldenRatio >> _shift;
@@ -280,12 +280,12 @@ namespace Faster.Map
             }
         }
         /// <summary>
-        /// Retrieve 7 high bits from hashcode
+        /// Retrieve 7 low bits from hashcode
         /// </summary>
         /// <param name="hashcode"></param>
         /// <returns></returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private uint H2(uint hashcode) =>  hashcode >> 25;
+        private static uint H2(uint hashcode) =>  hashcode & 0b01111111;
     
         /// <summary>
         /// 
@@ -320,9 +320,9 @@ namespace Faster.Map
             var hashcode = (uint)key.GetHashCode();
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = hashcode * GoldenRatio >> _shift;
-            // Get 7 high bits
+            // GEt 7 low bits
             var h2 = H2(hashcode);
-            //Create vector of the 7 high bits
+            //Create vector of the 7 low bits
             var target = Vector128.Create(Unsafe.As<uint, sbyte>(ref h2));
             //Set initial jumpdistance index
             uint jumpDistance = 0;
@@ -398,9 +398,9 @@ namespace Faster.Map
             var hashcode = (uint)key.GetHashCode();
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = hashcode * GoldenRatio >> _shift;
-            // Get 7 high bits
+            // GEt 7 low bits
             var h2 = H2(hashcode);
-            //Create vector of the 7 high bits
+            //Create vector of the 7 low bits
             var target = Vector128.Create(Unsafe.As<uint, sbyte>(ref h2));
             //Set initial jumpdistance index
             uint jumpDistance = 0;
@@ -473,7 +473,7 @@ namespace Faster.Map
             uint index = hashcode * GoldenRatio >> _shift;
             //get top 7 bits         
             var h2 = H2(hashcode);
-            //Create vector of the 7 high bits
+            //Create vector of the 7 low bits
             var target = Vector128.Create(Unsafe.As<uint, sbyte>(ref h2));
             //Set initial jumpdistance index
             uint jumpDistance = 0;
@@ -550,9 +550,9 @@ namespace Faster.Map
         {
             // Get object identity hashcode
             var hashcode = (uint)key.GetHashCode();
-            // Get 7 high bits          
+            // GEt 7 low bits          
             var h2 = H2(hashcode);
-            //Create vector of the 7 high bits
+            //Create vector of the 7 low bits
             var target = Vector128.Create(Unsafe.As<uint, sbyte>(ref h2));
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = hashcode * GoldenRatio >> _shift;
@@ -616,9 +616,9 @@ namespace Faster.Map
         {
             // Get object identity hashcode
             var hashcode = (uint)key.GetHashCode();        
-            // Get 7 high bits
+            // GEt 7 low bits
             var h2 = H2(hashcode);
-            //Create vector of the 7 high bits
+            //Create vector of the 7 low bits
             var target = Vector128.Create(Unsafe.As<uint, sbyte>(ref h2));
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = hashcode * GoldenRatio >> _shift;
@@ -676,9 +676,9 @@ namespace Faster.Map
         {
             // Get object identity hashcode
             var hashcode = (uint)key.GetHashCode();
-            // Get 7 high bits
+            // GEt 7 low bits
             var h2 = H2(hashcode);
-            //Create vector of the 7 high bits
+            //Create vector of the 7 low bits
             var target = Vector128.Create(Unsafe.As<uint, sbyte>(ref h2));
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = hashcode * GoldenRatio >> _shift;
