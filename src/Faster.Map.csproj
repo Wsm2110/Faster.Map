@@ -8,14 +8,13 @@
     <LangVersion>Latest</LangVersion>
     <Authors>Wiljan Ruizendaal</Authors>
     <PackageReleaseNotes>
-      - Moving on to .net80 
-      - Retired some old hashmaps
+      - made sure h2 targets 7 highbits
     </PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/Wsm2110/Faster.Map</PackageProjectUrl>
-    <AssemblyVersion>5.0.0</AssemblyVersion>
-    <FileVersion>5.0.0</FileVersion>
+    <AssemblyVersion>5.0.1</AssemblyVersion>
+    <FileVersion>5.0.1</FileVersion>
     <Title>Fastest .net hashmap</Title>
-    <Version>5.0.0</Version>
+    <Version>5.0.1</Version>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Description>incredible fast hashmaps using robinhood hashing or quadratic probing with triangular numbers</Description>
     <RepositoryUrl>https://github.com/Wsm2110/Faster.Map</RepositoryUrl>

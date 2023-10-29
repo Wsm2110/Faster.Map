@@ -12,7 +12,7 @@ namespace Faster.Map.Benchmark
 {
 
     [MarkdownExporterAttribute.GitHub]
-   // [DisassemblyDiagnoser]
+    [DisassemblyDiagnoser]
     [MemoryDiagnoser]  
     //[CsvMeasurementsExporter]
     //[RPlotExporter]
@@ -67,23 +67,23 @@ namespace Faster.Map.Benchmark
             }
         }
 
-        [Benchmark]
-        public void SlimDictionary()
-        {
-            foreach (var key in keys)
-            {
-                _slim.GetOrAddValueRef(key);
-            }
-        }
+        //[Benchmark]
+        //public void SlimDictionary()
+        //{
+        //    foreach (var key in keys)
+        //    {
+        //        _slim.GetOrAddValueRef(key);
+        //    }
+        //}
 
-        [Benchmark]
-        public void Dictionary()
-        {
-            foreach (var key in keys)
-            {
-                dictionary.TryGetValue(key, out var result);
-            }
-        }
+        //[Benchmark]
+        //public void Dictionary()
+        //{
+        //    foreach (var key in keys)
+        //    {
+        //        dictionary.TryGetValue(key, out var result);
+        //    }
+        //}
 
     }
 }

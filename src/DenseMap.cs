@@ -218,7 +218,7 @@ namespace Faster.Map
             // Get object identity hashcode
             var hashcode = (uint)key.GetHashCode();
             // Get 7 high bits
-            var h2 = hashcode & 0B01111111;
+            var h2 = H2(hashcode); 
             //Create vector of the 7 high bits
             var target = Vector128.Create(Unsafe.As<uint, sbyte>(ref h2));
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
@@ -235,8 +235,8 @@ namespace Faster.Map
                 //Check if key is unique
                 while (mask != 0)
                 {
-                    var offset = BitOperations.TrailingZeroCount(mask);
-                    var entry = Find(_entries, index + Unsafe.As<int, uint>(ref offset));
+                    var bitPos = BitOperations.TrailingZeroCount(mask);
+                    var entry = Find(_entries, index + Unsafe.As<int, uint>(ref bitPos));
 
                     if (_comparer.Equals(entry.Key, key))
                     {
@@ -252,9 +252,9 @@ namespace Faster.Map
                 //check for tombstones and empty entries 
                 if (mask != 0)
                 {
-                    var offset = BitOperations.TrailingZeroCount(mask);
+                    var BitPos = BitOperations.TrailingZeroCount(mask);
                     //calculate proper index
-                    index += Unsafe.As<int, uint>(ref offset);
+                    index += Unsafe.As<int, uint>(ref BitPos);
 
                     Find(_metadata, index) = Unsafe.As<uint, sbyte>(ref h2);
 
@@ -279,7 +279,14 @@ namespace Faster.Map
                 index = index & _length - 1;
             }
         }
-
+        /// <summary>
+        /// Retrieve 7 high bits from hashcode
+        /// </summary>
+        /// <param name="hashcode"></param>
+        /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private uint H2(uint hashcode) =>  hashcode >> 25;
+    
         /// <summary>
         /// 
         /// Tries to emplace a key-value pair into the map
@@ -313,8 +320,8 @@ namespace Faster.Map
             var hashcode = (uint)key.GetHashCode();
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = hashcode * GoldenRatio >> _shift;
-            //get top 7 bits
-            var h2 = hashcode & 0b01111111;
+            // Get 7 high bits
+            var h2 = H2(hashcode);
             //Create vector of the 7 high bits
             var target = Vector128.Create(Unsafe.As<uint, sbyte>(ref h2));
             //Set initial jumpdistance index
@@ -347,9 +354,9 @@ namespace Faster.Map
                 //check for tombstones and empty entries 
                 if (mask > 0)
                 {
-                    var offset = BitOperations.TrailingZeroCount(mask);
+                    var bitPos = BitOperations.TrailingZeroCount(mask);
                     //calculate proper index
-                    index += Unsafe.As<int, uint>(ref offset);
+                    index += Unsafe.As<int, uint>(ref bitPos);
 
                     //retrieve entry
                     ref var currentEntry = ref Find(_entries, index);
@@ -391,8 +398,8 @@ namespace Faster.Map
             var hashcode = (uint)key.GetHashCode();
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = hashcode * GoldenRatio >> _shift;
-            //get top 7 bits
-            var h2 = hashcode & 0b01111111;
+            // Get 7 high bits
+            var h2 = H2(hashcode);
             //Create vector of the 7 high bits
             var target = Vector128.Create(Unsafe.As<uint, sbyte>(ref h2));
             //Set initial jumpdistance index
@@ -464,8 +471,8 @@ namespace Faster.Map
             var hashcode = (uint)key.GetHashCode();
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = hashcode * GoldenRatio >> _shift;
-            //get top 7 bits
-            var h2 = hashcode & 0b01111111;
+            //get top 7 bits         
+            var h2 = H2(hashcode);
             //Create vector of the 7 high bits
             var target = Vector128.Create(Unsafe.As<uint, sbyte>(ref h2));
             //Set initial jumpdistance index
@@ -500,9 +507,9 @@ namespace Faster.Map
                 //Empty entry, add key              
                 if (mask > 0)
                 {
-                    var offset = BitOperations.TrailingZeroCount(mask);
+                    var bitPos = BitOperations.TrailingZeroCount(mask);
                     //calculate proper index
-                    index += Unsafe.As<int, uint>(ref offset);
+                    index += Unsafe.As<int, uint>(ref bitPos);
 
                     //retrieve entry
                     ref var currentEntry = ref Find(_entries, index);
@@ -529,7 +536,6 @@ namespace Faster.Map
                 jumpDistance += 16;
                 index += jumpDistance;
                 index = index & _lengthMinusOne;
-
             }
         }
 
@@ -544,8 +550,8 @@ namespace Faster.Map
         {
             // Get object identity hashcode
             var hashcode = (uint)key.GetHashCode();
-            // Get 7 high bits
-            var h2 = hashcode & 0B01111111;
+            // Get 7 high bits          
+            var h2 = H2(hashcode);
             //Create vector of the 7 high bits
             var target = Vector128.Create(Unsafe.As<uint, sbyte>(ref h2));
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
@@ -565,10 +571,10 @@ namespace Faster.Map
                 while (mask != 0)
                 {
                     //retrieve offset 
-                    var offset = BitOperations.TrailingZeroCount(mask);
+                    var bitPos = BitOperations.TrailingZeroCount(mask);
 
                     //get index and eq
-                    ref var entry = ref Find(_entries, index + Unsafe.As<int, uint>(ref offset));
+                    ref var entry = ref Find(_entries, index + Unsafe.As<int, uint>(ref bitPos));
 
                     if (_comparer.Equals(entry.Key, key))
                     {
@@ -609,9 +615,9 @@ namespace Faster.Map
         public bool Remove(TKey key)
         {
             // Get object identity hashcode
-            var hashcode = (uint)key.GetHashCode();
+            var hashcode = (uint)key.GetHashCode();        
             // Get 7 high bits
-            var h2 = hashcode & 0B01111111;
+            var h2 = H2(hashcode);
             //Create vector of the 7 high bits
             var target = Vector128.Create(Unsafe.As<uint, sbyte>(ref h2));
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
@@ -671,7 +677,7 @@ namespace Faster.Map
             // Get object identity hashcode
             var hashcode = (uint)key.GetHashCode();
             // Get 7 high bits
-            var h2 = hashcode & 0B01111111;
+            var h2 = H2(hashcode);
             //Create vector of the 7 high bits
             var target = Vector128.Create(Unsafe.As<uint, sbyte>(ref h2));
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
@@ -824,12 +830,12 @@ namespace Faster.Map
                 while (true)
                 {
                     //check for empty entries
-                    var result = Vector128.LoadUnsafe(ref Find(_metadata, index)).ExtractMostSignificantBits();
-                    if (result != 0)
+                    var mask = Vector128.LoadUnsafe(ref Find(_metadata, index)).ExtractMostSignificantBits();
+                    if (mask != 0)
                     {
-                        var offset = BitOperations.TrailingZeroCount(result);
+                        var BitPos = BitOperations.TrailingZeroCount(mask);
 
-                        index += Unsafe.As<int, uint>(ref offset);
+                        index += Unsafe.As<int, uint>(ref BitPos);
 
                         Find(_metadata, index) = h2;
                         Find(_entries, index) = entry;

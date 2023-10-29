@@ -13,7 +13,7 @@ namespace Faster.Map.Benchmark
 
           
 
-            BenchmarkRunner.Run<AddAndResizeBenchmark>();
+            BenchmarkRunner.Run<GetBenchmark>();
             //   BenchmarkRunner.Run<AddBenchmark>();
             //   BenchmarkRunner.Run<UpdateBenchmark>();
             //    BenchmarkRunner.Run<RemoveBenchmark>();
