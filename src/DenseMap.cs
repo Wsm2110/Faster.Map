@@ -467,6 +467,12 @@ namespace Faster.Map
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref TValue GetOrAdd(TKey key)
         {
+            //Resize if loadfactor is reached
+            if (Count >= _maxLookupsBeforeResize)
+            {
+                Resize();
+            }
+
             // Get object identity hashcode
             var hashcode = (uint)key.GetHashCode();
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift

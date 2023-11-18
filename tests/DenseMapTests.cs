@@ -15,7 +15,7 @@ namespace Faster.Map.Core.Tests
 
         [TestInitialize]
         public void Setup()
-        {  
+        {
             var output = File.ReadAllText("Numbers.txt");
             var splittedOutput = output.Split(',');
 
@@ -31,7 +31,7 @@ namespace Faster.Map.Core.Tests
 
         [TestMethod]
         public void AssertDailyUseCaseWithoutResize()
-        {  
+        {
             var fmap = new DenseMap<uint, uint>(1000000);
 
             foreach (var k in keys.Take(900000))
@@ -453,7 +453,7 @@ namespace Faster.Map.Core.Tests
             fmap.Emplace(8, 1);
             fmap.Emplace(9, 1);
             fmap.Emplace(10, 1);
-            fmap.Emplace(11, 1);        
+            fmap.Emplace(11, 1);
 
 
 
@@ -462,7 +462,7 @@ namespace Faster.Map.Core.Tests
 
 
 
-           // Assert.IsFalse(r);
+            // Assert.IsFalse(r);
         }
 
         [TestMethod]
@@ -525,7 +525,7 @@ namespace Faster.Map.Core.Tests
             DenseMap<uint, uint> map = new DenseMap<uint, uint>(16);
 
             map.Emplace(1, 1);
-            map.Emplace(13, 2); 
+            map.Emplace(13, 2);
             map.Emplace(16, 3);
             map.Emplace(111, 4);
             //act
@@ -774,12 +774,28 @@ namespace Faster.Map.Core.Tests
         {
             var fmap = new DenseMap<long, long>(1);
             fmap.Emplace(0L, 0L);
-
-            var r = fmap.Contains(1);
-
+          
             //hashmap has an overhead of + 16
 
             Assert.IsTrue(fmap.Size == 32);
         }
+
+        [TestMethod]
+        public void AssertGetOrAddMultipleValues()
+        {
+            //assign
+            var map = new DenseMap<int, int>();
+
+            //act
+            for (int i = 0; i < 20; i++)
+            {
+                map.GetOrAdd(i);                                
+            }
+
+            //assert
+            // resize + 16 is 48
+            Assert.IsTrue(map.Size == 48);
+        }
+
     }
 }
