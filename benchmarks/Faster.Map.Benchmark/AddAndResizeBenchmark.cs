@@ -2,13 +2,9 @@
 using Faster.Map.DenseMap;
 using Faster.Map.QuadMap;
 using Faster.Map.RobinhoodMap;
-using Microsoft.Collections.Extensions;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Faster.Map.Benchmark
 {

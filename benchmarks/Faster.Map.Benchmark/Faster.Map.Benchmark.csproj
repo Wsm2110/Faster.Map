@@ -39,10 +39,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Faster.Map.Core\Faster.Map.Core.csproj" />
-    <ProjectReference Include="..\..\Faster.Map.QuadMap\Faster.Map.QuadMap.csproj" />
-    <ProjectReference Include="..\..\Faster.RobinhoodMap\Faster.Map.RobinhoodMap.csproj" />
-    <ProjectReference Include="..\..\src\Faster.Map.DenseMap.csproj" />
+    <ProjectReference Include="..\..\src\Faster.Map.Core\Faster.Map.Core.csproj" />
+    <ProjectReference Include="..\..\src\Faster.Map.DenseMap\Faster.Map.DenseMap.csproj" />
+    <ProjectReference Include="..\..\src\Faster.Map.QuadMap\Faster.Map.QuadMap.csproj" />
+    <ProjectReference Include="..\..\src\Faster.Map.RobinhoodMap\Faster.Map.RobinhoodMap.csproj" />
   </ItemGroup>
 
 	
