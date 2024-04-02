@@ -1,4 +1,5 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+﻿using Faster.Map.DenseMap;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -6,7 +7,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
 
-namespace Faster.Map.Core.Tests
+namespace Faster.Map.Densemap.Tests
 {
     [TestClass]
     public class DenseMapTests
@@ -660,7 +661,7 @@ namespace Faster.Map.Core.Tests
             var map = new DenseMap<int, int>(16, 0.5);
 
             //act
-            ref var value = ref map.GetOrAdd(1);
+            ref var value = ref map.GetOrUpdate(1);
 
             //assert
             Assert.AreEqual(0, value);
@@ -673,7 +674,7 @@ namespace Faster.Map.Core.Tests
             var map = new DenseMap<int, int>(16, 0.5);
 
             //act
-            ref var value = ref map.GetOrAdd(1);
+            ref var value = ref map.GetOrUpdate(1);
 
             value = 100;
 
@@ -690,7 +691,7 @@ namespace Faster.Map.Core.Tests
             var map = new DenseMap<int, int>(16, 0.5);
 
             //act
-            ref var value = ref map.GetOrAdd(1);
+            ref var value = ref map.GetOrUpdate(1);
 
             value = 100;
 
@@ -707,7 +708,7 @@ namespace Faster.Map.Core.Tests
         {
             //assign
             var counterMap = new DenseMap<uint, uint>(16, 0.5);
-            ref var counter = ref counterMap.GetOrAdd(1);
+            ref var counter = ref counterMap.GetOrUpdate(1);
 
             //act
             ++counter;
@@ -789,7 +790,7 @@ namespace Faster.Map.Core.Tests
             //act
             for (int i = 0; i < 20; i++)
             {
-                map.GetOrAdd(i);                                
+                map.GetOrUpdate(i);                                
             }
 
             //assert

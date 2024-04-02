@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Faster.Map.csproj" />
+    <ProjectReference Include="..\..\src\Faster.Map.DenseMap.csproj" />
   </ItemGroup>
 
 </Project>

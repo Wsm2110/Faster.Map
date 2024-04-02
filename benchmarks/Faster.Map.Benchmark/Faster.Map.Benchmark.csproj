@@ -3,7 +3,8 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFrameworks>net8.0</TargetFrameworks>
-	  <Platforms>AnyCPU;x86</Platforms>
+	  <Platforms>AnyCPU</Platforms>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
@@ -31,14 +32,17 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="BenchmarkDotNet" Version="0.13.8" />
-    <PackageReference Include="BenchmarkDotNet.Diagnostics.Windows" Version="0.13.1" />
+    <PackageReference Include="BenchmarkDotNet" Version="0.13.12" />
+    <PackageReference Include="BenchmarkDotNet.Diagnostics.Windows" Version="0.13.12" />
     <PackageReference Include="Microsoft.Experimental.Collections" Version="1.0.6-e190117-3" />
-    <PackageReference Include="ObjectLayoutInspector" Version="0.1.2" />
+    <PackageReference Include="ObjectLayoutInspector" Version="0.1.4" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Faster.Map.csproj" />
+    <ProjectReference Include="..\..\Faster.Map.Core\Faster.Map.Core.csproj" />
+    <ProjectReference Include="..\..\Faster.Map.QuadMap\Faster.Map.QuadMap.csproj" />
+    <ProjectReference Include="..\..\Faster.RobinhoodMap\Faster.Map.RobinhoodMap.csproj" />
+    <ProjectReference Include="..\..\src\Faster.Map.DenseMap.csproj" />
   </ItemGroup>
 
 	

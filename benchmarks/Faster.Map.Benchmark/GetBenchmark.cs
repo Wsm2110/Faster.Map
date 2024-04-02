@@ -1,32 +1,33 @@
-﻿using System;
-using BenchmarkDotNet.Attributes;
+﻿using BenchmarkDotNet.Attributes;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using Microsoft.Collections.Extensions;
-using System.Diagnostics;
-using BenchmarkDotNet.Exporters.Csv;
-using BenchmarkDotNet.Exporters;
+using Faster.Map.QuadMap;
+using Faster.Map.DenseMap;
+using Faster.Map.RobinhoodMap;
+using System;
 
 namespace Faster.Map.Benchmark
 {
-
     [MarkdownExporterAttribute.GitHub]
     [DisassemblyDiagnoser]
-    [MemoryDiagnoser]  
-    //[CsvMeasurementsExporter]
-    //[RPlotExporter]
-    //// [SimpleJob(RunStrategy.Monitoring, 1, 10, 50)]
+    [MemoryDiagnoser]
     public class GetBenchmark
     {
         #region Fields
 
-        DenseMap<uint, uint> _denseMap = new DenseMap<uint, uint>();
-        private Dictionary<uint, uint> dictionary = new Dictionary<uint, uint>();
-        private DictionarySlim<uint, uint> _slim = new DictionarySlim<uint, uint>();
+        private DenseMap<uint, uint> _denseMap = new DenseMap<uint, uint>();
+        private Dictionary<uint, uint> _dictionary = new Dictionary<uint, uint>();
+        private RobinhoodMap<uint, uint> _robinHoodMap = new();
+        private QuadMap<uint, uint> _quadMap = new();
 
         private uint[] keys;
-        private uint _length = 900000;
+
+        #endregion
+
+        #region Properties
+
+        [Params(1, 1000, 100000, 1000000)]
+        public int Length { get; set; }
 
         #endregion
 
@@ -36,7 +37,6 @@ namespace Faster.Map.Benchmark
         [GlobalSetup]
         public void Setup()
         {
-
             var output = File.ReadAllText("Numbers.txt");
             var splittedOutput = output.Split(',');
 
@@ -49,41 +49,51 @@ namespace Faster.Map.Benchmark
 
             foreach (var key in keys)
             {
-                dictionary.Add(key, key);
+                _dictionary.Add(key, key);
                 _denseMap.Emplace(key, key);
-                _slim.GetOrAddValueRef(key);
+                _robinHoodMap.Emplace(key, key);
+                _quadMap.Emplace(key, key);
             }
         }
-
-        [ParamsAttribute(900000)]
-        public int Length { get; set; }
 
         [Benchmark]
         public void DenseMap()
         {
-            foreach (var key in keys)
+            for (int i = 0; i < Length; ++i)
             {
-                _denseMap.Get(key, out var result);
+                var key = keys[i];
+                _denseMap.Get(key, out var _);
             }
         }
 
-        //[Benchmark]
-        //public void SlimDictionary()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        _slim.GetOrAddValueRef(key);
-        //    }
-        //}
+        [Benchmark]
+        public void RobinhoodMap()
+        {
+            for (int i = 0; i < Length; ++i)
+            {
+                var key = keys[i];
+                _robinHoodMap.Get(key, out var _);
+            }
+        }
 
-        //[Benchmark]
-        //public void Dictionary()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        dictionary.TryGetValue(key, out var result);
-        //    }
-        //}
+        [Benchmark]
+        public void QuadMap()
+        {
+            for (int i = 0; i < Length; ++i)
+            {
+                var key = keys[i];
+                _quadMap.Get(key, out var _);
+            }
+        }
 
+        [Benchmark(Baseline = true)]
+        public void Dictionary()
+        {
+            for (int i = 0; i < Length; ++i)
+            {
+                var key = keys[i];
+                _dictionary.TryGetValue(key, out var _);
+            }
+        }
     }
 }

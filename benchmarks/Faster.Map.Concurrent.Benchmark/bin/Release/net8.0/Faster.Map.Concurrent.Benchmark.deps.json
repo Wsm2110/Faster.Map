@@ -9,7 +9,7 @@
       "Faster.Map.Concurrent.Benchmark/1.0.0": {
         "dependencies": {
           "BenchmarkDotNet": "0.13.2",
-          "Faster.Map": "4.2.1",
+          "Faster.Map.DenseMap": "5.0.3",
           "NonBlocking": "2.1.0"
         },
         "runtime": {
@@ -360,6 +360,14 @@
         }
       },
       "System.Collections.Immutable/5.0.0": {},
+      "System.IO.Hashing/8.0.0": {
+        "runtime": {
+          "lib/net8.0/System.IO.Hashing.dll": {
+            "assemblyVersion": "8.0.0.0",
+            "fileVersion": "8.0.23.53103"
+          }
+        }
+      },
       "System.Management/6.0.0": {
         "dependencies": {
           "System.CodeDom": "6.0.0"
@@ -391,9 +399,21 @@
         }
       },
       "System.Threading.Tasks.Extensions/4.5.4": {},
-      "Faster.Map/4.2.1": {
+      "Faster.Map.Core/1.0.0": {
+        "dependencies": {
+          "System.IO.Hashing": "8.0.0"
+        },
         "runtime": {
-          "Faster.Map.dll": {}
+          "Faster.Map.Core.dll": {}
+        }
+      },
+      "Faster.Map.DenseMap/5.0.3": {
+        "dependencies": {
+          "Faster.Map.Core": "1.0.0",
+          "System.IO.Hashing": "8.0.0"
+        },
+        "runtime": {
+          "Faster.Map.DenseMap.dll": {}
         }
       }
     }
@@ -579,6 +599,13 @@
       "path": "system.collections.immutable/5.0.0",
       "hashPath": "system.collections.immutable.5.0.0.nupkg.sha512"
     },
+    "System.IO.Hashing/8.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-ne1843evDugl0md7Fjzy6QjJrzsjh46ZKbhf8GwBXb5f/gw97J4bxMs0NQKifDuThh/f0bZ0e62NPl1jzTuRqA==",
+      "path": "system.io.hashing/8.0.0",
+      "hashPath": "system.io.hashing.8.0.0.nupkg.sha512"
+    },
     "System.Management/6.0.0": {
       "type": "package",
       "serviceable": true,
@@ -635,7 +662,12 @@
       "path": "system.threading.tasks.extensions/4.5.4",
       "hashPath": "system.threading.tasks.extensions.4.5.4.nupkg.sha512"
     },
-    "Faster.Map/4.2.1": {
+    "Faster.Map.Core/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Faster.Map.DenseMap/5.0.3": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
