@@ -1,4 +1,7 @@
 ﻿using BenchmarkDotNet.Attributes;
+using Faster.Map.DenseMap;
+using Faster.Map.QuadMap;
+using Faster.Map.RobinhoodMap;
 using Microsoft.Collections.Extensions;
 using System;
 using System.Collections.Generic;
@@ -7,16 +10,25 @@ using System.Linq;
 
 namespace Faster.Map.Benchmark
 {
+    [MarkdownExporterAttribute.GitHub]
+    [MemoryDiagnoser]
     public class StringBenchmark
     {
         #region Fields
 
         private DenseMap<string, string> _denseMap = new DenseMap<string, string>();
         private Dictionary<string, string> dic = new Dictionary<string, string>();
-        private DictionarySlim<string, string> _slim = new DictionarySlim<string, string>();
+        private RobinhoodMap<string, string> _robinhoodMap = new RobinhoodMap<string, string>();
+        private QuadMap<string, string> _quadMap = new QuadMap<string, string>();
 
         private string[] keys;
-        private int _length = 900000;
+
+        #endregion
+
+        #region Properties
+
+        [ParamsAttribute(/*1, 10, 100, 1000, 10000, 100000*/ 1000000)]
+        public int Length { get; set; }
 
         #endregion
 
@@ -29,36 +41,49 @@ namespace Faster.Map.Benchmark
             var output = File.ReadAllText("Numbers.txt");
             var splittedOutput = output.Split(',');
 
-            keys = new string[_length];
+            keys = new string[Length];
 
-            for (var index = 0; index < _length; index++)
+            for (var index = 0; index < Length; index++)
             {
                 keys[index] = splittedOutput[index];
             }
 
             foreach (var key in keys)
             {
+                 _denseMap.Emplace(key, key);
+                _robinhoodMap.Emplace(key, key);
                 dic.Add(key, key);
-                _denseMap.Emplace(key, key);           
-                _slim.GetOrAddValueRef(key);
+            
+                _quadMap.Emplace(key, key);
             }
-
-            //    Shuffle(new Random(), keys);
         }
 
-
-
+        //[Benchmark]
+        //public void DenseMap()
+        //{
+        //    foreach (var key in keys)
+        //    {
+        //        _denseMap.Get(key, out var result);
+        //    }
+        //}
 
         [Benchmark]
-        public void DenseMap()
+        public void RobinhoodMap()
         {
             foreach (var key in keys)
             {
-                _denseMap.Get(key, out var result);
+                _robinhoodMap.Get(key, out var result);
             }
         }
 
-    
+        //[Benchmark]
+        //public void QuadMap()
+        //{
+        //    foreach (var key in keys)
+        //    {
+        //        _quadMap.Get(key, out var result);
+        //    }
+        //}
 
         [Benchmark]
         public void Dictionary()
@@ -66,15 +91,6 @@ namespace Faster.Map.Benchmark
             foreach (var key in keys)
             {
                 dic.TryGetValue(key, out var result);
-            }
-        }
-
-        [Benchmark]
-        public void SlimDictionary()
-        {
-            foreach (var key in keys)
-            {
-                _slim.TryGetValue(key, out var result);
             }
         }
 

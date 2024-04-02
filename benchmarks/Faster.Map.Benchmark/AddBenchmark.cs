@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using BenchmarkDotNet.Attributes;
-using Microsoft.Collections.Extensions;
+using Faster.Map.DenseMap;
+using Faster.Map.RobinhoodMap;
+using Faster.Map.QuadMap;
 
 namespace Faster.Map.Benchmark
 {
@@ -15,11 +16,19 @@ namespace Faster.Map.Benchmark
         #region Fields
 
         //fixed size, dont want to measure resize()
-        DenseMap<uint, uint> _dense = new DenseMap<uint, uint>(1000000);
+        private DenseMap<uint, uint> _dense = new DenseMap<uint, uint>(1000000, 0.5);
         private Dictionary<uint, uint> dic = new Dictionary<uint, uint>(1000000);
-        private DictionarySlim<uint, uint> _slim = new DictionarySlim<uint, uint>(1000000);
+        private RobinhoodMap<uint, uint> _robinhoodMap = new RobinhoodMap<uint, uint>(1000000);
+        private QuadMap<uint, uint> _quadmap = new QuadMap<uint, uint>(1000000);
+
         private uint[] keys;
-        private uint _length = 900000;
+
+        #endregion
+
+        #region Properties
+
+        [ParamsAttribute(1, 10, 100, 1000, 10000, 100000, 1000000)]
+        public int Length { get; set; }
 
         #endregion
 
@@ -28,31 +37,28 @@ namespace Faster.Map.Benchmark
         /// </summary>
         [GlobalSetup]
         public void Add()
-        {
-            // System.Diagnostics.Debugger.Launch();
-
+        {      
             var output = File.ReadAllText("Numbers.txt");
             var splittedOutput = output.Split(',');
 
-            keys = new uint[_length];
+            keys = new uint[Length];
 
-            for (var index = 0; index < _length; index++)
+            for (var index = 0; index < Length; index++)
             {
                 keys[index] = uint.Parse(splittedOutput[index]);
-            }
-            //  Shuffle(new Random(), keys);
+            }        
         }
 
         [IterationCleanup]
         public void ResetMaps()
-        {           
+        {
             _dense.Clear();
             dic.Clear();
-            _slim.Clear();         
+            _robinhoodMap.Clear();
         }
 
         #region Benchmarks
-            
+
 
         [Benchmark]
         public void DenseMap()
@@ -61,7 +67,25 @@ namespace Faster.Map.Benchmark
             {
                 _dense.Emplace(key, key);
             }
-        }       
+        }
+
+        [Benchmark]
+        public void RobinhoodMap()
+        {
+            foreach (var key in keys)
+            {
+                _robinhoodMap.Emplace(key, key);
+            }
+        }
+
+        [Benchmark]
+        public void QuadMap()
+        {
+            foreach (var key in keys)
+            {
+                _quadmap.Emplace(key, key);
+            }
+        }
 
         [Benchmark]
         public void Dictionary()
@@ -72,14 +96,7 @@ namespace Faster.Map.Benchmark
             }
         }
 
-        [Benchmark]
-        public void DictionarySlim()
-        {
-            foreach (var key in keys)
-            {
-                _slim.GetOrAddValueRef(key);
-            }
-        }
+
 
         #endregion
 
