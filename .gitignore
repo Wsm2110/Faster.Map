@@ -397,3 +397,4 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 /benchmarks/Faster.Map.Concurrent.Benchmark/bin/Release/net8.0/Faster.Map.Concurrent.Benchmark.deps.json
+/act.exe
