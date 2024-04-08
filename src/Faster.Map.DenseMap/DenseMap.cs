@@ -102,6 +102,49 @@ namespace Faster.Map.DenseMap
 
         #endregion
 
+		#region Enumerator
+
+		public Enumerator GetEnumerator() => new (_metadata, _entries);
+
+        /// <summary>
+        /// ref returns all dictionary (struct) values
+        /// </summary>
+		public ref struct Enumerator
+		{
+			public Enumerator (sbyte[] metadata, Entry[] entries)
+			{
+				this.pMetadata = ref MemoryMarshal.GetArrayDataReference (metadata);
+                this.pMetadataOffset = ref Unsafe.Add (ref this.pMetadata, metadata.Length);
+
+				this.pEntries = ref MemoryMarshal.GetArrayDataReference (entries);
+			}
+
+			public bool MoveNext()
+			{
+                // loop backwards
+				do
+				{
+					this.pMetadataOffset = ref Unsafe.Subtract (ref this.pMetadataOffset, 1);
+
+					if (Unsafe.IsAddressLessThan (ref this.pMetadataOffset, ref this.pMetadata))
+						return false;
+
+				} while (this.pMetadataOffset < 0);
+
+				return true;
+			}
+
+			public ref TValue Current => ref Unsafe.Add (ref this.pEntries, Unsafe.ByteOffset (ref this.pMetadata, ref this.pMetadataOffset)).Value;
+
+			//
+			ref sbyte pMetadata,
+                      pMetadataOffset;
+
+			ref Entry pEntries;
+		}
+
+		#endregion
+
         #region Fields
 
         private const sbyte _emptyBucket = -127;
