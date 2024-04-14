@@ -1,6 +1,6 @@
 ﻿using Faster.Map.QuadMap;
 
-namespace Faster.Map.RobinhoodMap.Tests
+namespace Faster.Map.QuadMap.Tests
 {
     public class QuadMapGetOrUpdateByRefTests
     {
@@ -41,7 +41,7 @@ namespace Faster.Map.RobinhoodMap.Tests
         {
             // Arrange
             var dictionary = new QuadMap<uint, uint>(); // Initialize your dictionary
-           
+
             var existingKey = 2u/* Create an existing key */;
             var existingValue = 4u /* Create an existing value corresponding to the existing key */;
 

@@ -160,8 +160,8 @@ namespace Faster.Map.RobinhoodMap
             _shift = (byte)(_shift - BitOperations.Log2(_length));
 
             var size = (int)_length + _maxProbeSequenceLength;
-            _entries = GC.AllocateUninitializedArray<Entry>(size);
-            _meta = GC.AllocateUninitializedArray<byte>(size);
+            _entries = GC.AllocateArray<Entry>(size);
+            _meta = GC.AllocateArray<byte>(size);
         }
 
         #endregion
@@ -237,7 +237,7 @@ namespace Faster.Map.RobinhoodMap
             var maxDistance = index + _maxProbeSequenceLength;
             do
             {
-                var entry = Find(_entries, index);
+               ref var entry = ref Find(_entries, index);
 
                 if (_keyComparer.Equals(entry.Key, key))
                 {
@@ -552,7 +552,7 @@ namespace Faster.Map.RobinhoodMap
             var oldEntries = _entries;
             var oldMeta = _meta;
 
-            _entries = GC.AllocateUninitializedArray<Entry>(size);
+            _entries = GC.AllocateArray<Entry>(size);
             _meta = GC.AllocateArray<byte>(size);
 
             for (uint i = 0; i < oldMeta.Length; ++i)

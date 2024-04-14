@@ -1,5 +1,4 @@
 ﻿using BenchmarkDotNet.Running;
-using Faster.Map.Benchmark;
 
 namespace Faster.Map.Concurrent.Benchmark
 {

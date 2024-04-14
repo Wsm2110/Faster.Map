@@ -2,7 +2,7 @@
 using Faster.Map.DenseMap;
 using Xunit;
 
-namespace Faster.Map.Densemap.Tests
+namespace Faster.Map.DenseMap.Tests
 {
     public class DenseMapStringWrapperTests
     {

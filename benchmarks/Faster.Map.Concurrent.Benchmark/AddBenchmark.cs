@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
 using Faster.Map.Concurrent;
 
-namespace Faster.Map.Benchmark
+namespace Faster.Map.Concurrent.Benchmark
 {
     [MarkdownExporterAttribute.GitHub]
     public class AddBenchmark

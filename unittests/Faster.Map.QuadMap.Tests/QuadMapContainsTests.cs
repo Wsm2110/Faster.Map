@@ -1,7 +1,6 @@
-﻿using Faster.Map;
-using Faster.Map.QuadMap;
+﻿using Faster.Map.QuadMap;
 
-namespace Faster.Map.RobinhoodMap.Tests
+namespace Faster.Map.QuadMap.Tests
 {
     public class RobinhoodContainsTests
     {

@@ -1,7 +1,6 @@
 ﻿using Faster.Map.QuadMap;
-using Faster.Map.QuadMap.Tests;
 
-namespace Faster.Map.RobinhoodMap.Tests
+namespace Faster.Map.QuadMap.Tests
 {
     public class QuadMapRemoveUnitTests(QuadMapFixture fixture) : IClassFixture<QuadMapFixture>
     {
@@ -18,7 +17,7 @@ namespace Faster.Map.RobinhoodMap.Tests
             map.Clear();
 
             // Assert
-            Assert.Equal(0u, map.Count);         
+            Assert.Equal(0u, map.Count);
         }
 
         [Fact]

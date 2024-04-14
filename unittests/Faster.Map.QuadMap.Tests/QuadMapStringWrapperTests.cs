@@ -1,7 +1,7 @@
 ﻿using Faster.Map.Core;
 using Faster.Map.QuadMap;
 
-namespace Faster.Map.RobinhoodMap.Tests
+namespace Faster.Map.QuadMap.Tests
 {
     public class QuadMapStringWrapperTests
     {
@@ -12,7 +12,7 @@ namespace Faster.Map.RobinhoodMap.Tests
             // Assign
             var map = new QuadMap<StringWrapper, StringWrapper>();
 
-            map.Emplace("one", "Nine");          
+            map.Emplace("one", "Nine");
 
             // Act
             map.Get("one", out var result); ;

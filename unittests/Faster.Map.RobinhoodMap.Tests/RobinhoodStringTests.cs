@@ -28,14 +28,36 @@ namespace Faster.Map.RobinhoodMap.Tests
             for (uint i = 0; i < amount; i++)
             {
                 // Act
-                var result = map.Get(i.ToString(), out var _);
+                var result = map.Get(i.ToString(), out var x);
                 if (!result)
                 {
                     // Assert
-                    Assert.Fail();
+                    Assert.True(result, $"{x} failed");
                 }
             }
         }
 
+        [Fact]
+        public void Get_Strings_Return_Succesful_PartTwo()
+        {
+            for (uint i = 0; i < 1000; i++)
+            {
+                // Arrange
+                var map = new RobinhoodMap<string, string>();
+
+                for (uint ii = 0; ii < 1000; ii++)
+                {
+                    map.Emplace(ii.ToString(), Guid.NewGuid().ToString());
+                }
+
+                for (uint ii = 0; ii < 1000; ii++)
+                {
+                    // Act
+                    var result = map.Get(ii.ToString(), out var x);
+
+                    Assert.True(result, $"{x} failed");
+                }
+            }
+        }
     }
 }

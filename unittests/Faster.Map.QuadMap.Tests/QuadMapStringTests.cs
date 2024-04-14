@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Faster.Map.RobinhoodMap.Tests
+namespace Faster.Map.QuadMap.Tests
 {
     public class QuadMapStringTests
     {

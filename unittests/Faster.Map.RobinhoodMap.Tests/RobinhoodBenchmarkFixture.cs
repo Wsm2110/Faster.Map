@@ -1,5 +1,4 @@
-﻿[assembly: CollectionBehavior(DisableTestParallelization = true)]
-
+﻿
 namespace Faster.Map.RobinhoodMap.Tests
 {
     public class RobinhoodBenchmarkFixture
