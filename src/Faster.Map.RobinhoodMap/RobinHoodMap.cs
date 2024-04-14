@@ -2,7 +2,6 @@
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Runtime.Intrinsics;
 
 #nullable enable
 
@@ -49,12 +48,12 @@ namespace Faster.Map.RobinhoodMap
             get
             {
                 //iterate backwards so we can remove the current item
-                for (int i = _entries.Length - 1; i >= 0; --i)
+                for (int i = _meta.Length - 1; i >= 0; --i)
                 {
-                    var entry = _entries[i];
-                    if (entry.Psl is not 0)
+                    var meta = _meta[i];
+                    if (meta is not 0)
                     {
-                        yield return new KeyValuePair<TKey, TValue>(entry.Key, entry.Value);
+                        yield return new KeyValuePair<TKey, TValue>(_entries[i].Key, _entries[i].Value);
                     }
                 }
             }
@@ -71,12 +70,12 @@ namespace Faster.Map.RobinhoodMap
             get
             {
                 //iterate backwards so we can remove the current item
-                for (int i = _entries.Length - 1; i >= 0; --i)
+                for (int i = _meta.Length - 1; i >= 0; --i)
                 {
-                    var entry = _entries[i];
-                    if (entry.Psl != 0)
+                    var meta = _meta[i];
+                    if (meta != 0)
                     {
-                        yield return entry.Key;
+                        yield return _entries[i].Key;
                     }
                 }
             }
@@ -92,12 +91,12 @@ namespace Faster.Map.RobinhoodMap
         {
             get
             {
-                for (int i = _entries.Length - 1; i >= 0; --i)
+                for (int i = _meta.Length - 1; i >= 0; --i)
                 {
-                    var entry = _entries[i];
-                    if (entry.Psl is not 0)
+                    var meta = _meta[i];
+                    if (meta is not 0)
                     {
-                        yield return entry.Value;
+                        yield return _entries[i].Value;
                     }
                 }
             }
@@ -107,6 +106,7 @@ namespace Faster.Map.RobinhoodMap
 
         #region Fields
 
+        private byte[] _meta;
         private Entry[] _entries;
         private uint _length;
         private readonly double _loadFactor;
@@ -114,7 +114,6 @@ namespace Faster.Map.RobinhoodMap
         private byte _shift = 32;
         private byte _maxProbeSequenceLength;
         private readonly IEqualityComparer<TKey> _keyComparer;
-
         private int _maxLookupsBeforeResize;
 
         #endregion
@@ -147,17 +146,22 @@ namespace Faster.Map.RobinhoodMap
         /// <param name="keyComparer">Used to compare keys to resolve hashcollisions</param>
         public RobinhoodMap(uint length, double loadFactor, IEqualityComparer<TKey> keyComparer)
         {
-            //default length is 8
-            _length = NextPow2(length);
+            _length = BitOperations.RoundUpToPowerOf2(length);
             _loadFactor = loadFactor;
 
+            if (_length < 8)
+            {
+                _length = 8;
+            }
+
             _maxProbeSequenceLength = (byte)BitOperations.Log2(_length);
-            _maxLookupsBeforeResize = (int)(_length * loadFactor);
+            _maxLookupsBeforeResize = (int)((_length + _maxProbeSequenceLength) * loadFactor);
             _keyComparer = keyComparer ?? EqualityComparer<TKey>.Default;
             _shift = (byte)(_shift - BitOperations.Log2(_length));
 
             var size = (int)_length + _maxProbeSequenceLength;
-            _entries = GC.AllocateArray<Entry>(size);
+            _entries = GC.AllocateUninitializedArray<Entry>(size);
+            _meta = GC.AllocateUninitializedArray<byte>(size);
         }
 
         #endregion
@@ -174,42 +178,48 @@ namespace Faster.Map.RobinhoodMap
         public bool Emplace(TKey key, TValue value)
         {
             //Resize if loadfactor is reached
-            if (Count >= _maxLookupsBeforeResize)
+            if (Count > _maxLookupsBeforeResize)
             {
                 Resize();
             }
 
-            var hashcode = (uint)key.GetHashCode();
-            var index = (_goldenRatio * hashcode) >> _shift;
-            // create default entry
-            var insert = new Entry(key, value, 1);
+            var index = Hash(key);
+
+            byte distance = 0;
+            var entry = new Entry(key, value);
 
             do
             {
-                ref var entry = ref Find(_entries, index);
+                ref var meta = ref Find(_meta, index);
 
                 //Empty spot, add Entry
-                if (entry.Psl == 0)
+                if (meta == 0)
                 {
-                    entry = insert;
+                    ++meta;
+
+                    Find(_entries, index) = entry;
                     ++Count;
                     return true;
                 }
 
+                //Steal from the rich, give to the poor
+                if (distance > meta)
+                {
+                    Swap(ref distance, ref meta);
+                    Swap(ref entry, ref Find(_entries, index));
+                    goto next;
+                }
+
                 //equals check
-                if (_keyComparer.Equals(insert.Key, entry.Key))
+                if (_keyComparer.Equals(key, Find(_entries, index).Key))
                 {
                     return false;
                 }
 
-                //Steal from the rich, give to the poor
-                if (insert.Psl > entry.Psl)
-                {
-                    Swap(ref insert, ref entry);
-                }
+                next:
 
                 //increase probe sequence length
-                ++insert.Psl;
+                ++distance;
                 ++index;
             } while (true);
         }
@@ -223,8 +233,7 @@ namespace Faster.Map.RobinhoodMap
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Get(TKey key, out TValue value)
         {
-            var hashcode = (uint)key.GetHashCode();
-            var index = (_goldenRatio * hashcode) >> _shift;
+            var index = Hash(key);
             var maxDistance = index + _maxProbeSequenceLength;
             do
             {
@@ -268,38 +277,43 @@ namespace Faster.Map.RobinhoodMap
                 Resize();
             }
 
-            var hashcode = (uint)key.GetHashCode();
-            var index = (_goldenRatio * hashcode) >> _shift;
-            // create default entry
-            var insert = new Entry(key, default, 1);
+            var index = Hash(key);
+            var entry = new Entry(key, default);
+            byte distance = 0;
 
             do
             {
-                ref var entry = ref Find(_entries, index);
+                ref var meta = ref Find(_meta, index);
 
                 //Empty spot, add Entry
-                if (entry.Psl == 0)
+                if (meta == 0)
                 {
-                    entry = insert;
-                    ++Count;
-                    return ref entry.Value;
-                }
+                    ++meta;
+                    ref var x = ref Find(_entries, index);
+                    x = entry;
 
-                //equals check 
-                if (_keyComparer.Equals(insert.Key, entry.Key))
-                {
-                    //update
-                    return ref entry.Value;
+                    ++Count;
+                    return ref x.Value;
                 }
 
                 //Steal from the rich, give to the poor
-                if (insert.Psl > entry.Psl)
+                if (distance > meta)
                 {
-                    Swap(ref insert, ref entry);
+                    Swap(ref distance, ref meta);
+                    Swap(ref entry, ref Find(_entries, index));
+                    goto next;
                 }
 
+                //equals check
+                if (_keyComparer.Equals(key, Find(_entries, index).Key))
+                {
+                    return ref Find(_entries, index).Value;
+                }
+
+                next:
+
                 //increase probe sequence length
-                ++insert.Psl;
+                ++distance;
                 ++index;
             } while (true);
         }
@@ -310,8 +324,7 @@ namespace Faster.Map.RobinhoodMap
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Update(TKey key, TValue value)
         {
-            var hashcode = (uint)key.GetHashCode();
-            var index = (_goldenRatio * hashcode) >> _shift;
+            var index = Hash(key);
             var maxDistance = index + _maxProbeSequenceLength;
 
             do
@@ -326,7 +339,7 @@ namespace Faster.Map.RobinhoodMap
 
             } while (++index < maxDistance);
 
-            //EntryTwo not found
+            //Entry not found
             return false;
         }
 
@@ -338,31 +351,34 @@ namespace Faster.Map.RobinhoodMap
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Remove(TKey key)
         {
-            var hashcode = (uint)key.GetHashCode();
-            var index = (_goldenRatio * hashcode) >> _shift;
+            var index = Hash(key);
             var maxDistance = index + _maxProbeSequenceLength;
 
             do
-            {
-                ref var entry = ref _entries[index];
-
+            {         
                 //validate hash en compare keys
-                if (_keyComparer.Equals(key, entry.Key))
+                if (_keyComparer.Equals(key, Find(_entries, index).Key))
                 {
-                    //Get next EntryTwo
-                    ref var next = ref Find(_entries, ++index);
+                    uint nextIndex = index + 1;
+                    var nextMeta = Find(_meta, nextIndex);
 
-                    entry = default;
-
-                    while (next.Psl > 1)
+                    while (nextMeta > 1)
                     {
                         //decrease next psl by 1
-                        next.Psl--;
-                        //swap upper EntryTwo with lower
-                        Swap(ref next, ref _entries[index - 1]);
+                        nextMeta--;
+
+                        Find(_meta, index) = nextMeta;
+                        Find(_entries, index) = Find(_entries, nextIndex);
+
+                        index++;
+                        nextIndex++;
+
                         //increase index by one
-                        next = ref Find(_entries, ++index);
+                        nextMeta = Find(_meta, nextIndex);
                     }
+
+                    Find(_meta, index) = default;
+                    Find(_entries, index) = default;
 
                     --Count;
                     return true;
@@ -385,9 +401,8 @@ namespace Faster.Map.RobinhoodMap
         /// </returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Contains(TKey key)
-        {
-            var hashcode = (uint)key.GetHashCode();
-            var index = (_goldenRatio * hashcode) >> _shift;
+        { 
+            var index = Hash(key);
             var maxDistance = index + _maxProbeSequenceLength;
 
             do
@@ -412,13 +427,13 @@ namespace Faster.Map.RobinhoodMap
         {
             for (var i = 0; i < denseMap._entries.Length; ++i)
             {
-                var entry = denseMap._entries[i];
-                if (entry.Psl is 0)
+                var meta = denseMap._meta[i];
+                if (meta is 0)
                 {
                     continue;
                 }
 
-                Emplace(entry.Key, entry.Value);
+                Emplace(denseMap._entries[i].Key, denseMap._entries[i].Value);
             }
         }
 
@@ -428,6 +443,7 @@ namespace Faster.Map.RobinhoodMap
         public void Clear()
         {
             Array.Clear(_entries);
+            Array.Clear(_meta);
             Count = 0;
         }
 
@@ -469,38 +485,45 @@ namespace Faster.Map.RobinhoodMap
         #region Private Methods
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ref Entry Find(Entry[] array, uint index)
+        private uint Hash(TKey key)
+        {
+            var hashcode = (uint)key.GetHashCode();
+            return (_goldenRatio * hashcode) >> _shift;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static ref T Find<T>(T[] array, uint index)
         {
             ref var arr0 = ref MemoryMarshal.GetArrayDataReference(array);
             return ref Unsafe.Add(ref arr0, index);
-        } 
+        }
 
-        private void EmplaceInternal(TKey key, TValue value)
+        private void EmplaceInternal(ref Entry entry)
         {
-            var hashcode = (uint)key.GetHashCode();
-            var index = (_goldenRatio * hashcode) >> _shift;
-            // create default entry
-            var insert = new Entry(key, value, 1);
+            var index = Hash(entry.Key);
+            byte distance = 0;
 
             do
             {
-                ref var entry = ref Find(_entries, index);
+                ref var meta = ref Find(_meta, index);
 
                 //Empty spot, add Entry
-                if (entry.Psl == 0)
+                if (meta == 0)
                 {
-                    entry = insert;
+                    Find(_entries, index) = entry;
+                    ++meta;
                     return;
                 }
 
                 //Steal from the rich, give to the poor
-                if (insert.Psl > entry.Psl)
+                if (distance > meta)
                 {
-                    Swap(ref insert, ref entry);
+                    Swap(ref distance, ref meta);
+                    Swap(ref entry, ref Find(_entries, index));
                 }
 
                 //increase probe sequence length
-                ++insert.Psl;
+                ++distance;
                 ++index;
             } while (true);
         }
@@ -511,74 +534,49 @@ namespace Faster.Map.RobinhoodMap
         /// <param name="x">The x.</param>
         /// <param name="y">The y.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static void Swap(ref Entry x, ref Entry y)
-        {
-            var tmp = x;
-
-            x = y;
-            y = tmp;
-        }
+        private static void Swap<T>(ref T x, ref T y) => (x, y) = (y, x);
 
         /// <summary>
         /// Resizes this instance.
         /// </summary>
         private void Resize()
         {
-            _length = _length << 1;
+            _length <<= 1;
             _shift--;
 
             _maxProbeSequenceLength = (byte)BitOperations.Log2(_length);
-            _maxLookupsBeforeResize = (int)(_length * _loadFactor);
+            _maxLookupsBeforeResize = (int)((_length + _maxProbeSequenceLength) * _loadFactor);
 
             var size = Unsafe.As<uint, int>(ref _length) + _maxProbeSequenceLength;
 
             var oldEntries = _entries;
+            var oldMeta = _meta;
 
-            _entries = GC.AllocateArray<Entry>(size);
+            _entries = GC.AllocateUninitializedArray<Entry>(size);
+            _meta = GC.AllocateArray<byte>(size);
 
-            for (uint i = 0; i < oldEntries.Length; ++i)
+            for (uint i = 0; i < oldMeta.Length; ++i)
             {
-                var entry = Find(oldEntries, i);
-                if (entry.Psl == 0)
+                if (oldMeta[i] == 0)
                 {
                     continue;
                 }
 
-                EmplaceInternal(entry.Key, entry.Value);
+                EmplaceInternal(ref Find(oldEntries, i));
             }
         }
 
-        /// <summary>
-        /// calculates next power of 2
-        /// </summary>
-        /// <param name="c">The c.</param>
-        /// <returns></returns>
-        ///
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static uint NextPow2(uint c)
+        [DebuggerDisplay("{Key} {Value}")]
+        [StructLayout(LayoutKind.Sequential)]
+        internal record struct Entry
         {
-            c--;
-            c |= c >> 1;
-            c |= c >> 2;
-            c |= c >> 4;
-            c |= c >> 8;
-            c |= c >> 16;
-            return ++c;
-        }
-
-        [DebuggerDisplay("{Key} {Value} {Psl}")]
-        [StructLayout(LayoutKind.Sequential, Pack = 1)]
-        internal struct Entry
-        {
-            public byte Psl;
             public TKey Key;
             public TValue Value;
 
-            public Entry(TKey key, TValue value, byte psl)
+            public Entry(TKey key, TValue value)
             {
                 Key = key;
                 Value = value;
-                Psl = psl;
             }
         }
 
