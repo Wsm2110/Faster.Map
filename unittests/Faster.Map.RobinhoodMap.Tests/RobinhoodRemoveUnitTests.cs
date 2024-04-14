@@ -82,6 +82,7 @@ namespace Faster.Map.RobinhoodMap.Tests
         [InlineData(100000)]
         [InlineData(1000000)]
         [InlineData(10000000)]
+        [InlineData(100000000)]
         public void ShiftRemove_ShiftsOneMillionEntriesDown(int amount)
         {
             // Arrange
@@ -95,7 +96,7 @@ namespace Faster.Map.RobinhoodMap.Tests
             }
 
             // Assert
-            Assert.Equal(0, map.Count);
+            Assert.Equal(0, map.Count);           
         }
 
         [Fact]
@@ -104,12 +105,12 @@ namespace Faster.Map.RobinhoodMap.Tests
             // Arrange
             var dictionary = new RobinhoodMap<int, string>();
             dictionary.Emplace(1, "One");
-        
+
             // Act
             dictionary.Remove(1); // Removing entry with key 2
 
             // Assert
-            Assert.Equal(0, dictionary.Count);       
+            Assert.Equal(0, dictionary.Count);
         }
     }
 }
