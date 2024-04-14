@@ -31,7 +31,7 @@ namespace Faster.Map.RobinhoodMap.Tests
         {
             // Arrange
             var dictionary = new RobinhoodMap<uint, uint>(); // Initialize your dictionary
-                                                         
+
             uint nonExistingKey = 50030 /* Create a key that doesn't exist in the dictionary */;
 
             // Act
@@ -91,7 +91,7 @@ namespace Faster.Map.RobinhoodMap.Tests
             var dictionary = new RobinhoodMap<uint, string>(); // Initialize your dictionary
 
             var existingKey = 2u/* Create an existing key */;
-                
+
             // Act
             ref var updatedValue = ref dictionary.GetOrUpdate(existingKey);
 

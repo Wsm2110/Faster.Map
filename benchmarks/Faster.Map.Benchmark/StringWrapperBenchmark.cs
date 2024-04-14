@@ -48,10 +48,10 @@ namespace Faster.Map.Benchmark
 
             foreach (var key in keys)
             {
-             //   dic.Add(key, key);
+               dic.Add(key, key);
                // _denseMap.Emplace(key, key);
                 _robinhoodMap.Emplace(key, key);
-                _quadMap.Emplace(key, key);
+                //_quadMap.Emplace(key, key);
             }
         }
 
@@ -74,23 +74,23 @@ namespace Faster.Map.Benchmark
             }
         }
 
-        [Benchmark]
-        public void QuadMap()
-        {
-            foreach (var key in keys)
-            {
-                _quadMap.Get(key, out var _);
-            }
-        }
-
-        //[Benchmark(Baseline = true)]
-        //public void Dictionary()
+        //[Benchmark]
+        //public void QuadMap()
         //{
         //    foreach (var key in keys)
         //    {
-        //        dic.TryGetValue(key, out var _);
+        //        _quadMap.Get(key, out var _);
         //    }
         //}
+
+        [Benchmark(Baseline = true)]
+        public void Dictionary()
+        {
+            foreach (var key in keys)
+            {
+                dic.TryGetValue(key, out var _);
+            }
+        }
 
     }
 }

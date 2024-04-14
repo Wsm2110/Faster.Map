@@ -16,7 +16,7 @@ namespace Faster.Map.Benchmark
         #region Fields
 
         //fixed size, dont want to measure resize()
-        private DenseMap<uint, uint> _dense = new DenseMap<uint, uint>(1000000, 0.5);
+        private DenseMap<uint, uint> _dense = new DenseMap<uint, uint>(1000000);
         private Dictionary<uint, uint> dic = new Dictionary<uint, uint>(1000000);
         private RobinhoodMap<uint, uint> _robinhoodMap = new RobinhoodMap<uint, uint>(1000000);
         private QuadMap<uint, uint> _quadmap = new QuadMap<uint, uint>(1000000);
@@ -27,7 +27,7 @@ namespace Faster.Map.Benchmark
 
         #region Properties
 
-        [ParamsAttribute(1, 10, 100, 1000, 10000, 100000, 1000000)]
+        [ParamsAttribute( 1000000)]
         public int Length { get; set; }
 
         #endregion
@@ -54,6 +54,7 @@ namespace Faster.Map.Benchmark
         {
             _dense.Clear();
             dic.Clear();
+            _quadmap.Clear();
             _robinhoodMap.Clear();
         }
 
