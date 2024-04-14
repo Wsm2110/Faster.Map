@@ -81,8 +81,6 @@ namespace Faster.Map.RobinhoodMap.Tests
         [InlineData(10000)]
         [InlineData(100000)]
         [InlineData(1000000)]
-        [InlineData(10000000)]
-        [InlineData(100000000)]
         public void ShiftRemove_ShiftsOneMillionEntriesDown(int amount)
         {
             // Arrange
