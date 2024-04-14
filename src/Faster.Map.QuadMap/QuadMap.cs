@@ -177,7 +177,7 @@ namespace Faster.Map.QuadMap
         public bool Emplace(TKey key, TValue value)
         {
             //Resize if loadfactor is reached
-            if (Count >= _maxLookupsBeforeResize)
+            if (Count > _maxLookupsBeforeResize)
             {
                 Resize();
             }
@@ -195,7 +195,7 @@ namespace Faster.Map.QuadMap
             do
             {
                 //retrieve infobyte
-                ref var entry = ref FindValueRef(_entries, index);
+                ref var entry = ref Find(_entries, index);
 
                 //Empty spot, add entry
                 if (entry.Metadata == _emptyBucket || entry.Metadata == _tombstone)
@@ -243,7 +243,7 @@ namespace Faster.Map.QuadMap
             do
             {
                 //retrieve infobyte
-                ref var entry = ref FindValueRef(_entries, index);
+                ref var entry = ref Find(_entries, index);
 
                 //Empty spot, add entry
                 if (entry.Metadata == _emptyBucket || entry.Metadata == _tombstone)
@@ -359,7 +359,7 @@ namespace Faster.Map.QuadMap
             while (true)
             {
                 //retrieve entry
-                ref var entry = ref FindValueRef(_entries, index);
+                ref var entry = ref Find(_entries, index);
 
                 if (h2 == entry.Metadata && _comparer.Equals(key, entry.Key))
                 {
@@ -398,7 +398,7 @@ namespace Faster.Map.QuadMap
 
             do
             {
-                ref var entry = ref FindValueRef(_entries, index);
+                ref var entry = ref Find(_entries, index);
 
                 if (h2 == entry.Metadata && _comparer.Equals(key, entry.Key))
                 {
@@ -437,7 +437,7 @@ namespace Faster.Map.QuadMap
 
             do
             {
-                ref var entry = ref FindValueRef(_entries, index);
+                ref var entry = ref Find(_entries, index);
 
                 if (h2 == entry.Metadata && _comparer.Equals(key, entry.Key))
                 {
@@ -479,7 +479,7 @@ namespace Faster.Map.QuadMap
 
             do
             {
-                ref var entry = ref FindValueRef(_entries, index);
+                ref var entry = ref Find(_entries, index);
 
                 if (h2 == entry.Metadata && _comparer.Equals(key, entry.Key))
                 {
@@ -584,7 +584,7 @@ namespace Faster.Map.QuadMap
             do
             {
                 //retrieve infobyte
-                ref var entry = ref FindValueRef(_entries, index);
+                ref var entry = ref Find(_entries, index);
 
                 //Empty spot, add entry
                 if (entry.Metadata == _emptyBucket)
@@ -624,7 +624,7 @@ namespace Faster.Map.QuadMap
 
             for (uint i = 0; i < oldEntries.Length; ++i)
             {
-                ref var entry = ref FindValueRef(oldEntries, i);
+                ref var entry = ref Find(oldEntries, i);
                 if (entry.Metadata < 0)
                 {
                     continue;
@@ -635,7 +635,7 @@ namespace Faster.Map.QuadMap
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ref T FindValueRef<T>(T[] array, uint index)
+        private static ref T Find<T>(T[] array, uint index)
         {
             ref var arr0 = ref MemoryMarshal.GetArrayDataReference(array);
             return ref Unsafe.Add(ref arr0, index);
