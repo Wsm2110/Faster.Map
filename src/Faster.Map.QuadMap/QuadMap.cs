@@ -268,78 +268,6 @@ namespace Faster.Map.QuadMap
             } while (true);
         }
 
-
-        /// <summary>
-        /// 
-        /// Tries to emplace a key-value pair into the map
-        ///
-        /// If the map already contains this key, update the existing KeyValuePair
-        ///
-        /// </summary>
-        /// <param name="key">The key.</param>
-        /// <param name="value">The value.</param>
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-        //public void EmplaceOrUpdate(TKey key, TValue value)
-        //{
-        //    //Resize if loadfactor is reached
-        //    if (Count > _maxLookupsBeforeResize)
-        //    {
-        //        Resize();
-        //    }
-
-        //    //Get object identity hashcode
-        //    var hashcode = (uint)key.GetHashCode();
-
-        //    // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
-        //    uint index = hashcode * _goldenRatio >> _shift;
-
-        //    uint jumpDistance = 1;
-
-        //    // Get 7 high bits
-        //    var h2 = hashcode & _bitmask;
-
-        //    do
-        //    {
-        //        //retrieve infobyte
-        //        ref var metadata = ref _metadata[index];
-
-        //        //Empty spot, add entry
-        //        if (metadata == _emptyBucket || metadata == _tombstone)
-        //        {
-        //            _entries[index].Key = key;
-        //            _entries[index].Value = value;
-
-        //            metadata = Unsafe.As<long, sbyte>(ref h2);
-
-        //            ++Count;
-        //            return;
-        //        }
-
-        //        ref var entry = ref _entries[index];
-
-        //        //validate hash
-        //        if (h2 == metadata && _comparer.Equals(key, entry.Key))
-        //        {
-        //            // Update existing value
-        //            entry.Value = value;
-        //            return;
-        //        }
-
-        //        index += jumpDistance;
-
-        //        if (index >= _length)
-        //        {
-        //            // adding jumpdistance to the index will prevent endless loops.
-        //            // Every time this code block is entered jumpdistance will be different hence the index will be different too
-        //            // thus it will always look for an empty spot
-        //            index = BitOperations.RotateRight(hashcode, 31) + jumpDistance >> _shift;
-        //        }
-
-        //        jumpDistance += 1;
-
-        //    } while (true);
-        //}
-
         /// <summary>
         /// Gets the value with the corresponding key
         /// </summary>
@@ -353,7 +281,9 @@ namespace Faster.Map.QuadMap
             var hashcode = (uint)key.GetHashCode();
             // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
             uint index = _goldenRatio * hashcode >> _shift;
+
             long h2 = hashcode & _bitmask;
+
             uint jumpDistance = 0;
 
             while (true)
@@ -367,7 +297,7 @@ namespace Faster.Map.QuadMap
                     return true;
                 }
               
-                //Empty spot, add entry
+                //Empty spot
                 if (entry.Metadata == _emptyBucket)
                 {
                     value = _defaultValue;
