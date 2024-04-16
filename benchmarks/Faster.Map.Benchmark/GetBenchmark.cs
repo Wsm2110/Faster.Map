@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using Faster.Map.QuadMap;
 using Faster.Map.DenseMap;
-using Faster.Map.RobinhoodMap;
+using Faster.Map.RobinHoodMap;
 using System;
 
 namespace Faster.Map.Benchmark
@@ -15,10 +15,10 @@ namespace Faster.Map.Benchmark
     {
         #region Fields
 
-        private DenseMap<uint, uint> _denseMap = new DenseMap<uint, uint>();
-        private Dictionary<uint, uint> _dictionary = new Dictionary<uint, uint>();
-        private RobinhoodMap<uint, uint> _robinHoodMap = new();
-        private QuadMap<uint, uint> _quadMap = new();
+        private DenseMap<uint, uint> _denseMap;
+        private Dictionary<uint, uint> _dictionary;
+        private RobinhoodMap<uint, uint> _robinHoodMap;
+        private QuadMap<uint, uint> _quadMap;
 
         private uint[] keys;
 
@@ -26,8 +26,8 @@ namespace Faster.Map.Benchmark
 
         #region Properties
 
-        [Params(1, 10, 100, 1000, 10000, 100000, 1000000)]
-        public int Length { get; set; }
+        [Params(1, 10, 100, 1000 ,10000, 100000, 1000000)]
+        public uint Length { get; set; }
 
         #endregion
 
@@ -37,6 +37,11 @@ namespace Faster.Map.Benchmark
         [GlobalSetup]
         public void Setup()
         {
+            _denseMap = new DenseMap<uint, uint>(Length);
+            _dictionary = new Dictionary<uint, uint>((int)Length);
+            _robinHoodMap = new(Length);
+            _quadMap = new(Length);
+
             var output = File.ReadAllText("Numbers.txt");
             var splittedOutput = output.Split(',');
 
@@ -72,7 +77,7 @@ namespace Faster.Map.Benchmark
             for (int i = 0; i < Length; ++i)
             {
                 var key = keys[i];
-                _robinHoodMap.Get(key, out var _);
+                _robinHoodMap.Get(key, out var _);           
             }
         }
 

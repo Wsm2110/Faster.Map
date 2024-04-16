@@ -794,7 +794,7 @@ namespace Faster.Map.DenseMap
             var size = Unsafe.As<uint, int>(ref _length) + 16;
 
             _metadata = GC.AllocateArray<sbyte>(size);
-            _entries = GC.AllocateUninitializedArray<Entry>(size);
+            _entries = GC.AllocateArray<Entry>(size);
 
             _metadata.AsSpan().Fill(_emptyBucket);
 
@@ -840,12 +840,8 @@ namespace Faster.Map.DenseMap
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ref T Find<T>(T[] array, uint index)
         {
-#if DEBUG
-            return ref array[index];
-#else
             ref var arr0 = ref MemoryMarshal.GetArrayDataReference(array);
             return ref Unsafe.Add(ref arr0, index);
-#endif
         }
 
         /// <summary>
@@ -863,7 +859,6 @@ namespace Faster.Map.DenseMap
             ref var arr0 = ref MemoryMarshal.GetArrayDataReference(array);
             return ref Unsafe.Add(ref arr0, index);
         }
-
 
         /// <summary>
         /// Reset the lowest significant bit in the given value

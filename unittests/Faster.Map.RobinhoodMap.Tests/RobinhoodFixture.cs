@@ -4,10 +4,22 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Faster.Map.RobinhoodMap.Tests
+namespace Faster.Map.RobinHoodMap.Tests
 {
     public class RobinhoodFixture : IDisposable
     {
+
+        public IEnumerable<uint> LoadKeysFromFile()
+        {
+            var output = File.ReadAllText("Numbers.txt");
+            var splittedOutput = output.Split(',');
+
+            for (var index = 0; index < splittedOutput.Length; index++)
+            {
+                yield return uint.Parse(splittedOutput[index]);
+            }
+        }
+
         public RobinhoodMap<uint, uint> CreateMap(IEnumerable<uint> keys)
         {
             var map = new RobinhoodMap<uint, uint>();

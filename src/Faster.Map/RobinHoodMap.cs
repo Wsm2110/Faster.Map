@@ -1,11 +1,13 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 #nullable enable
 
-namespace Faster.Map.RobinhoodMap
+namespace Faster.Map.RobinHoodMap
 {
     /// <summary>
     /// This hashmap uses the following
@@ -73,7 +75,7 @@ namespace Faster.Map.RobinhoodMap
                 for (int i = _meta.Length - 1; i >= 0; --i)
                 {
                     var meta = _meta[i];
-                    if (meta != 0)
+                    if (meta > 0)
                     {
                         yield return _entries[i].Key;
                     }
@@ -149,9 +151,9 @@ namespace Faster.Map.RobinhoodMap
             _length = BitOperations.RoundUpToPowerOf2(length);
             _loadFactor = loadFactor;
 
-            if (_length < 8)
+            if (length < 4)
             {
-                _length = 8;
+                _length = 4;
             }
 
             _maxProbeSequenceLength = (byte)BitOperations.Log2(_length);
@@ -160,7 +162,7 @@ namespace Faster.Map.RobinhoodMap
             _shift = (byte)(_shift - BitOperations.Log2(_length));
 
             var size = (int)_length + _maxProbeSequenceLength;
-            _entries = GC.AllocateArray<Entry>(size);
+            _entries = GC.AllocateUninitializedArray<Entry>(size);
             _meta = GC.AllocateArray<byte>(size);
         }
 
@@ -185,7 +187,7 @@ namespace Faster.Map.RobinhoodMap
 
             var index = Hash(key);
 
-            byte distance = 0;
+            byte distance = 1;
             var entry = new Entry(key, value);
 
             do
@@ -195,8 +197,7 @@ namespace Faster.Map.RobinhoodMap
                 //Empty spot, add Entry
                 if (meta == 0)
                 {
-                    ++meta;
-
+                    meta = distance;
                     Find(_entries, index) = entry;
                     ++Count;
                     return true;
@@ -207,7 +208,10 @@ namespace Faster.Map.RobinhoodMap
                 {
                     Swap(ref distance, ref meta);
                     Swap(ref entry, ref Find(_entries, index));
-                    goto next;
+
+                    ++distance;
+                    ++index;
+                    continue;
                 }
 
                 //equals check
@@ -215,8 +219,6 @@ namespace Faster.Map.RobinhoodMap
                 {
                     return false;
                 }
-
-                next:
 
                 //increase probe sequence length
                 ++distance;
@@ -237,7 +239,7 @@ namespace Faster.Map.RobinhoodMap
             var maxDistance = index + _maxProbeSequenceLength;
             do
             {
-               ref var entry = ref Find(_entries, index);
+                ref var entry = ref Find(_entries, index);
 
                 if (_keyComparer.Equals(entry.Key, key))
                 {
@@ -279,7 +281,7 @@ namespace Faster.Map.RobinhoodMap
 
             var index = Hash(key);
             var entry = new Entry(key, default);
-            byte distance = 0;
+            byte distance = 1;
 
             do
             {
@@ -288,7 +290,7 @@ namespace Faster.Map.RobinhoodMap
                 //Empty spot, add Entry
                 if (meta == 0)
                 {
-                    ++meta;
+                    meta = distance;
                     ref var x = ref Find(_entries, index);
                     x = entry;
 
@@ -355,7 +357,7 @@ namespace Faster.Map.RobinhoodMap
             var maxDistance = index + _maxProbeSequenceLength;
 
             do
-            {         
+            {
                 //validate hash en compare keys
                 if (_keyComparer.Equals(key, Find(_entries, index).Key))
                 {
@@ -401,7 +403,7 @@ namespace Faster.Map.RobinhoodMap
         /// </returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Contains(TKey key)
-        { 
+        {
             var index = Hash(key);
             var maxDistance = index + _maxProbeSequenceLength;
 
@@ -492,16 +494,21 @@ namespace Faster.Map.RobinhoodMap
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ref T Find<T>(T[] array, uint index)
+        private ref Entry Find(Entry[] array, uint index)
         {
-            ref var arr0 = ref MemoryMarshal.GetArrayDataReference(array);
-            return ref Unsafe.Add(ref arr0, index);
+            return ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(array), index);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private ref byte Find(byte[] array, uint index)
+        {          
+            return ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(array), index);
         }
 
         private void EmplaceInternal(ref Entry entry)
         {
             var index = Hash(entry.Key);
-            byte distance = 0;
+            byte distance = 1;
 
             do
             {
@@ -510,8 +517,9 @@ namespace Faster.Map.RobinhoodMap
                 //Empty spot, add Entry
                 if (meta == 0)
                 {
+                    meta = distance;
                     Find(_entries, index) = entry;
-                    ++meta;
+               
                     return;
                 }
 
@@ -552,7 +560,7 @@ namespace Faster.Map.RobinhoodMap
             var oldEntries = _entries;
             var oldMeta = _meta;
 
-            _entries = GC.AllocateArray<Entry>(size);
+            _entries = GC.AllocateUninitializedArray<Entry>(size);
             _meta = GC.AllocateArray<byte>(size);
 
             for (uint i = 0; i < oldMeta.Length; ++i)
@@ -568,7 +576,7 @@ namespace Faster.Map.RobinhoodMap
 
         [DebuggerDisplay("{Key} {Value}")]
         [StructLayout(LayoutKind.Sequential)]
-        internal record struct Entry
+        internal struct Entry
         {
             public TKey Key;
             public TValue Value;

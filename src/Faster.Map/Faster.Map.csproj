@@ -7,13 +7,13 @@
     <LangVersion>Latest</LangVersion>
     <Authors>Wiljan Ruizendaal</Authors>
     <PackageReleaseNotes>
-      Missing Resize in GetOrAdd method
+      Add robinhood hashmap and quadratic hashmap
     </PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/Wsm2110/Faster.Map</PackageProjectUrl>
-    <AssemblyVersion>5.0.3</AssemblyVersion>
-    <FileVersion>5.0.3</FileVersion>
+    <AssemblyVersion>5.0.4</AssemblyVersion>
+    <FileVersion>5.0.4</FileVersion>
     <Title>Fastest .net hashmap</Title>
-    <Version>5.0.3</Version>
+    <Version>5.0.4</Version>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Description>Cutting-edge NuGet package offering high-performance hash map implementations leveraging SIMD (Single Instruction, Multiple Data) instructions. This innovative library combines the efficiency of SIMD operations with advanced hashing techniques </Description>
     <RepositoryUrl>https://github.com/Wsm2110/Faster.Map</RepositoryUrl>
@@ -33,10 +33,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.IO.Hashing" Version="8.0.0" />
-  </ItemGroup>
-
-  <ItemGroup>
     <None Update="../README.md">
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
@@ -44,16 +40,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Faster.Map.Core\Faster.Map.Core.csproj" />
-  </ItemGroup>
+    <PackageReference Include="System.IO.Hashing" Version="8.0.*" />
 
-  <ItemGroup>
-    <None Update="README.md">
-      <Pack>True</Pack>
-      <PackagePath>\</PackagePath>
-    </None>
   </ItemGroup>
-
 
 
 </Project>

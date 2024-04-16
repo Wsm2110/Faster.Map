@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using BenchmarkDotNet.Attributes;
 using Faster.Map.DenseMap;
-using Faster.Map.RobinhoodMap;
+using Faster.Map.RobinHoodMap;
 using Faster.Map.QuadMap;
 
 namespace Faster.Map.Benchmark

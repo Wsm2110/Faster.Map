@@ -1,7 +1,7 @@
 using Faster.Map;
 using Newtonsoft.Json.Linq;
 
-namespace Faster.Map.RobinhoodMap.Tests
+namespace Faster.Map.RobinHoodMap.Tests
 {
     public class RobinhoodAddTests
     {

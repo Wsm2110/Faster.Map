@@ -1,8 +1,20 @@
 ﻿
-namespace Faster.Map.RobinhoodMap.Tests
+namespace Faster.Map.RobinHoodMap.Tests
 {
     public class RobinhoodBenchmarkFixture
     {
+
+        public IEnumerable<uint> PreGeneratedKeys()
+        {
+            var output = File.ReadAllText("Numbers.txt");
+            var splittedOutput = output.Split(',');
+
+            for (var index = 0; index < splittedOutput.Length; index++)
+            {
+                yield return uint.Parse(splittedOutput[index]);
+            }
+        }
+
         public IList<uint> CreateKeys()
         {
             var output = File.ReadAllText("Numbers.txt");

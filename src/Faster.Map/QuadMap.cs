@@ -1,4 +1,6 @@
-﻿using System.Numerics;
+﻿using System;
+using System.Collections.Generic;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -111,8 +113,7 @@ namespace Faster.Map.QuadMap
         private readonly IEqualityComparer<TKey> _comparer;
         private double _maxLookupsBeforeResize;
         private uint _lengthMinusOne;
-        private readonly TValue? _defaultValue;
-
+       
         #endregion
 
         #region Constructor
@@ -159,8 +160,7 @@ namespace Faster.Map.QuadMap
             _entries = GC.AllocateUninitializedArray<Entry>((int)_length);
             _entries.AsSpan().Fill(new Entry(default, default, _emptyBucket));
 
-            _lengthMinusOne = _length - 1;
-            _defaultValue = default;
+            _lengthMinusOne = _length - 1;            
         }
 
         #endregion
@@ -300,7 +300,7 @@ namespace Faster.Map.QuadMap
                 //Empty spot
                 if (entry.Metadata == _emptyBucket)
                 {
-                    value = _defaultValue;
+                    value = default;
                     return false;
                 }
 

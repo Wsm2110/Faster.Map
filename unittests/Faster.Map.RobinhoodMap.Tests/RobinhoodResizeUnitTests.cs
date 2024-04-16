@@ -6,7 +6,7 @@ using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Faster.Map.RobinhoodMap.Tests
+namespace Faster.Map.RobinHoodMap.Tests
 {
     public class RobinhoodResizeUnitTests
     {
@@ -24,7 +24,7 @@ namespace Faster.Map.RobinhoodMap.Tests
             map.Emplace(4, "Four");
 
             // Assert
-            Assert.Equal(8u + BitOperations.Log2(8), map.Size);
+            Assert.Equal(4u + BitOperations.Log2(4), map.Size);
             Assert.Equal(4, map.Count);
         }
     }

@@ -7,7 +7,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Faster.Map.RobinhoodMap.Tests
+namespace Faster.Map.RobinHoodMap.Tests
 {
     public class RobinhoodGetUnitTests(RobinhoodFixture fixture) : IClassFixture<RobinhoodFixture>
     {
@@ -130,5 +130,43 @@ namespace Faster.Map.RobinhoodMap.Tests
                 Assert.Equal(500000, map.Count);
             }
         }
+
+        [Fact]
+        public void Assert_Keys_From_File_Is_OneMillion()
+        {
+            // Arrange
+            var keys = fixture.LoadKeysFromFile().ToList();
+            var map = fixture.CreateMap(keys);
+
+            Assert.Equal(1000000, map.Count);
+
+        }
+
+        [Fact]
+        public void Assert_Get_Keys_From_File()
+        {
+            // Arrange
+            var keys = fixture.LoadKeysFromFile().ToList();
+            var map = fixture.CreateMap(keys);
+
+            for (var i = 0; i < keys.Count; i++)
+            {
+                Assert.True(map.Get(keys[i], out var retrievedValue));
+            }
+        }
+
+        [Fact]
+        public void Assert_Get_1000_Keys_From_File()
+        {
+            // Arrange
+            var keys = fixture.LoadKeysFromFile().Take(1000).ToList();
+            var map = fixture.CreateMap(keys);
+
+            for (var i = 0; i < 1000; i++)
+            {
+                Assert.True(map.Get(keys[i], out var retrievedValue));
+            }
+        }
+
     }
 }

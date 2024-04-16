@@ -5,7 +5,7 @@ using System.Linq;
 using BenchmarkDotNet.Attributes;
 using Faster.Map.DenseMap;
 using Faster.Map.QuadMap;
-using Faster.Map.RobinhoodMap;
+using Faster.Map.RobinHoodMap;
 using Microsoft.Collections.Extensions;
 
 namespace Faster.Map.Benchmark
