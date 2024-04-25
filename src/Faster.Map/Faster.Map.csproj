@@ -3,7 +3,7 @@
     <ImplicitUsings>false</ImplicitUsings>
     <Nullable>disable</Nullable>
     <LangVersion>preview</LangVersion>
-    <TargetFrameworks>net8.0</TargetFrameworks>
+    <TargetFrameworks>net9.0</TargetFrameworks>
     <LangVersion>Latest</LangVersion>
     <Authors>Wiljan Ruizendaal</Authors>
     <PackageReleaseNotes>

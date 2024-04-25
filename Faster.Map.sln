@@ -19,9 +19,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Faster.Map.QuadMap.Tests", 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Faster.Map.RobinhoodMap.Tests", "unittests\Faster.Map.RobinhoodMap.Tests\Faster.Map.RobinhoodMap.Tests.csproj", "{C5F9A7E0-085D-4BA9-BD18-BDEDF987C35E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Faster.Map.Nuget.Tests", "unittests\Faster.Map.Nuget.Tests\Faster.Map.Nuget.Tests.csproj", "{9489C1F8-4BCC-407F-9B90-C4D2726F382E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Faster.Map.Nuget.Tests", "unittests\Faster.Map.Nuget.Tests\Faster.Map.Nuget.Tests.csproj", "{9489C1F8-4BCC-407F-9B90-C4D2726F382E}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Faster.Map", "src\Faster.Map\Faster.Map.csproj", "{6C8A8BB9-6DB6-4956-B203-BFF15E558AA5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Faster.Map.CMap.Tests", "Faster.Map.CMap.Tests\Faster.Map.CMap.Tests.csproj", "{7F39ABDA-EDF9-4ECE-B94C-63E516F69F01}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -87,6 +89,14 @@ Global
 		{6C8A8BB9-6DB6-4956-B203-BFF15E558AA5}.Release|Any CPU.Build.0 = Release|Any CPU
 		{6C8A8BB9-6DB6-4956-B203-BFF15E558AA5}.Release|x86.ActiveCfg = Release|Any CPU
 		{6C8A8BB9-6DB6-4956-B203-BFF15E558AA5}.Release|x86.Build.0 = Release|Any CPU
+		{7F39ABDA-EDF9-4ECE-B94C-63E516F69F01}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7F39ABDA-EDF9-4ECE-B94C-63E516F69F01}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7F39ABDA-EDF9-4ECE-B94C-63E516F69F01}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{7F39ABDA-EDF9-4ECE-B94C-63E516F69F01}.Debug|x86.Build.0 = Debug|Any CPU
+		{7F39ABDA-EDF9-4ECE-B94C-63E516F69F01}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7F39ABDA-EDF9-4ECE-B94C-63E516F69F01}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7F39ABDA-EDF9-4ECE-B94C-63E516F69F01}.Release|x86.ActiveCfg = Release|Any CPU
+		{7F39ABDA-EDF9-4ECE-B94C-63E516F69F01}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -99,6 +109,7 @@ Global
 		{C5F9A7E0-085D-4BA9-BD18-BDEDF987C35E} = {D14F1A94-1E12-40B7-95AD-458306CAC233}
 		{9489C1F8-4BCC-407F-9B90-C4D2726F382E} = {D14F1A94-1E12-40B7-95AD-458306CAC233}
 		{6C8A8BB9-6DB6-4956-B203-BFF15E558AA5} = {21A59AB1-1ABE-404A-972E-21ECAE7DC24A}
+		{7F39ABDA-EDF9-4ECE-B94C-63E516F69F01} = {D14F1A94-1E12-40B7-95AD-458306CAC233}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {B844430C-F4DE-4B2B-BD01-0E455BD01E41}

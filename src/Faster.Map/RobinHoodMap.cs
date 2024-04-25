@@ -236,18 +236,18 @@ namespace Faster.Map.RobinHoodMap
         public bool Get(TKey key, out TValue value)
         {
             var index = Hash(key);
-            var maxDistance = index + _maxProbeSequenceLength;
-            do
-            {
-                ref var entry = ref Find(_entries, index);
 
-                if (_keyComparer.Equals(entry.Key, key))
-                {
-                    value = entry.Value;
-                    return true;
-                }
+          
+            //var buffer = MemoryMarshal.CreateSpan>(ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(_entries), index);
 
-            } while (++index < maxDistance);
+            //foreach (var entry in buffer)
+            //{
+            //    if (_keyComparer.Equals(entry.Key, key))
+            //    {
+            //        value = entry.Value;
+            //        return true;
+            //    }
+            //}
 
             value = default;
             return false;
@@ -501,7 +501,7 @@ namespace Faster.Map.RobinHoodMap
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private ref byte Find(byte[] array, uint index)
-        {          
+        {
             return ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(array), index);
         }
 
@@ -519,7 +519,7 @@ namespace Faster.Map.RobinHoodMap
                 {
                     meta = distance;
                     Find(_entries, index) = entry;
-               
+
                     return;
                 }
 

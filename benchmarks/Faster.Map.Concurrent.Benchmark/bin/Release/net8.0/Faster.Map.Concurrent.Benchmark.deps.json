@@ -9,7 +9,7 @@
       "Faster.Map.Concurrent.Benchmark/1.0.0": {
         "dependencies": {
           "BenchmarkDotNet": "0.13.2",
-          "Faster.Map.DenseMap": "5.0.3",
+          "Faster.Map": "5.0.4",
           "NonBlocking": "2.1.0"
         },
         "runtime": {
@@ -399,21 +399,12 @@
         }
       },
       "System.Threading.Tasks.Extensions/4.5.4": {},
-      "Faster.Map.Core/1.0.0": {
+      "Faster.Map/5.0.4": {
         "dependencies": {
           "System.IO.Hashing": "8.0.0"
         },
         "runtime": {
-          "Faster.Map.Core.dll": {}
-        }
-      },
-      "Faster.Map.DenseMap/5.0.3": {
-        "dependencies": {
-          "Faster.Map.Core": "1.0.0",
-          "System.IO.Hashing": "8.0.0"
-        },
-        "runtime": {
-          "Faster.Map.DenseMap.dll": {}
+          "Faster.Map.dll": {}
         }
       }
     }
@@ -662,12 +653,7 @@
       "path": "system.threading.tasks.extensions/4.5.4",
       "hashPath": "system.threading.tasks.extensions.4.5.4.nupkg.sha512"
     },
-    "Faster.Map.Core/1.0.0": {
-      "type": "project",
-      "serviceable": false,
-      "sha512": ""
-    },
-    "Faster.Map.DenseMap/5.0.3": {
+    "Faster.Map/5.0.4": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
