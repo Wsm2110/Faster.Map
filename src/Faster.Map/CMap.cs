@@ -4,10 +4,10 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System;
-using System.Linq;
 using System.Diagnostics;
+using System.Linq;
 
-namespace Faster.Map.QuadMap
+namespace Faster.Map
 {
     /// <summary>
     /// This hashmap uses the following
@@ -26,7 +26,7 @@ namespace Faster.Map.QuadMap
         /// <value>
         /// The entry count.
         /// </value>
-        public uint Count { get => _count; }
+        public uint Count { get => (uint)_count; }
 
         /// <summary>
         /// Gets the size of the map
@@ -46,13 +46,14 @@ namespace Faster.Map.QuadMap
         {
             get
             {
+                var table = _table;
 
-                for (int i = _table.Metadata.Length - 1; i >= 0; i--)
+                for (int i = table.Metadata.Length - 1; i >= 0; i--)
                 {
-                    var meta = Volatile.Read(ref _table.Metadata[i]);
+                    var meta = table.Metadata[i];
                     if (meta > -1)
                     {
-                        var entry = Volatile.Read(ref _table.Entries[i]);
+                        var entry = table.Entries[i];
                         yield return new KeyValuePair<TKey, TValue>(entry.Key, entry.Value);
                     }
                 }
@@ -72,10 +73,10 @@ namespace Faster.Map.QuadMap
                 //iterate backwards so we can remove the jumpDistanceIndex item
                 for (int i = _table.Metadata.Length - 1; i >= 0; i--)
                 {
-                    var meta = Volatile.Read(ref _table.Metadata[i]);
+                    var meta = _table.Metadata[i];
                     if (meta > -1)
                     {
-                        yield return Volatile.Read(ref _table.Entries[i]).Key;
+                        yield return Find(_table.Entries, (uint)i).Key;
                     }
                 }
             }
@@ -97,7 +98,7 @@ namespace Faster.Map.QuadMap
                     var meta = Volatile.Read(ref _table.Metadata[i]);
                     if (meta > -1)
                     {
-                        var entry = Volatile.Read(ref _table.Entries[i]);
+                        var entry = _table.Entries[i];
                         yield return entry.Value;
                     }
                 }
@@ -107,17 +108,19 @@ namespace Faster.Map.QuadMap
         #endregion
 
         #region Fields
-        private int _resizeInProgress;
-        private const sbyte _emptyBucket = -126;
-        private const sbyte _tombstone = -125;
-        private const sbyte _resizeBucket = -124;
-        private double _loadFactor;
-        private uint _count = 0;
-        private readonly IEqualityComparer<TKey> _comparer;
-        private volatile Table _migrationTable;
-        private volatile Table _table;
+        private volatile uint _count = 0;
+        internal volatile Table _migrationTable;
+        internal volatile Table _table;
+        private const sbyte _emptyBucket = -127;
+        private const sbyte _tombstone = -126;
+        private const sbyte _resizeBucket = -125;
+        private const sbyte _inProgressMarker = -124;
 
-        uint[] _powersOfTwo = {
+        private double _loadFactor;
+
+        private readonly IEqualityComparer<TKey> _comparer;
+
+        volatile uint[] _powersOfTwo = {
             0x1,       // 2^0
             0x2,       // 2^1
             0x4,       // 2^2
@@ -151,6 +154,7 @@ namespace Faster.Map.QuadMap
             0x40000000,// 2^30
             0x80000000 // 2^31
         };
+
 
         #endregion
 
@@ -187,9 +191,9 @@ namespace Faster.Map.QuadMap
                 throw new ArgumentOutOfRangeException(nameof(initialCapacity) + " or " + nameof(loadFactor));
             }
 
-            if (initialCapacity < 8)
+            if (initialCapacity < 16)
             {
-                initialCapacity = 8;
+                initialCapacity = 16;
             }
             _loadFactor = loadFactor;
             _comparer = EqualityComparer<TKey>.Default;
@@ -210,66 +214,53 @@ namespace Faster.Map.QuadMap
         public bool Emplace(TKey key, TValue value)
         {
 
-            Interlocked.Increment(ref _count);
+            //Resize if threshold is reached        
+            if (_count >= _table.Threshold)
+            {
+                Resize();
+            }
 
             start:
 
             var table = _table;
-
-            //Resize if threshold is reached
-            if (_count > table.Threshhold)
-            {
-                Resize();
-                goto start;
-            }
-
             var hashcode = (uint)key.GetHashCode();
-            var index = table.GetIndex(hashcode);
+            var index = table.GetBucket(hashcode);
             var h2 = table.H2(hashcode);
-            byte jumpDistance = 0;
+            uint jumpDistance = 0;
 
             do
             {
                 // Retrieve metadata
-                var meta = Volatile.Read(ref Find(table.Metadata, index));
-                if (meta is _resizeBucket)
+                ref var meta = ref Find(table.Metadata, index);
+                if (meta == _resizeBucket)
                 {
-                    Resize();
+                    Resize(index);
                     goto start;
                 }
 
                 // Try to claim emptybucket
-                if (Interlocked.CompareExchange(ref Find(table.Metadata, index), h2, _emptyBucket) is _emptyBucket)
+                if (_emptyBucket == Interlocked.CompareExchange(ref meta, _inProgressMarker, _emptyBucket))
                 {
-                    // Successfully claimed tomsto the bucket, add the entry
-                    Interlocked.Exchange(ref table.Entries[index], new Entry(key, value));
+                    ref Entry entry = ref Find(table.Entries, index);
+
+                    entry.Key = key;
+                    entry.Value = value;
+
+                    //set h2 metadata indicating adding has finished
+                    Interlocked.Exchange(ref meta, h2);
+                    Interlocked.Increment(ref _count);
+
+                    if (_count >= table.Threshold)
+                    {
+                        Resize(index);
+                    }
+
                     return true;
-                }
-
-                // Try to claim tombstone bucket
-                if (Interlocked.CompareExchange(ref Find(table.Metadata, index), h2, _tombstone) is _tombstone)
-                {
-                    // Successfully claimed the bucket, add the entry
-                    Interlocked.Exchange(ref table.Entries[index], new Entry(key, value));
-                    return true;
-                }
-
-
-                //Claiming a metadata slot, and insert in an entry are 2 instructions which can never be threadsafe;
-                // while resizing, a metadata slot can have a h2 hash but the entry can be null.....
-                var entry = Volatile.Read(ref Find(table.Entries, index));
-
-                if (entry == null)
-                {
-                    goto start;
                 }
 
                 // Bucket is occupied, check if key matches
-                if (h2 == meta && _comparer.Equals(key, entry.Key))
+                if (h2 == meta && _comparer.Equals(key, Find(table.Entries, index).Key))
                 {
-
-                    Interlocked.Decrement(ref _count);
-                    // Key has already been added to the map
                     return false;
                 }
 
@@ -293,13 +284,11 @@ namespace Faster.Map.QuadMap
 
         #region Private Methods
 
-        private volatile uint _resizeIndex;
-
         /// <summary>
         /// This method is designed to be used in a highly concurrent environment where minimizing locking and blocking is crucial.
         /// The use of lock-free programming techniques helps to maximize scalability and performance by allowing multiple threads to operate in parallel with minimal interference.
         /// </summary>
-        public void Resize()
+        public void Resize(uint mindex = 0)
         {
             // These lines read the current table and its properties.
             // The use of local variables here is thread - safe as they only capture the state at a specific point in time and do not modify shared state.
@@ -307,54 +296,63 @@ namespace Faster.Map.QuadMap
             var length = table.Length;
             var index = BitOperations.Log2(length);
 
+            if (_count < table.Threshold)
+            {
+                // resized
+                return;
+            }
+
             // Interlocked.CompareExchange is used to ensure that the resize operation initializes only once.
             // This operation is atomic and ensures that only one thread can set _powersOfTwo[index] from length to 0 at a time, which effectively controls the initialization of the new migration table.
-            if (Interlocked.CompareExchange(ref _powersOfTwo[index], 0, length) == length)
+            if (_powersOfTwo[index] > 0 && _count >= table.Threshold)
             {
-                System.Diagnostics.Debug.WriteLine($"length {length}");
-
-                // Create new snapshot using the metadata, entries array
-                var migrationTable = new Table(length * 2, _loadFactor);
-                //Interlocked.Exchange safely publishes the migrationTable to _migrationTable, ensuring visibility to other threads, which is crucial for the correctness of the migration.
-                Interlocked.Exchange(ref _migrationTable, migrationTable);
+                if (Interlocked.CompareExchange(ref _powersOfTwo[index], 0, length) == length)
+                {
+                    // Create new snapshot using the metadata, entries array
+                    var migrationTable = new Table(length * 2, _loadFactor);
+                    //Interlocked.Exchange safely publishes the migrationTable to _migrationTable, ensuring visibility to other threads, which is crucial for the correctness of the migration.
+                    Interlocked.Exchange(ref _migrationTable, migrationTable);
+                }
             }
 
             var ctable = _migrationTable;
 
             // There could be a scenario where ctable is null when accessed. The check if (ctable == null) is vital and must be retained to ensure thread safety.
             // This can only happen when threads are racing. one allocating and the others dont
-            if (ctable == null)
+            if (ctable == null || table.Length == ctable.Length)
             {
+                //waiting for a new allocated table
                 return;
             }
-            // Here, all threads, regardless of whether they initialized the resize, help with the migration process.
-            // This shared responsibility model enhances performance and reduces the time the table is in an inconsistent state during resizing.
-            if (table == ctable)
+
+            if (table != _table)
+            {
+                //already resized
+                return;
+            }
+
+            if (table._completed == 1)
             {
                 return;
             }
 
-            // Avoid unnecessary work if the migration has already been completed by another thread.
-            // This check is read-safe assuming that MigrationCompleted is either volatile or accessed through atomic operations internally.
-            if (ctable.MigrationCompleted == 1)
+            table.Migrate(ctable, mindex);
+
+            if (table != _table)
             {
+                //already resized
                 return;
             }
-
-            table.AssistMigration(ctable);
 
             // This atomic operation attempts to update the main table reference from the old table to the new (migrated) table.
             // It ensures that this change happens only if the current table is still the one that was originally read into table.
             // This prevents lost updates and ensures that all threads see the new table once the migration is complete.
             // Emphasize that the operation only succeeds if _table still references table, thereby preventing conflicts from concurrent resize operations.
-            if (Interlocked.CompareExchange(ref _table, ctable, table) == table)
+            if (_count == table._migrationCount && Interlocked.CompareExchange(ref _table, ctable, table) == table)
             {
-
+                table._completed = 1;
             }
-
-            table.CompleteMigration();
         }
-
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ref T Find<T>(T[] array, uint index)
@@ -366,26 +364,22 @@ namespace Faster.Map.QuadMap
         #endregion
 
         [StructLayout(LayoutKind.Sequential)]
-        internal class Entry
+        [DebuggerDisplay("key = {Key};  value = {Value};")]
+        public struct Entry(TKey key, TValue value)
         {
-            public TKey Key;
-            public TValue Value;
-
-            public Entry(TKey key, TValue value)
-            {
-                Key = key;
-                Value = value;
-            }
+            public TKey Key = key;
+            public TValue Value = value;
         }
 
         internal class Table
         {
             #region Fields
 
-            private volatile byte _shift;
+            private byte _shift;
             private const sbyte _bitmask = (1 << 7) - 1;
-            private const uint _goldenRatio = 0x9E3779B9; //2654435769;
-            private volatile byte _completed = 0;
+            private const uint _goldenRatio = 0x9E3779B9; //2654435769; 
+            internal byte _completed = 0;
+            internal volatile uint _migrationCount = 0;
 
             #endregion
 
@@ -394,14 +388,13 @@ namespace Faster.Map.QuadMap
             public volatile sbyte[] Metadata;
             public volatile Entry[] Entries;
             public volatile uint LengthMinusOne;
-            public volatile uint Threshhold;
+            public volatile uint Threshold;
             public volatile uint Length;
 
-            public byte MigrationCompleted => _completed;
-
             #endregion
+
             /// <summary>
-            /// Creates a snapshot of the current hashmap state
+            /// Creates a snapshot of the current state
             /// </summary>
             /// <param name="entries"></param>
             /// <param name="metadata"></param>
@@ -410,89 +403,14 @@ namespace Faster.Map.QuadMap
                 Length = length;
                 _shift = (byte)(32 - BitOperations.Log2(Length));
 
-                LengthMinusOne = Length - 1;
-                Threshhold = (uint)(Length * _loadFactor);
+                LengthMinusOne = length - 1;
+                Threshold = (uint)(Length * _loadFactor);
 
-                // Allocate a new, larger metadata and entry array
-                Entries = new Entry[Length];
-                Metadata = new sbyte[Length];
+                Entries = GC.AllocateArray<Entry>((int)length);
+                Metadata = GC.AllocateUninitializedArray<sbyte>((int)length);
+
+                // Fill arrays
                 Metadata.AsSpan().Fill(_emptyBucket);
-            }
-
-            public void AssistMigration(Table next)
-            {
-                for (uint i = 0; i < Metadata.Length; i++)
-                {
-                    if (_completed == 1)
-                    {
-                        return;
-                    }
-                    var meta = Metadata[i];
-
-                    // Claim and sweep the bucket
-                    if (Interlocked.CompareExchange(ref Metadata[i], _resizeBucket, meta) == meta)
-                    {
-                        // Make sure we have to latest. Threads can still add, update or remove entries while resizing
-                        var entry = Volatile.Read(ref Find(Entries, i));
-                        if (entry == null)
-                        {
-                            SpinWait.SpinUntil(() =>  Find(Entries, i) != null);
-                        }
-
-                        next.Move(entry, meta);
-                        continue;
-                    }
-
-                    // Claim empty bucket and set resize market
-                    if (Interlocked.CompareExchange(ref Metadata[i], _resizeBucket, _emptyBucket) == _emptyBucket)
-                    {
-                        continue;
-                    }
-
-                    // Claim tombstone bucket and set resize marker
-                    Interlocked.CompareExchange(ref Metadata[i], _resizeBucket, _tombstone);
-
-                }
-
-                var markers = Metadata.Count(i => i != _resizeBucket);
-                if (markers > 0)
-                {
-                    Debugger.Launch();
-                }
-            }
-
-            private void Move(Entry entry, sbyte meta)
-            {
-                var hashcode = (uint)entry.Key.GetHashCode();
-                var index = GetIndex(hashcode);
-                byte jumpDistance = 0;
-
-                do
-                {
-                    var nMeta = Volatile.Read(ref Metadata[index]);
-                    if (nMeta is _resizeBucket)
-                    {
-                        //resize is already in progress
-                        return;
-                    }
-
-
-                    //Claim empty bucket
-                    if (Interlocked.CompareExchange(ref Metadata[index], meta, _emptyBucket) is _emptyBucket)
-                    {
-                        //Claim current Bucket
-                        Interlocked.Exchange(ref Entries[index], entry);
-                        return;
-                    }
-
-
-                    //spot taken i
-                    jumpDistance += 1;
-                    index += jumpDistance;
-                    index &= LengthMinusOne;
-
-
-                } while (true);
             }
 
             /// <summary>
@@ -501,7 +419,19 @@ namespace Faster.Map.QuadMap
             /// <param name="hashcode"></param>
             /// <returns></returns>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public uint GetIndex(uint hashcode) => _goldenRatio * hashcode >> _shift;
+            public uint GetBucket(uint hashcode)
+            {
+                //return   _goldenRatio* hashcode >> _shift;
+
+                // xor-shift some upper bits down, in case if variations are mostly in high bits
+                // and scatter the bits a little to break up clusters if hashes are periodic (like 42, 43, 44, ...)
+                // long clusters can cause long reprobes. small clusters are ok though.
+                hashcode ^= hashcode >> 15;
+                hashcode ^= hashcode >> 8;
+                hashcode += (hashcode >> 3) * _goldenRatio;
+
+                return hashcode & LengthMinusOne;
+            }
 
             /// <summary>
             /// 
@@ -515,11 +445,67 @@ namespace Faster.Map.QuadMap
                 return Unsafe.As<long, sbyte>(ref h2);
             }
 
-
             internal void Clear() => Array.Clear(Metadata);
 
-            internal void CompleteMigration() => Interlocked.CompareExchange(ref _completed, 1, 0);
+            internal void Migrate(Table migrationTable, uint index)
+            {
+                for (; index < Metadata.Length; index++)
+                {
+                    if (_completed == 1)
+                    {
+                        return;
+                    }
+
+                    var oldvalue = Metadata[index];
+                    if (oldvalue == _resizeBucket)
+                    {
+                        continue;
+                    }
+
+                    // Claim and sweep the bucket
+                    var result = Interlocked.CompareExchange(ref Metadata[index], _resizeBucket, oldvalue);
+
+                 
+                    // If cas succeeded
+                    if (result == oldvalue && result == _inProgressMarker)
+                    {
+                        ref var entry = ref Find(Entries, index);
+                        migrationTable.EmplaceInternal(ref entry, result);
+                        Interlocked.Increment(ref _migrationCount);
+                        continue;
+                    }
+
+                    // Check if we succesfully claimed the bucket
+                    if (result == oldvalue && result > -1)
+                    {
+                        ref var entry = ref Find(Entries, index);
+                        migrationTable.EmplaceInternal(ref entry, result);
+                        Interlocked.Increment(ref _migrationCount);
+                    }
+                }
+            }
+
+            internal bool EmplaceInternal(ref Entry entry, sbyte meta)
+            {
+                uint jumpDistance = 0;
+                var hashcode = (uint)entry.Key.GetHashCode();
+                var index = GetBucket(hashcode);
+
+                do
+                {
+                    //Claim empty bucket
+                    if (_emptyBucket == Interlocked.CompareExchange(ref Metadata[index], meta, _emptyBucket))
+                    {
+                        Entries[index] = entry;
+                        return true;
+                    }
+
+                    //spot taken i
+                    jumpDistance += 1;
+                    index += jumpDistance;
+                    index &= LengthMinusOne;
+                } while (true);
+            }
         }
     }
 }
-
