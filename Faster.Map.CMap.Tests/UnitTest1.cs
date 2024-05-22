@@ -12,7 +12,7 @@ namespace Faster.Map.CMap.Tests
     {
 
         [Fact]
-        public void Bench() 
+        public void Bench()
         {
             var map = new CMap<int, int>(10000000, 0.75);
             Parallel.For(0, 10000000, new ParallelOptions { MaxDegreeOfParallelism = 256 }, i =>
@@ -123,27 +123,8 @@ namespace Faster.Map.CMap.Tests
                 {
                     for (int j = 0; j < addsPerThread; j++)
                     {
-
-                        try
-                        {
-                            if (false == dict.Emplace((j + ii * addsPerThread), (-(j + ii * addsPerThread))))
-                            {
-                                Debugger.Launch();
-                            }
-                        }
-                        catch (Exception)
-                        {
-                            Debugger.Launch();
-
-                        }
-                     
-
-                     
-                      
-
-
+                        dict.Emplace((j + ii * addsPerThread), (-(j + ii * addsPerThread)));
                     }
-
                 });
             }
 
@@ -187,6 +168,54 @@ namespace Faster.Map.CMap.Tests
 
         }
 
+        [Theory]
+        [InlineData(1, 10000)]
+        [InlineData(2, 5000)]
+        [InlineData(5, 2001)]
+        [InlineData(8, 2001)]
+        [InlineData(16, 2001)]
+        [InlineData(32, 5000)]
+        [InlineData(64, 25000)]
+        [InlineData(128, 2000)]
+        [InlineData(256, 2000)]
+        [InlineData(512, 2000)]
 
+        public static void TestRead1(int threads, int readsPerThread)
+        {
+            var dict = new CMap<int, int>();
+
+            for (int i = 0; i < readsPerThread; i += 2)
+            {
+                dict.Emplace(i, i);
+            }
+
+            int count = threads;
+            using (ManualResetEvent mre = new ManualResetEvent(false))
+            {
+                for (int i = 0; i < threads; i++)
+                {
+                    int ii = i;
+                    Task.Run(
+                        () =>
+                        {
+                            for (int j = 0; j < readsPerThread; j++)
+                            {
+                                int val = 0;
+                                if (dict.Get(j, out val))
+                                {
+                                    Assert.Equal(0, j % 2);
+                                    Assert.Equal(j, val);
+                                }
+                                else
+                                {
+                                    Assert.Equal(1, j % 2);
+                                }
+                            }
+                            if (Interlocked.Decrement(ref count) == 0) mre.Set();
+                        });
+                }
+                mre.WaitOne();
+            }
+        }
     }
 }
