@@ -16,7 +16,7 @@ namespace Faster.Map.Concurrent.Benchmark
 
         private const int N = 1000000; // Adjust as needed for your scale
 
-        [Params(1, 8, 16, 32, 64, 128, 256, 512)] // Example thread counts to test scalability
+        [Params(1, 8, 16, 32, 64, 128)] // Example thread counts to test scalability
         public int NumberOfThreads { get; set; }
 
         [GlobalSetup]
