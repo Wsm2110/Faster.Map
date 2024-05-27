@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System;
 using System.Diagnostics;
+using System.Threading.Tasks;
 
 namespace Faster.Map
 {
@@ -42,7 +43,7 @@ namespace Faster.Map
                 for (int i = table.Metadata.Length - 1; i >= 0; i--)
                 {
                     var meta = table.Metadata[i];
-                    if (meta > -1)
+                    if (meta.Meta > -1)
                     {
                         var entry = table.Entries[i];
                         yield return new KeyValuePair<TKey, TValue>(entry.Key, entry.Value);
@@ -64,7 +65,7 @@ namespace Faster.Map
                 //iterate backwards so we can remove the jumpDistanceIndex item
                 for (int i = _table.Metadata.Length - 1; i >= 0; i--)
                 {
-                    var meta = _table.Metadata[i];
+                    var meta = _table.Metadata[i].Meta;
                     if (meta > -1)
                     {
                         yield return Find(_table.Entries, (uint)i).Key;
@@ -86,7 +87,7 @@ namespace Faster.Map
                 //iterate backwards so we can remove the jumpDistanceIndex item
                 for (int i = _table.Metadata.Length - 1; i >= 0; i--)
                 {
-                    var meta = Volatile.Read(ref _table.Metadata[i]);
+                    var meta = Volatile.Read(ref _table.Metadata[i].Meta);
                     if (meta > -1)
                     {
                         var entry = _table.Entries[i];
@@ -106,6 +107,9 @@ namespace Faster.Map
         private const sbyte _tombstone = -126;
         private const sbyte _resizeBucket = -125;
         private const sbyte _inProgressMarker = -124;
+        private const byte _unlocked = 0;
+        private const byte _locked = 1;
+        private const byte _sleeper = 2;
         private double _loadFactor;
 
         private readonly IEqualityComparer<TKey> _comparer;
@@ -210,51 +214,50 @@ namespace Faster.Map
             var h2 = _table.H2(hashcode);
             uint jumpDistance = 0;
 
-            start:
-
             //Resize if threshold is reached        
             if (_table._count >= _table.Threshold)
             {
                 Resize();
             }
 
+            start:
             var table = _table;
             var index = table.GetBucket(hashcode);
-         
+
             do
             {
                 // Retrieve metadata
-                ref var location = ref Find(table.Metadata, index);
+                ref var metadata = ref Find(table.Metadata, index);
 
-                // Try to claim emptybucket
-                if (_emptyBucket == location && _emptyBucket == Interlocked.CompareExchange(ref location, _inProgressMarker, _emptyBucket))
-                {   
+                // Try to claim bucket without the metadata lock, using the lock will result in 3 compare exchanges
+                if (_emptyBucket == metadata.Meta && _emptyBucket == Interlocked.CompareExchange(ref metadata.Meta, _inProgressMarker, _emptyBucket))
+                {
                     ref var entry = ref Find(table.Entries, index);
 
                     entry.Key = key;
                     entry.Value = value;
 
-                    //set h2 metadata indicating adding has finished
-                    Interlocked.Exchange(ref location, h2);
-                    Interlocked.Increment(ref table._count);
-
-                    if (!Unsafe.AreSame(ref _table, ref table))
+                    Interlocked.Exchange(ref metadata.Meta, h2);
+                                       
+                    if (_table != table)
                     {
                         //Resize happened, try again with new table
                         jumpDistance = 0;
                         goto start;
                     }
 
+                    Interlocked.Increment(ref table._count);
+
                     return true;
                 }
 
                 // Bucket is occupied, check if key matches
-                if (h2 == location && _comparer.Equals(key, Find(table.Entries, index).Key))
+                if (h2 == metadata.Meta && _comparer.Equals(key, Find(table.Entries, index).Key))
                 {
                     return false;
                 }
 
-                if (location == _resizeBucket)
+                if (metadata.Meta == _resizeBucket)
                 {
                     Resize(index);
                     jumpDistance = 0;
@@ -278,30 +281,30 @@ namespace Faster.Map
             start:
 
             var table = _table;
-            var index = table.GetBucket(hashcode);         
+            var index = table.GetBucket(hashcode);
 
             do
             {
                 // Retrieve metadata
-                var location = Find(table.Metadata, index);
-                if (h2 == location && _comparer.Equals(key, Find(table.Entries, index).Key))
+                var metadata = Find(table.Metadata, index);
+                if (h2 == metadata.Meta && _comparer.Equals(key, Find(table.Entries, index).Key))
                 {
                     value = Find(table.Entries, index).Value;
                     return true;
                 }
 
-                if (_emptyBucket == location)
+                if (_emptyBucket == metadata.Meta)
                 {
                     value = default;
                     return false;
                 }
 
-                if (location == _resizeBucket && Unsafe.AreSame(ref _table, ref table))
+                if (metadata.Meta == _resizeBucket)
                 {
                     Resize(index);
                     jumpDistance = 0;
                     goto start;
-                }                          
+                }
 
                 //Probing is done by incrementing the currentEntry bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
                 jumpDistance += 1;
@@ -313,66 +316,55 @@ namespace Faster.Map
         /// <summary>
         ///Updates the value of a specific key
         /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Update(TKey key, TValue value)
-        {
-            var hashcode = (uint)key.GetHashCode();
-            var h2 = _table.H2(hashcode);
-            uint jumpDistance = 0;
+        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        //public bool Update(TKey key, TValue value)
+        //{
+        //    var hashcode = (uint)key.GetHashCode();
+        //    var h2 = _table.H2(hashcode);
+        //    uint jumpDistance = 0;
 
-            start:
+        //    start:
 
-            var table = _table;
-            var index = table.GetBucket(hashcode);
+        //    var table = _table;
+        //    var index = table.GetBucket(hashcode);
 
-            do
-            {
-                // Retrieve metadata
-                var location = Find(table.Metadata, index);
+        //    do
+        //    {
+        //        // Retrieve metadata
+        //        var location = Find(table.Metadata, index);
 
-                if (h2 == location && _comparer.Equals(key, Find(table.Entries, index).Key))
-                {
-                    // Claim bucket
-                    if (h2 == Interlocked.CompareExchange(ref location, _inProgressMarker, _emptyBucket))
-                    {
-                        ref var entry = ref Find(table.Entries, index);
-                        
-                        entry.Value = value;
+        //        if (h2 == location)
+        //        {
+        //            ref var entry = ref Find(table.Entries, index);
+        //            if (_comparer.Equals(key, entry.Key))
+        //            {
+        //                var result = Interlocked.CompareExchange(ref entry.Value, value, entry.Value);
+        //                if (result == entry.Value)
+        //                {
+        //                    return true;
+        //                }
+        //            }
+        //        }
 
-                        //set h2 metadata indicating adding has finished
-                        Interlocked.Exchange(ref location, h2);
-                   
-                        if (!Unsafe.AreSame(ref _table, ref table))
-                        {
-                            //Resize happened, try again with new table
-                            jumpDistance = 0;
-                            goto start;
-                        }
+        //        if (_emptyBucket == location)
+        //        {
+        //            value = default;
+        //            return false;
+        //        }
 
-                        return true;
-                    }                
-                }
+        //        if (location == _resizeBucket)
+        //        {
+        //            Resize(index);
+        //            jumpDistance = 0;
+        //            goto start;
+        //        }
 
-                if (_emptyBucket == location)
-                {
-                    value = default;
-                    return false;
-                }
-
-                if (location == _resizeBucket && Unsafe.AreSame(ref _table, ref table))
-                {
-                    Resize(index);
-                    jumpDistance = 0;
-                    goto start;
-                }
-
-                //Probing is done by incrementing the currentEntry bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
-                jumpDistance += 1;
-                index += jumpDistance;
-                index = index & table.LengthMinusOne;
-            } while (true);
-        }
-
+        //        //Probing is done by incrementing the currentEntry bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
+        //        jumpDistance += 1;
+        //        index += jumpDistance;
+        //        index = index & table.LengthMinusOne;
+        //    } while (true);
+        //}
 
         /// <summary>
         /// Clears this instance.
@@ -479,12 +471,37 @@ namespace Faster.Map
             public TValue Value = value;
         }
 
+        [DebuggerDisplay("Meta = {Meta};  State = {State};")]
+        public struct MetaData
+        {
+            public sbyte Meta = _emptyBucket;
+            public volatile byte State;
+
+            public MetaData()
+            {
+                Meta = _emptyBucket;
+            }
+
+            public void Lock()
+            {
+                if (Interlocked.Exchange(ref State, _locked) == _unlocked)
+                    return;
+
+                while (Interlocked.Exchange(ref State, _sleeper) != _unlocked)
+                    Thread.SpinWait(1);
+            }
+
+            public bool TryLockBucket() => Interlocked.CompareExchange(ref State, _locked, _unlocked) == _unlocked;
+
+            public void Unlock() => Interlocked.Exchange(ref State, _unlocked);
+        }
+
+
         internal class Table
         {
             #region Fields
-
-            private byte _shift;
-            private const sbyte _bitmask = (1 << 7) - 1;
+            private byte _shift = 32;
+            private const sbyte _bitmask = (1 << 6) - 1;
             private const uint _goldenRatio = 0x9E3779B9; //2654435769; 
             internal byte _completed = 0;
             internal uint _migrationCount = 0;
@@ -493,7 +510,7 @@ namespace Faster.Map
 
             #region Properties
 
-            public sbyte[] Metadata;
+            public MetaData[] Metadata;
             public Entry[] Entries;
             public uint LengthMinusOne;
             public uint Threshold;
@@ -510,16 +527,14 @@ namespace Faster.Map
             public Table(uint length, double _loadFactor)
             {
                 Length = length;
-                _shift = (byte)(32 - BitOperations.Log2(Length));
-
                 LengthMinusOne = length - 1;
                 Threshold = (uint)(Length * _loadFactor);
+                _shift = (byte)(_shift - BitOperations.Log2(length));
 
-                Entries = GC.AllocateArray<Entry>((int)length);
-                Metadata = GC.AllocateArray<sbyte>((int)length);
+                Entries = GC.AllocateUninitializedArray<Entry>((int)length);
+                Metadata = GC.AllocateUninitializedArray<MetaData>((int)length);
 
-                // Fill arrays
-                Metadata.AsSpan().Fill(_emptyBucket);
+                Metadata.AsSpan().Fill(new MetaData());
             }
 
             /// <summary>
@@ -530,16 +545,16 @@ namespace Faster.Map
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public uint GetBucket(uint hashcode)
             {
-                // return   _goldenRatio* hashcode >> _shift;
+                return _goldenRatio * hashcode >> _shift;
 
                 // xor-shift some upper bits down, in case if variations are mostly in high bits
                 // and scatter the bits a little to break up clusters if hashes are periodic (like 42, 43, 44, ...)
                 // long clusters can cause long reprobes. small clusters are ok though.
-                hashcode ^= hashcode >> 15;
-                hashcode ^= hashcode >> 8;
-                hashcode += (hashcode >> 3) * _goldenRatio;
+                ////hashcode ^= hashcode >> 15;
+                ////hashcode ^= hashcode >> 8;
+                ////hashcode += (hashcode >> 3) * _goldenRatio;
 
-                return hashcode & LengthMinusOne;
+                ////return hashcode & LengthMinusOne;
             }
 
             /// <summary>
@@ -565,18 +580,28 @@ namespace Faster.Map
                         return;
                     }
 
-                    ref var location = ref Find(Metadata, index);
-                    if (location == _resizeBucket || location == _inProgressMarker)
+                    ref var metadata = ref Find(Metadata, index);
+
+                    if (metadata.Meta == _resizeBucket ||
+                        metadata.Meta == _inProgressMarker ||
+                        metadata.State == _locked)
                     {
                         continue;
                     }
 
-                    // Claim and sweep the bucket
-                    var result = Interlocked.Exchange(ref location, _resizeBucket);
-                    // Check if we succesfully claimed the bucket
-                    if (result > -1)
+                    //Wait free - Claim bucket, if lock is taken we just continue to the next
+                    if (metadata.TryLockBucket())
                     {
-                        mTable.EmplaceInternal(ref Find(Entries, index), result);
+                        // Sweep the bucket including empty and tombstones
+                        var result = Interlocked.Exchange(ref metadata.Meta, _resizeBucket);
+                        // Only process the buckets with h2 data
+                        if (result > -1)
+                        {
+                            mTable.EmplaceInternal(ref Find(Entries, index), result);
+                        }
+
+                        // Unlock bucket
+                        metadata.Unlock();
                     }
                 }
             }
@@ -591,7 +616,7 @@ namespace Faster.Map
                 {
                     ref var location = ref Find(Metadata, index);
                     //Claim empty bucket
-                    if (_emptyBucket == Interlocked.CompareExchange(ref location, meta, _emptyBucket))
+                    if (_emptyBucket == Interlocked.CompareExchange(ref location.Meta, meta, _emptyBucket))
                     {
                         Find(Entries, index) = entry;
                         Interlocked.Increment(ref _count);

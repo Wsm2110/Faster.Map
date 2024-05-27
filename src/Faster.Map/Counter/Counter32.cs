@@ -13,7 +13,7 @@ namespace Faster.Map.Concurrent.Benchmark.Counter
     /// </summary>
     public class CounterBase
     {
-        private protected const int CACHE_LINE = 64;
+        private protected const int CACHE_LINE = 640;
         private protected const int OBJ_HEADER_SIZE = 8;
 
         private protected static readonly int s_MaxCellCount = (int)(BitOperations.RoundUpToPowerOf2((uint)Environment.ProcessorCount) + 1);

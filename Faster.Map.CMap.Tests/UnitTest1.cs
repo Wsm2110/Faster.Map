@@ -14,7 +14,7 @@ namespace Faster.Map.CMap.Tests
         [Fact]
         public void Bench()
         {
-            var map = new CMap<int, int>(10000000, 0.75);
+            var map = new CMap<int, int>(2000000, 0.5);
             Parallel.For(0, 10000000, new ParallelOptions { MaxDegreeOfParallelism = 256 }, i =>
             {
                 map.Emplace(i, i);
