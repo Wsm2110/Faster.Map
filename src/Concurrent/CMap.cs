@@ -42,7 +42,7 @@ namespace Faster.Map.Concurrent
                 for (int i = table.Entries.Length - 1; i >= 0; i--)
                 {
                     var entry = table.Entries[i];
-                    if (entry.Hashcode > -1)
+                    if (entry.Meta > -1)
                     {
                         yield return new KeyValuePair<TKey, TValue>(entry.Key, entry.Value);
                     }
@@ -64,7 +64,7 @@ namespace Faster.Map.Concurrent
                 for (int i = _table.Entries.Length - 1; i >= 0; i--)
                 {
                     var entry = _table.Entries[i];
-                    if (entry.Hashcode > -1)
+                    if (entry.Meta > -1)
                     {
                         yield return entry.Key;
                     }
@@ -86,7 +86,7 @@ namespace Faster.Map.Concurrent
                 for (int i = _table.Entries.Length - 1; i >= 0; i--)
                 {
                     var entry = _table.Entries[i];
-                    if (entry.Hashcode > -1)
+                    if (entry.Meta > -1)
                     {
                         yield return entry.Value;
                     }
@@ -103,7 +103,7 @@ namespace Faster.Map.Concurrent
         private const int _emptyBucket = -127;
         private const int _tombstone = -126;
         private const int _resizeBucket = -125;
-        private const int _inProgressMarker = -124;  
+        private const int _inProgressMarker = -124;
         private double _loadFactor;
 
         private readonly IEqualityComparer<TKey> _comparer;
@@ -196,7 +196,8 @@ namespace Faster.Map.Concurrent
         #region Public Methods
 
         /// <summary>
-        /// Inserts the specified value.
+        /// This method, Emplace, is designed to insert a key-value pair into a hash table while ensuring thread safety and managing collisions through quadratic probing. 
+        /// It also handles dynamic resizing of the table when a certain threshold is reached.
         /// </summary>
         /// <param name="key">The key.</param>
         /// <param name="value">The value.</param>
@@ -204,54 +205,53 @@ namespace Faster.Map.Concurrent
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Emplace(TKey key, TValue value)
         {
-            var hashcode = key.GetHashCode();
-            uint jumpDistance = 0;
+            var hashcode = key.GetHashCode(); // Get the hashcode of the key
+            byte jumpDistance = 0; // Initialize jump distance for quadratic probing
 
-            //Resize if threshold is reached        
+            // Resize the table if the count exceeds the threshold
             if (_table._count >= _table.Threshold)
             {
-                Resize();
+                Resize(); // Resize the table to accommodate more entries
             }
 
-            start:
-            var table = _table;
-            var index = table.GetBucket(hashcode);
+            start: // Label for restarting the insertion process after resizing
+            var table = _table; // Get the current table
+            var index = table.GetBucket(hashcode); // Calculate initial bucket index
+            var h2 = table.H2(hashcode); // Calculate secondary hash for the entry metadata
 
             do
             {
-                // Retrieve metadata
+                // Retrieve the metadata for the current entry
                 ref var entry = ref Find(table.Entries, index);
 
-                // Try to claim bucket
-                if (_emptyBucket == entry.Hashcode && Interlocked.CompareExchange(ref entry.Hashcode, _inProgressMarker, _emptyBucket) == _emptyBucket)
+                // Check if the bucket is empty and try to claim it
+                if (_emptyBucket == entry.Meta && Interlocked.CompareExchange(ref entry.Meta, _inProgressMarker, _emptyBucket) == _emptyBucket)
                 {
+                    // Place the key and value in the entry
                     entry.Key = key;
                     entry.Value = value;
-                    entry.Hashcode = hashcode;
+                    entry.Meta = h2;
 
-                    // Interlocked operations provide a full memory fence, meaning they ensure all preceding memory writes are completed and visible to other threads before the Interlocked operation completes.
-                    // This means that when you perform an Interlocked operation, it guarantees that any changes made to other variables(not just the variable involved in the Interlocked operation) are also visible to other threads.
-                    // Note this also means we dont need any explicit mememorybarriers.
-                    // Note this code, using Interlocked operations, will also work correctly on ARM architectures without needing additional explicit memory barriers.The memory ordering and visibility are managed by the Interlocked methods.
-
+                    // Increment the count of the table atomically
                     Interlocked.Increment(ref table._count);
 
+                    // Check if the table has been resized during the operation
                     if (_table != table)
                     {
-                        //Resize happened, try again with new table
+                        // If resized, restart with the new table
                         jumpDistance = 0;
                         goto start;
                     }
 
-                    return true;
+                    return true; // Successfully inserted the entry
                 }
 
-                // Try to claim bucket
-                if (_tombstone == entry.Hashcode && Interlocked.CompareExchange(ref entry.Hashcode, _inProgressMarker, _tombstone) == _tombstone)
+                // Check if the bucket contains a tombstone and try to claim it
+                if (_tombstone == entry.Meta && Interlocked.CompareExchange(ref entry.Meta, _inProgressMarker, _tombstone) == _tombstone)
                 {
                     entry.Key = key;
                     entry.Value = value;
-                    entry.Hashcode = hashcode;
+                    entry.Meta = h2;
 
                     // Interlocked operations provide a full memory fence, meaning they ensure all preceding memory writes are completed and visible to other threads before the Interlocked operation completes.
                     // This means that when you perform an Interlocked operation, it guarantees that any changes made to other variables(not just the variable involved in the Interlocked operation) are also visible to other threads.
@@ -260,34 +260,36 @@ namespace Faster.Map.Concurrent
 
                     Interlocked.Increment(ref table._count);
 
+                    // Check if the table has been resized during the operation
                     if (_table != table)
                     {
-                        //Resize happened, try again with new table
+                        // If resized, restart with the new table
                         jumpDistance = 0;
                         goto start;
                     }
 
-                    return true;
+                    return true; // Successfully inserted the entry
                 }
 
-                // Bucket is occupied, check if key matches
-                if (hashcode == entry.Hashcode && _comparer.Equals(key, entry.Key))
+                // Check if the bucket is occupied by an entry with the same key
+                if (h2 == entry.Meta && _comparer.Equals(key, entry.Key))
                 {
-                    return false;
+                    return false; // Key already exists, insertion failed
                 }
 
-                if (entry.Hashcode == _resizeBucket)
+                // If the bucket is marked for resizing, perform the resize operation
+                if (entry.Meta == _resizeBucket)
                 {
-                    Resize(index);
-                    jumpDistance = 0;
-                    goto start;
+                    Resize(index); // Resize the table starting from the current index
+                    jumpDistance = 0; // Reset jump distance
+                    goto start; // Restart insertion process after resizing
                 }
 
-                // Retry due to collision or another thread claiming the bucket
-                jumpDistance += 1;
-                index += jumpDistance;
-                index &= table.LengthMinusOne;
-            } while (true);
+                // Retry insertion due to a collision or another thread claiming the bucket
+                jumpDistance += 1; // Increment jump distance for quadratic probing
+                index += jumpDistance; // Calculate new index with jump distance
+                index &= table.LengthMinusOne; // Ensure the index is within table bounds
+            } while (true); // Continue retrying until insertion is successful
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -300,24 +302,25 @@ namespace Faster.Map.Concurrent
 
             var table = _table;
             var index = table.GetBucket(hashcode);
+            var h2 = table.H2(hashcode);
 
             do
             {
                 // Retrieve metadata
                 var entry = Find(table.Entries, index);
-                if (hashcode == entry.Hashcode && _comparer.Equals(key, entry.Key))
+                if (h2 == entry.Meta && _comparer.Equals(key, entry.Key))
                 {
                     value = entry.Value;
                     return true;
                 }
 
-                if (_emptyBucket == entry.Hashcode)
+                if (_emptyBucket == entry.Meta)
                 {
                     value = default;
                     return false;
                 }
 
-                if (entry.Hashcode == _resizeBucket)
+                if (entry.Meta == _resizeBucket)
                 {
                     Resize(index);
                     jumpDistance = 0;
@@ -350,7 +353,7 @@ namespace Faster.Map.Concurrent
                 // Retrieve metadata
                 ref var entry = ref Find(table.Entries, index);
 
-                if (hashcode == entry.Hashcode && _comparer.Equals(key, entry.Key))
+                if (hashcode == entry.Meta && _comparer.Equals(key, entry.Key))
                 {
                     // Guarantee that only one thread can access the critical section(protected code block) at a time.This prevents race conditions and ensures data consistency when multiple threads modify shared data
                     entry.Enter();
@@ -364,13 +367,13 @@ namespace Faster.Map.Concurrent
                     return true;
                 }
 
-                if (_emptyBucket == entry.Hashcode)
+                if (_emptyBucket == entry.Meta)
                 {
                     value = default;
                     return false;
                 }
 
-                if (_resizeBucket == entry.Hashcode)
+                if (_resizeBucket == entry.Meta)
                 {
                     Resize(index);
                     jumpDistance = 0;
@@ -442,17 +445,17 @@ namespace Faster.Map.Concurrent
                 return;
             }
 
-            if (table != _table)
-            {
-                //already resized
-                return;
-            }
-
             if (table._completed == 1)
             {
                 return;
             }
 
+            if (table != _table)
+            {
+                //already resized
+                return;
+            }
+                    
             table.Migrate(ctable, mindex);
 
             if (table != _table)
@@ -483,12 +486,12 @@ namespace Faster.Map.Concurrent
 
         [StructLayout(LayoutKind.Sequential)]
         [DebuggerDisplay("key = {Key};  value = {Value}; meta {Meta};")]
-        public struct Entry(TKey key, TValue value)
+        internal struct Entry(TKey key, TValue value)
         {
-            public byte state;
-            public int Hashcode;
-            public TKey Key = key;
-            public TValue Value = value;
+            internal byte state;
+            internal sbyte Meta;
+            internal TKey Key = key;
+            internal TValue Value = value;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Enter()
@@ -548,7 +551,7 @@ namespace Faster.Map.Concurrent
                 _shift = (byte)(_shift - BitOperations.Log2(length));
 
                 Entries = GC.AllocateUninitializedArray<Entry>((int)length);
-                Entries.AsSpan().Fill(new Entry { Key = default, Value = default, Hashcode = _emptyBucket });
+                Entries.AsSpan().Fill(new Entry { Key = default, Value = default, Meta = _emptyBucket });
             }
 
             /// <summary>
@@ -559,7 +562,6 @@ namespace Faster.Map.Concurrent
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public uint GetBucket(int hashcode) => _goldenRatio * (uint)hashcode >> _shift;
 
-         
             internal void Clear() => Array.Clear(Entries);
 
             internal void Migrate(Table mTable, uint index)
@@ -573,14 +575,13 @@ namespace Faster.Map.Concurrent
 
                     ref var entry = ref Find(Entries, index);
 
-                    if (entry.Hashcode == _resizeBucket ||
-                        entry.Hashcode == _inProgressMarker)
+                    if (entry.Meta == _resizeBucket || entry.Meta == _inProgressMarker)
                     {
                         continue;
                     }
 
                     // Sweep the bucket including empty and tombstones
-                    var result = Interlocked.Exchange(ref entry.Hashcode, _resizeBucket);
+                    var result = Interlocked.Exchange(ref entry.Meta, _resizeBucket);
                     // Only process the buckets with h2 data
                     if (result > -1)
                     {
@@ -589,9 +590,9 @@ namespace Faster.Map.Concurrent
                 }
             }
 
-            internal bool EmplaceInternal(Entry entry, int meta)
+            internal bool EmplaceInternal(Entry entry, sbyte meta)
             {
-                uint jumpDistance = 0;
+                byte jumpDistance = 0;
                 var hashcode = entry.Key.GetHashCode();
                 var index = GetBucket(hashcode);
 
@@ -599,9 +600,9 @@ namespace Faster.Map.Concurrent
                 {
                     ref var location = ref Find(Entries, index);
                     //Claim empty bucket
-                    if (_emptyBucket == Interlocked.CompareExchange(ref location.Hashcode, meta, _emptyBucket))
+                    if (_emptyBucket == Interlocked.CompareExchange(ref location.Meta, meta, _emptyBucket))
                     {
-                        entry.Hashcode = meta;
+                        entry.Meta = meta;
                         location = entry;
                         Interlocked.Increment(ref _count);
                         return true;
@@ -612,6 +613,13 @@ namespace Faster.Map.Concurrent
                     index += jumpDistance;
                     index &= LengthMinusOne;
                 } while (true);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            internal sbyte H2(int hashcode)
+            {
+                var result = hashcode & _bitmask;
+                return Unsafe.As<int, sbyte>(ref result);
             }
         }
     }

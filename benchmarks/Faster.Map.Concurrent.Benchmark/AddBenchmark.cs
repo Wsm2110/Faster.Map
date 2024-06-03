@@ -1,9 +1,15 @@
-﻿using System.IO;
+﻿using System.Collections.Generic;
+using System.IO;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
+using Faster.Map.DenseMap;
+using Faster.Map.QuadMap;
+using Faster.Map.RobinHoodMap;
 
 namespace Faster.Map.Concurrent.Benchmark
 {
+
+    [MemoryDiagnoser]
     public class AddBenchmark
     {
         private CMap<uint, uint> _map;
@@ -16,13 +22,13 @@ namespace Faster.Map.Concurrent.Benchmark
 
         private const int N = 1000000; // Adjust as needed for your scale
 
-        [Params(/*1, 8, 16, 32, 64,*/ 128, 256, 512)] // Example thread counts to test scalability
+        [Params(1, 8, 16, 32, 64, 128 /*, 256, 512*/)] // Example thread counts to test scalability
         public int NumberOfThreads { get; set; }
 
         [GlobalSetup]
         public void Setup()
         {
-            _map = new CMap<uint, uint>(20000000);
+            _map = new CMap<uint, uint>(2000000);
             _nonBlocking = new NonBlocking.ConcurrentDictionary<uint, uint>(NumberOfThreads, 2000000);
             _concurrentMap = new System.Collections.Concurrent.ConcurrentDictionary<int, int>(NumberOfThreads, 1000000);
 
@@ -36,6 +42,16 @@ namespace Faster.Map.Concurrent.Benchmark
                 keys[index] = uint.Parse(splittedOutput[index]);
             }
         }
+
+        [IterationSetup]
+        public void Clean()
+        {
+            _map = new CMap<uint, uint>(2000000);
+            _nonBlocking = new NonBlocking.ConcurrentDictionary<uint, uint>(NumberOfThreads, 2000000);
+            _concurrentMap = new System.Collections.Concurrent.ConcurrentDictionary<int, int>(NumberOfThreads, 1000000);
+
+        }
+
 
         [Benchmark]
         public void NonBlocking()

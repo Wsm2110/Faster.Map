@@ -137,9 +137,9 @@ namespace Faster.Map.CMap.Tests
 
         [Theory]
         [InlineData(256)]
-        public void Assert_Emplace_With_RandomNumvers(int numberOfThreads)
+        public void Assert_Emplace_With_RandomNumbers(int numberOfThreads)
         {
-            var map = new CMap<uint, uint>(20000000);
+            var map = new CMap<uint, uint>(2000000, 0.8);
             var N = 1000000;
             var output = File.ReadAllText("Numbers.txt");
             var splittedOutput = output.Split(',');
