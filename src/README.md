@@ -21,8 +21,9 @@ Faster.Map is a collection of high-performance hashmaps implemented in C#, each 
 * QuadMap using Triangular Numbers:
         Utilizes triangular numbers to achieve a balanced distribution of keys, minimizing collisions and enhancing lookup efficiency.
         Offers a unique approach to hashmap implementation, ideal for specialized use cases. 
+* CMap  is a high-performance, thread-safe, lockfree concurrent hash map that uses open addressing, quadratic probing, and Fibonacci hashing to manage key-value pairs. The default load factor is set to 0.5, meaning the hash map will resize when it is half full.
 
-Installation:
+* Installation:
 
 You can include Faster.Map in your C# project via NuGet Package Manager:
 ```
