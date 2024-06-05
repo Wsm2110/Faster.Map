@@ -1,0 +1,48 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ImplicitUsings>false</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <LangVersion>preview</LangVersion>
+    <TargetFrameworks>net9.0</TargetFrameworks>
+    <LangVersion>Latest</LangVersion>
+    <Authors>Wiljan Ruizendaal</Authors>
+    <PackageReleaseNotes>
+      Add robinhood hashmap and quadratic hashmap
+    </PackageReleaseNotes>
+    <PackageProjectUrl>https://github.com/Wsm2110/Faster.Map</PackageProjectUrl>
+    <AssemblyVersion>5.0.4</AssemblyVersion>
+    <FileVersion>5.0.4</FileVersion>
+    <Title>Fastest .net hashmap</Title>
+    <Version>5.0.4</Version>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Description>Cutting-edge NuGet package offering high-performance hash map implementations leveraging SIMD (Single Instruction, Multiple Data) instructions. This innovative library combines the efficiency of SIMD operations with advanced hashing techniques </Description>
+    <RepositoryUrl>https://github.com/Wsm2110/Faster.Map</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>Hashmap Hashtable Dictionary Faster.map performance, simd, robinhood hashing, swisstable, absl</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <EmbedAllSources>True</EmbedAllSources>
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
+    <PackageId>Faster.Map</PackageId>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Update="../README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.IO.Hashing" Version="8.0.*" />
+  </ItemGroup>
+
+
+</Project>
