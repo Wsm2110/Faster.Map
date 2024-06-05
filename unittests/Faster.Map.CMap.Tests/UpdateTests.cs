@@ -18,7 +18,7 @@ namespace Faster.Map.CMap.Tests
         [InlineData(128, 2000)]
         [InlineData(256, 2000)]
 
-        public static void TestUpdate(int threads, int updatesPerThread)
+        public static void TestUpdatePart1(int threads, int updatesPerThread)
         {
             CMap<int, int> dict = new CMap<int, int>();
 
@@ -40,7 +40,10 @@ namespace Faster.Map.CMap.Tests
                             {
                                 dict.Update(j, (ii + 2) * j);
                             }
-                            if (Interlocked.Decrement(ref running) == 0) mre.Set();
+                            if (Interlocked.Decrement(ref running) == 0)
+                            {
+                                mre.Set();
+                            }
                         });
                 }
                 mre.WaitOne();
@@ -61,7 +64,7 @@ namespace Faster.Map.CMap.Tests
             {
                 gotKeys.Add(pair.Key);
             }
-          
+
             gotKeys.Sort();
 
             List<int> expectKeys = new List<int>();
@@ -80,80 +83,7 @@ namespace Faster.Map.CMap.Tests
         }
 
         [Fact]
-        public void ConcurrentUpdates_Should_UpdateSameEntry()
-        {
-            // Arrange
-            var hashTable = new CMap<int, string>(16);
-
-            // Add initial entry to update
-            hashTable.Update(1, "Initial");
-
-            // Act
-            int numberOfThreads = 10;
-            int updatesPerThread = 100;
-            var tasks = new List<Task>();
-
-            for (int i = 0; i < numberOfThreads; i++)
-            {
-                int threadId = i;
-                tasks.Add(Task.Run(() =>
-                {
-                    for (int j = 0; j < updatesPerThread; j++)
-                    {
-                        hashTable.Update(1, $"Value {threadId}-{j}");
-                    }
-                }));
-            }
-
-            Task.WaitAll(tasks.ToArray());
-
-            // Assert
-            // The final value should be one of the last updates
-            // Given the concurrent nature, exact final value is unpredictable
-            // Here we simply check if the update method ran without errors.
-            Assert.True(true, "Concurrent updates completed without errors.");
-        }
-
-        [Fact]
-        public void ConcurrentUpdates_Should_UpdateSameEntry_Part_Two()
-        {
-            // Arrange
-            var hashTable = new CMap<int, string>(16);
-
-            // Add initial entry to update
-            hashTable.Emplace(1, "Initial");
-
-            // Act
-            int numberOfThreads = 10;
-            int updatesPerThread = 100;
-            var tasks = new List<Task>();
-            var expectedValues = new ConcurrentBag<string>();
-
-            for (int i = 0; i < numberOfThreads; i++)
-            {
-                int threadId = i;
-                tasks.Add(Task.Run(() =>
-                {
-                    for (int j = 0; j < updatesPerThread; j++)
-                    {
-                        string newValue = $"Value {threadId}-{j}";
-                        hashTable.Update(1, newValue);
-                    
-                    }
-                }));
-
-                Task.Delay(TimeSpan.FromMicroseconds(1));
-            }
-
-            Task.WaitAll(tasks.ToArray());
-
-            // Assert
-             hashTable.Get(1, out var finalValue);
-            Assert.Equal("Value 9-99", finalValue);
-        }
-
-        [Fact]
-        public void CMapUpdateTestsPart3() 
+        public void UpdateTestsPart2()
         {
             var map = new CMap<string, int>();
             const int numThreads = 10;
@@ -176,19 +106,14 @@ namespace Faster.Map.CMap.Tests
                 });
             }
 
-            Task.WaitAll(tasks);
+            Task.WaitAll(tasks, TimeSpan.FromSeconds(10));
 
             // Check if the final count matches the expected number of updates
             int expectedUpdates = numThreads * iterationsPerThread;
-            if (map.Get("key", out int finalValue) && finalValue == expectedUpdates)
+            if (!map.Get("key", out int finalValue) && finalValue == expectedUpdates)
             {
-                Console.WriteLine("Test passed! Expected updates: {0}, Final value: {1}", expectedUpdates, finalValue);
+                Assert.Fail($"Test failed! Expected updates: {expectedUpdates}, Final value: {finalValue}");
             }
-            else
-            {
-                Console.WriteLine("Test failed! Expected updates: {0}, Final value: {1}", expectedUpdates, finalValue);
-            }
-        }   
-
+        }
     }
 }

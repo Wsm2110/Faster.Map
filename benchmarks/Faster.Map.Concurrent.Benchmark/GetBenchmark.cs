@@ -51,32 +51,32 @@ namespace Faster.Map.Concurrent.Benchmark
             }
         }
 
-        //[Benchmark]
-        //public void ConcurrentDictionary()
-        //{
-        //    Parallel.For(0, NumberOfThreads, i =>
-        //    {
-        //        for (int j = 0; j < Length; j++)
-        //        {
-        //            var key = keys[j];
-        //            _dic2.TryGetValue(key, out _);
-        //        }
-        //    });
-        //}
+        [Benchmark]
+        public void ConcurrentDictionary()
+        {
+            Parallel.For(0, NumberOfThreads, i =>
+            {
+                for (int j = 0; j < Length; j++)
+                {
+                    var key = keys[j];
+                    _dic2.TryGetValue(key, out _);
+                }
+            });
+        }
 
 
-        //[Benchmark]
-        //public void NonBlocking()
-        //{
-        //    Parallel.For(0, NumberOfThreads, i =>
-        //    {
-        //        for (int j = 0; j < Length; j++)
-        //        {
-        //            var key = keys[j];
-        //            _dic.TryGetValue(key, out _);
-        //        }
-        //    });
-        //}
+        [Benchmark]
+        public void NonBlocking()
+        {
+            Parallel.For(0, NumberOfThreads, i =>
+            {
+                for (int j = 0; j < Length; j++)
+                {
+                    var key = keys[j];
+                    _dic.TryGetValue(key, out _);
+                }
+            });
+        }
 
         [Benchmark]
         public void GetCmapBenchmark()
