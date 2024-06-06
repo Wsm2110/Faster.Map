@@ -6,17 +6,17 @@ namespace Faster.Map.CMap.Tests
     public class EmplaceTests
     {
         [Theory]
-        //[InlineData(1, 128)]
-        //[InlineData(2, 10000)]
-        //[InlineData(8, 4)]
-        //[InlineData(5, 2000)]
-        //[InlineData(4, 2000)]
+        [InlineData(1, 128)]
+        [InlineData(2, 10000)]
+        [InlineData(8, 4)]
+        [InlineData(5, 2000)]
+        [InlineData(4, 2000)]
         [InlineData(256, 2000)]
-        //[InlineData(5, 5000)]
-        //[InlineData(5, 2500)]
-        //[InlineData(20, 5000)]
-        //[InlineData(64, 5000)]
-        //[InlineData(16, 8)]
+        [InlineData(5, 5000)]
+        [InlineData(5, 2500)]
+        [InlineData(20, 5000)]
+        [InlineData(64, 5000)]
+        [InlineData(16, 8)]
 
         public static void Assert_Emplace_With_Resize(int threads, int addsPerThread)
         {
@@ -78,7 +78,17 @@ namespace Faster.Map.CMap.Tests
         }
 
         [Theory]
+        [InlineData(1, 128)]
+        [InlineData(2, 10000)]
+        [InlineData(8, 4)]
+        [InlineData(5, 2000)]
+        [InlineData(4, 2000)]
         [InlineData(256, 2000)]
+        [InlineData(5, 5000)]
+        [InlineData(5, 2500)]
+        [InlineData(20, 5000)]
+        [InlineData(64, 5000)]
+        [InlineData(16, 8)]
         public static void Assert_Emplace_With_Resize_Strings(int threads, int addsPerThread)
         {
             CMap<int, string> dict = new CMap<int, string>();
@@ -138,6 +148,11 @@ namespace Faster.Map.CMap.Tests
 
         [Theory]
         [InlineData(256)]
+        [InlineData(8)]
+        [InlineData(16)]
+        [InlineData(32)]
+        [InlineData(128)]
+        [InlineData(64)]
         public void Assert_Emplace_With_RandomNumbers(int numberOfThreads)
         {
             var map = new CMap<uint, uint>(2000000, 0.8);

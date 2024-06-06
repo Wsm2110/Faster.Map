@@ -5,7 +5,6 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System;
 using System.Diagnostics;
-using System.Reflection.PortableExecutable;
 
 namespace Faster.Map.Concurrent
 {
@@ -61,10 +60,10 @@ namespace Faster.Map.Concurrent
         {
             get
             {
-                //iterate backwards so we can remove the jumpDistanceIndex item
-                for (int i = _table.Entries.Length - 1; i >= 0; i--)
+                var table = _table;
+                for (int i = table.Entries.Length - 1; i >= 0; i--)
                 {
-                    var entry = _table.Entries[i];
+                    var entry = table.Entries[i];
                     if (entry.Meta > -1)
                     {
                         yield return entry.Key;
@@ -83,10 +82,10 @@ namespace Faster.Map.Concurrent
         {
             get
             {
-                //iterate backwards so we can remove the jumpDistanceIndex item
-                for (int i = _table.Entries.Length - 1; i >= 0; i--)
+                var table = _table;
+                for (int i = table.Entries.Length - 1; i >= 0; i--)
                 {
-                    var entry = _table.Entries[i];
+                    var entry = table.Entries[i];
                     if (entry.Meta > -1)
                     {
                         yield return entry.Value;
@@ -248,6 +247,12 @@ namespace Faster.Map.Concurrent
                         goto start;
                     }
 
+                    // Resize the table if the count exceeds the threshold
+                    if (table._count >= table.Threshold)
+                    {
+                        Resize(); // Resize the table to accommodate more entries
+                    }
+
                     return true; // Successfully inserted the entry
                 }
 
@@ -273,6 +278,12 @@ namespace Faster.Map.Concurrent
                         goto start;
                     }
 
+                    // Resize the table if the count exceeds the threshold
+                    if (table._count >= table.Threshold)
+                    {
+                        Resize(); // Resize the table to accommodate more entries
+                    }
+
                     return true; // Successfully inserted the entry
                 }
 
@@ -296,7 +307,6 @@ namespace Faster.Map.Concurrent
                 index &= table.LengthMinusOne; // Ensure the index is within table bounds
             } while (true); // Continue retrying until insertion is successful
         }
-
 
         /// <summary>
         /// The Get method retrieves a value from a concurrent hash table based on a key.
@@ -386,15 +396,24 @@ namespace Faster.Map.Concurrent
                     // Guarantee that only one thread can access the critical section at a time
                     // the enter method uses Interlocked.CompareExchange and thus provides a full memory fence, ensuring thread safety
                     // And ensures that the changes made by one thread are visible to others
-
                     entry.Enter();
 
-                    // Perform the critical section: update the value
-                    entry.Value = newValue;
+                    if (h2 == entry.Meta)
+                    {
+                        // Perform the critical section: update the value
+                        entry.Value = newValue;
+                        entry.Exit();
+                        return true;
+                    }
 
-                    // Release the lock
-                    entry.Exit();
-                    return true;
+                    // Check if the table has been resized during the operation
+                    if (_table != table)
+                    {
+                        // If resized, restart with the new table
+                        jumpDistance = 0;
+                        entry.Exit();
+                        goto start;
+                    }   
                 }
 
                 // If the entry indicates an empty bucket, the key does not exist in the table
@@ -486,7 +505,45 @@ namespace Faster.Map.Concurrent
         /// <summary>
         /// Clears this instance.
         /// </summary>
-        public void Clear() => _table.Clear();
+        public void Clear() 
+        {
+            var table = new Table(_table.Length, _loadFactor);
+            Interlocked.Exchange(ref _table, table);  
+        }
+
+        /// <summary>
+        /// Gets or sets the value by using a Tkey
+        /// </summary>
+        /// <value>
+        /// The 
+        /// </value>
+        /// <param name="key">The key.</param>
+        /// <returns></returns>
+        /// <exception cref="KeyNotFoundException">
+        /// Unable to find entry - {key.GetType().FullName} key - {key.GetHashCode()}
+        /// or
+        /// Unable to find entry - {key.GetType().FullName} key - {key.GetHashCode()}
+        /// </exception>
+        public TValue this[TKey key]
+        {
+            get
+            {
+                if (Get(key, out var result))
+                {
+                    return result;
+                }
+
+                throw new KeyNotFoundException($"Unable to find entry - {key.GetType().FullName} key - {key.GetHashCode()}");
+            }
+            set
+            {
+                //Change to add or update
+                if (!Emplace(key, value))
+                {
+                    throw new KeyNotFoundException($"Unable to find entry - {key.GetType().FullName} key - {key.GetHashCode()}");
+                }
+            }
+        }
 
         #endregion
 
@@ -653,12 +710,7 @@ namespace Faster.Map.Concurrent
             /// <returns></returns>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public uint GetBucket(int hashcode) => _goldenRatio * (uint)hashcode >> _shift;
-
-            internal void Clear()
-            {
-                Array.Clear(Entries);
-                Interlocked.Exchange(ref _count, 0);
-            }
+                      
 
             internal void Migrate(Table mTable, uint index)
             {
@@ -671,7 +723,8 @@ namespace Faster.Map.Concurrent
 
                     ref var entry = ref Find(Entries, index);
 
-                    if (entry.Meta == _resizeBucket || entry.Meta == _inProgressMarker)
+                    // Entry is already resized, is in progress or the entry is locked
+                    if (entry.Meta is _resizeBucket or _inProgressMarker && entry.state == 1)
                     {
                         continue;
                     }
