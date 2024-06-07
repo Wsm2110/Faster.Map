@@ -645,16 +645,24 @@ namespace Faster.Map.Concurrent
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Enter()
             {
+                int spinCount = 1; // Initial spin count
+
                 while (true)
                 {
-                    // Attempt to set lockByte to 1 (locked) if it is currently 0 (unlocked)
+                    // Attempt to set state to 1 (locked) if it is currently 0 (unlocked)
                     if (Interlocked.CompareExchange(ref state, 1, 0) == 0)
                     {
                         return;
                     }
 
-                    // Optional: Yield to allow other threads some execution time
-                    Thread.SpinWait(1);
+                    // Optional: Exponential backoff to reduce contention
+                    Thread.SpinWait(spinCount);
+
+                    // Exponential backoff: Increase the spin count, but cap it to prevent excessive delays
+                    if (spinCount < 1024)
+                    {
+                        spinCount *= 2;
+                    }
                 }
             }
 

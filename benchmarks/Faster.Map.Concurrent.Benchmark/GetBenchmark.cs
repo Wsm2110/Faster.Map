@@ -1,15 +1,9 @@
 ﻿using BenchmarkDotNet.Attributes;
-using Faster.Map.DenseMap;
-using Faster.Map.QuadMap;
-using Faster.Map.RobinHoodMap;
+using NonBlocking;
 using System;
-using System.Collections;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Faster.Map.Concurrent.Benchmark
@@ -17,22 +11,21 @@ namespace Faster.Map.Concurrent.Benchmark
     public class GetBenchmark
     {
         CMap<uint, uint> _map = new CMap<uint, uint>();
-        NonBlocking.ConcurrentDictionary<uint, uint> _dic = new NonBlocking.ConcurrentDictionary<uint, uint>();
-        ConcurrentDictionary<uint, uint> _dic2;
+        NonBlocking.ConcurrentDictionary<uint, uint> _block = new NonBlocking.ConcurrentDictionary<uint, uint>();
+        System.Collections.Concurrent.ConcurrentDictionary<uint, uint> _dic
+            ;
 
         [Params(1000000)]
         public uint Length { get; set; }
         private uint[] keys;
 
-
         [Params(1, 8, 16, 32, 64, 128)] // Example thread counts to test scalability
         public int NumberOfThreads { get; set; }
-
 
         [GlobalSetup]
         public void Setup()
         {
-            _dic2 = new ConcurrentDictionary<uint, uint>(NumberOfThreads, 1);
+            _dic = new System.Collections.Concurrent.ConcurrentDictionary<uint, uint>();
             var output = File.ReadAllText("Numbers.txt");
             var splittedOutput = output.Split(',');
 
@@ -46,47 +39,61 @@ namespace Faster.Map.Concurrent.Benchmark
             foreach (var key in keys)
             {
                 _map.Emplace(key, key);
+                _block.TryAdd(key, key);
                 _dic.TryAdd(key, key);
-                _dic2.TryAdd(key, key);
             }
         }
 
         [Benchmark]
         public void ConcurrentDictionary()
         {
-            Parallel.For(0, NumberOfThreads, i =>
+            int numKeys = 1000000;
+            int segmentSize = numKeys / NumberOfThreads;
+
+            Parallel.For(0, NumberOfThreads, threadIndex =>
             {
-                for (int j = 0; j < Length; j++)
+                int start = threadIndex * segmentSize;
+                int end = (threadIndex == NumberOfThreads - 1) ? numKeys : start + segmentSize;
+
+                for (uint i = (uint)start; i < end; i++)
                 {
-                    var key = keys[j];
-                    _dic2.TryGetValue(key, out _);
+                    _dic.TryGetValue(keys[i], out _);
                 }
             });
         }
-
 
         [Benchmark]
         public void NonBlocking()
         {
-            Parallel.For(0, NumberOfThreads, i =>
+            int numKeys = 1000000;
+            int segmentSize = numKeys / NumberOfThreads;
+
+            Parallel.For(0, NumberOfThreads, threadIndex =>
             {
-                for (int j = 0; j < Length; j++)
+                int start = threadIndex * segmentSize;
+                int end = (threadIndex == NumberOfThreads - 1) ? numKeys : start + segmentSize;
+
+                for (uint i = (uint)start; i < end; i++)
                 {
-                    var key = keys[j];
-                    _dic.TryGetValue(key, out _);
+                    _block.TryGetValue(keys[i], out _);
                 }
             });
         }
 
         [Benchmark]
-        public void GetCmapBenchmark()
+        public void CMap()
         {
-            Parallel.For(0, NumberOfThreads, i =>
+            int numKeys = 1000000;       
+            int segmentSize = numKeys / NumberOfThreads;
+
+            Parallel.For(0, NumberOfThreads, threadIndex =>
             {
-                for (int j = 0; j < Length; j++)
+                int start = threadIndex * segmentSize;
+                int end = (threadIndex == NumberOfThreads - 1) ? numKeys : start + segmentSize;
+
+                for (uint i = (uint)start; i < end; i++)
                 {
-                    var key = keys[j];
-                    _map.Get(key, out _);
+                    _map.Get(keys[i], out _);
                 }
             });
         }

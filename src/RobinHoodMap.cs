@@ -236,20 +236,23 @@ namespace Faster.Map.RobinHoodMap
         public bool Get(TKey key, out TValue value)
         {
             var index = Hash(key);
+            var maxDistance = index + _maxProbeSequenceLength;
 
-          
-            //var buffer = MemoryMarshal.CreateSpan>(ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(_entries), index);
+            do
+            {
+                ref var entry = ref Find(_entries, index);
 
-            //foreach (var entry in buffer)
-            //{
-            //    if (_keyComparer.Equals(entry.Key, key))
-            //    {
-            //        value = entry.Value;
-            //        return true;
-            //    }
-            //}
+                if (_keyComparer.Equals(entry.Key, key))
+                {
+                    value = entry.Value;
+                    return true;
+                }
+
+            } while (++index < maxDistance);
+
 
             value = default;
+            //Entry not found
             return false;
         }
 

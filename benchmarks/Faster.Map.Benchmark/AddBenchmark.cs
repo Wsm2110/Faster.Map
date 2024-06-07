@@ -5,21 +5,20 @@ using BenchmarkDotNet.Attributes;
 using Faster.Map.DenseMap;
 using Faster.Map.RobinHoodMap;
 using Faster.Map.QuadMap;
+using System.Collections.Concurrent;
 
 namespace Faster.Map.Benchmark
 {
     [MarkdownExporterAttribute.GitHub]
-    [DisassemblyDiagnoser]
-    [MemoryDiagnoser]
     public class AddBenchmark
     {
         #region Fields
 
         //fixed size, dont want to measure resize()
-        private DenseMap<uint, uint> _dense = new DenseMap<uint, uint>(1000000);
-        private Dictionary<uint, uint> dic = new Dictionary<uint, uint>(1000000);
-        private RobinhoodMap<uint, uint> _robinhoodMap = new RobinhoodMap<uint, uint>(1000000);
-        private QuadMap<uint, uint> _quadmap = new QuadMap<uint, uint>(1000000);
+        private DenseMap<uint, uint> _dense = new DenseMap<uint, uint>(2000000);
+        private Dictionary<uint, uint> dic = new Dictionary<uint, uint>(2000000);
+        private RobinhoodMap<uint, uint> _robinhoodMap = new RobinhoodMap<uint, uint>(2000000);
+        private QuadMap<uint, uint> _quadmap = new QuadMap<uint, uint>(2000000);
 
         private uint[] keys;
 
@@ -27,8 +26,8 @@ namespace Faster.Map.Benchmark
 
         #region Properties
 
-        [ParamsAttribute( 1000000)]
-        public int Length { get; set; }
+        [Params(1, 10, 100, 1000, 10000, 100000, 1000000)]
+        public uint Length { get; set; }
 
         #endregion
 
@@ -49,14 +48,14 @@ namespace Faster.Map.Benchmark
             }        
         }
 
-        [IterationCleanup]
-        public void ResetMaps()
+        [IterationSetup]
+        public void Setup()
         {
             _dense.Clear();
             dic.Clear();
             _quadmap.Clear();
             _robinhoodMap.Clear();
-        }
+        }  
 
         #region Benchmarks
 
