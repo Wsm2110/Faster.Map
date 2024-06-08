@@ -147,73 +147,34 @@ namespace Faster.Map.CMap.Tests
             }
         }
 
-        //[Fact]
-        //public static void TestRemove3()
-        //{
-        //    var dict = new CMap<int, int>();
+        [Fact]
+        public static void TestRemove3()
+        {
+            var _map = new CMap<int, int>();
 
-        //    dict[99] = -99;
+            _map[99] = -99;
 
-        //    ICollection<KeyValuePair<int, int>> col = dict;
+            var col = _map.Entries.ToList();
 
-        //    // Make sure we cannot "remove" a key/value pair which is not in the dictionary
-        //    for (int i = 0; i < 200; i++)
-        //    {
-        //        if (i != 99)
-        //        {
-        //            Assert.False(col.Remove(new KeyValuePair<int, int>(i, -99)), "Should not remove not existing a key/value pair - new KeyValuePair<int, int>(i, -99)");
-        //            Assert.False(col.Remove(new KeyValuePair<int, int>(99, -i)), "Should not remove not existing a key/value pair - new KeyValuePair<int, int>(99, -i)");
-        //        }
-        //    }
+            // Make sure we cannot "remove" a key/value pair which is not in the dictionary
+            for (int i = 0; i < 200; i++)
+            {
+                if (i != 99)
+                {
+                    Assert.False(col.Remove(new KeyValuePair<int, int>(i, -99)), "Should not remove not existing a key/value pair - new KeyValuePair<int, int>(i, -99)");
+                    Assert.False(col.Remove(new KeyValuePair<int, int>(99, -i)), "Should not remove not existing a key/value pair - new KeyValuePair<int, int>(99, -i)");
+                }
+            }
 
-        //    // Can we remove a key/value pair successfully?
-        //    Assert.True(col.Remove(new KeyValuePair<int, int>(99, -99)), "Failed to remove existing key/value pair");
+            // Can we remove a key/value pair successfully?
+            Assert.True(col.Remove(new KeyValuePair<int, int>(99, -99)), "Failed to remove existing key/value pair");
 
-        //    // Make sure the key/value pair is gone
-        //    Assert.False(col.Remove(new KeyValuePair<int, int>(99, -99)), "Should not remove the key/value pair which has been removed");
+            // Make sure the key/value pair is gone
+            Assert.False(col.Remove(new KeyValuePair<int, int>(99, -99)), "Should not remove the key/value pair which has been removed");
 
-        //    // And that the dictionary is empty. We will check the count in a few different ways:
-        //    Assert.Equal(0, dict.Count);
-        //    Assert.Equal(0, dict.ToArray().Length);
-        //}
-
-        //[Fact]
-        //public static void TryRemove_KeyValuePair_ArgumentValidation()
-        //{
-        //    AssertExtensions.Throws<ArgumentNullException>("item", () => new ConcurrentDictionary<string, int>().TryRemove(new KeyValuePair<string, int>(null, 42)));
-        //    new ConcurrentDictionary<int, int>().TryRemove(new KeyValuePair<int, int>(0, 0)); // no error when using default value type
-        //    new ConcurrentDictionary<int?, int>().TryRemove(new KeyValuePair<int?, int>(0, 0)); // or nullable
-        //}
-
-        //[Fact]
-        //public static void TryRemove_KeyValuePair_RemovesSuccessfullyAsAppropriate()
-        //{
-        //    var dict = new CMap<string, int>();
-
-        //    for (int i = 0; i < 2; i++)
-        //    {
-        //        Assert.False(dict.TRemove(KeyValuePair.Create("key", 42)));
-        //        Assert.Equal(0, dict.Count);
-        //        Assert.True(dict.Emplace("key", 42));
-        //        Assert.Equal(1, dict.Count);
-        //        Assert.True(dict.Remove(KeyValuePair.Create("key", 42)));
-        //        Assert.Equal(0, dict.Count);
-        //    }
-
-        //    Assert.True(dict.Emplace("key", 42));
-        //    Assert.False(dict.Remove("key", 43))); // value doesn't match
-        //}
-
-        //[Fact]
-        //public static void TryRemove_KeyValuePair_MatchesKeyWithDefaultComparer()
-        //{
-        //    var dict = new CMap<string, string>(5, 0.5, StringComparer.OrdinalIgnoreCase);
-        //    dict.Emplace("key", "value");
-
-        //    Assert.False(dict.TryRemove(KeyValuePair.Create("key", "VALUE")));
-        //    Assert.True(dict.TryRemove(KeyValuePair.Create("KEY", "value")));
-        //}
-
+            // And that the dictionary is empty. We will check the count in a few different ways:
+            Assert.Empty(col);            
+        }
 
     }
 }

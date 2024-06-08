@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System;
 using System.Diagnostics;
+using System.Reflection.PortableExecutable;
 
 namespace Faster.Map.Concurrent
 {
@@ -106,7 +107,7 @@ namespace Faster.Map.Concurrent
         private const int _inProgressMarker = -124;
         private double _loadFactor;
 
-        private readonly IEqualityComparer<TKey> _comparer;
+        private readonly IEqualityComparer<TKey> _keyComparer;
 
         uint[] _powersOfTwo = {
             0x1,       // 2^0
@@ -175,7 +176,7 @@ namespace Faster.Map.Concurrent
         /// <param name="initialCapacity">The length of the hashmap. Will always take the closest power of two</param>
         /// <param name="loadFactor">The loadfactor determines when the hashmap will resize(default is 0.5d) i.e size 32 loadfactor 0.5 hashmap will resize at 16</param>
         /// <param name="keyComparer">Used to compare keys to resolve hashcollisions</param>
-        public CMap(uint initialCapacity, double loadFactor, IEqualityComparer<TKey>? keyComparer)
+        public CMap(uint initialCapacity, double loadFactor, IEqualityComparer<TKey> keyComparer)
         {
             if (initialCapacity <= 0 || loadFactor <= 0 || loadFactor > 1)
             {
@@ -187,7 +188,7 @@ namespace Faster.Map.Concurrent
                 initialCapacity = 16;
             }
             _loadFactor = loadFactor;
-            _comparer = EqualityComparer<TKey>.Default;
+            _keyComparer = keyComparer;
             _table = new Table(BitOperations.RoundUpToPowerOf2(initialCapacity), _loadFactor);
         }
 
@@ -250,7 +251,7 @@ namespace Faster.Map.Concurrent
                     // Resize the table if the count exceeds the threshold
                     if (table._count >= table.Threshold)
                     {
-                        Resize(); // Resize the table to accommodate more entries
+                        Resize(index); // Resize the table to accommodate more entries
                     }
 
                     return true; // Successfully inserted the entry
@@ -281,14 +282,14 @@ namespace Faster.Map.Concurrent
                     // Resize the table if the count exceeds the threshold
                     if (table._count >= table.Threshold)
                     {
-                        Resize(); // Resize the table to accommodate more entries
+                        Resize(index); // Resize the table to accommodate more entries
                     }
 
                     return true; // Successfully inserted the entry
                 }
 
                 // Check if the bucket is occupied by an entry with the same key
-                if (h2 == entry.Meta && _comparer.Equals(key, entry.Key))
+                if (h2 == entry.Meta && _keyComparer.Equals(key, entry.Key))
                 {
                     return false; // Key already exists, insertion failed
                 }
@@ -332,7 +333,7 @@ namespace Faster.Map.Concurrent
             {
                 // Retrieve the entry from the table at the calculated index
                 var entry = Find(table.Entries, index);
-                if (h2 == entry.Meta && _comparer.Equals(key, entry.Key))
+                if (h2 == entry.Meta && _keyComparer.Equals(key, entry.Key))
                 {
                     // If the entry's metadata and key match, return the value
                     value = entry.Value;
@@ -383,16 +384,8 @@ namespace Faster.Map.Concurrent
                 // Retrieve the entry from the table at the calculated index
                 ref var entry = ref Find(table.Entries, index);
 
-                // If the entry indicates a resize operation, perform the resize
-                if (_resizeBucket == entry.Meta)
-                {
-                    Resize(index); // Resize the table
-                    jumpDistance = 0; // Reset the jump distance
-                    goto start; // Restart the update process with the new table
-                }
-
                 // If the entry's metadata and key match, proceed with the update
-                if (h2 == entry.Meta && _comparer.Equals(key, entry.Key))
+                if (h2 == entry.Meta && _keyComparer.Equals(key, entry.Key))
                 {
                     // Guarantee that only one thread can access the critical section at a time
                     // the enter method uses Interlocked.CompareExchange and thus provides a full memory fence, ensuring thread safety
@@ -421,6 +414,91 @@ namespace Faster.Map.Concurrent
                 if (_emptyBucket == entry.Meta)
                 {
                     return false;
+                }
+
+                // If the entry indicates a resize operation, perform the resize
+                if (_resizeBucket == entry.Meta)
+                {
+                    Resize(index); // Resize the table
+                    jumpDistance = 0; // Reset the jump distance
+                    goto start; // Restart the update process with the new table
+                }
+
+                // Increment the jump distance and calculate the next index using triangular probing
+                jumpDistance += 1;
+                index += jumpDistance;
+                index &= table.LengthMinusOne; // Ensure the index wraps around the table size
+            } while (true); // Continue probing until a matching entry is found or the table is exhausted
+        }
+
+        /// <summary>
+        /// This method demonstrates a sophisticated approach to updating values in a concurrent hash table, leveraging quadratic probing, atomic operations, and handle the ABA problem effectively. 
+        /// The use of aggressive inlining and careful memory management ensures that the method performs efficiently even under high concurrency.
+        /// </summary>         
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Remove(TKey key)
+        {
+            // Calculate the hash code for the given key
+            var hashcode = key.GetHashCode();
+            byte jumpDistance = 0; // Initialize jump distance for quadratic probing
+
+            start:
+
+            // Get the current state of the table
+            var table = _table;
+            var index = table.GetBucket(hashcode); // Calculate the initial bucket index
+            var h2 = table.H2(hashcode); // Calculate the secondary hash
+
+            do
+            {
+                // Retrieve the entry from the table at the calculated index
+                ref var entry = ref Find(table.Entries, index);
+
+                // If the entry's metadata and key match, proceed with the update
+                if (h2 == entry.Meta && _keyComparer.Equals(key, entry.Key))
+                {
+                    // Guarantee that only one thread can access the critical section at a time
+                    // the enter method uses Interlocked.CompareExchange and thus provides a full memory fence, ensuring thread safety
+                    // And ensures that the changes made by one thread are visible to others
+                    entry.Enter();
+
+                    if (h2 == entry.Meta)
+                    {
+                        // reset current entry
+                        entry.Meta = _tombstone;
+                        entry.Key = default;
+                        entry.Value = default;                    
+
+                        // Check if the table has been resized during the operation
+                        if (_table != table)
+                        {
+                            // If resized, restart with the new table
+                            jumpDistance = 0;
+                            entry.Exit();
+                            goto start;
+                        }
+
+
+                        entry.Exit();
+
+                        Interlocked.Decrement(ref table._count);
+
+                        return true;
+                    }         
+                }
+
+                // If the entry indicates an empty bucket, the key does not exist in the table
+                if (_emptyBucket == entry.Meta)
+                {
+                    return false;
+                }
+
+                // If the entry indicates a resize operation, perform the resize
+                if (_resizeBucket == entry.Meta)
+                {
+                    Resize(index); // Resize the table
+                    jumpDistance = 0; // Reset the jump distance
+                    goto start; // Restart the update process with the new table
                 }
 
                 // Increment the jump distance and calculate the next index using triangular probing
@@ -465,7 +543,7 @@ namespace Faster.Map.Concurrent
                 }
 
                 // If the entry's metadata and key match, proceed with the update
-                if (h2 == entry.Meta && _comparer.Equals(key, entry.Key))
+                if (h2 == entry.Meta && _keyComparer.Equals(key, entry.Key))
                 {
                     // Guarantee that only one thread can access the critical section at a time
                     // the enter method uses Interlocked.CompareExchange and thus provides a full memory fence, ensuring thread safety
@@ -532,7 +610,7 @@ namespace Faster.Map.Concurrent
                 ref var entry = ref Find(table.Entries, index);
 
                 // If the entry's metadata and key match, proceed with the update
-                if (h2 == entry.Meta && _comparer.Equals(key, entry.Key))
+                if (h2 == entry.Meta && _keyComparer.Equals(key, entry.Key))
                 {
                     // Guarantee that only one thread can access the critical section at a time
                     // the enter method uses Interlocked.CompareExchange and thus provides a full memory fence, ensuring thread safety
