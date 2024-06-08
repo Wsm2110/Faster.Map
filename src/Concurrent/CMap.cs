@@ -308,6 +308,7 @@ namespace Faster.Map.Concurrent
                 index &= table.LengthMinusOne; // Ensure the index is within table bounds
             } while (true); // Continue retrying until insertion is successful
         }
+        
 
         /// <summary>
         /// The Get method retrieves a value from a concurrent hash table based on a key.
@@ -467,7 +468,7 @@ namespace Faster.Map.Concurrent
                         // reset current entry
                         entry.Meta = _tombstone;
                         entry.Key = default;
-                        entry.Value = default;                    
+                        entry.Value = default;
 
                         // Check if the table has been resized during the operation
                         if (_table != table)
@@ -478,13 +479,12 @@ namespace Faster.Map.Concurrent
                             goto start;
                         }
 
-
                         entry.Exit();
 
                         Interlocked.Decrement(ref table._count);
 
                         return true;
-                    }         
+                    }
                 }
 
                 // If the entry indicates an empty bucket, the key does not exist in the table
