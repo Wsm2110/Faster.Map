@@ -117,83 +117,85 @@ namespace Faster.Map.CMap.Tests
             }
         }
 
-        //[Fact]
-        //public static void TestTryUpdate()
-        //{
-        //    var map = new CMap<string, int>();
+        [Fact]
+        public static void TestTryUpdate()
+        {
+            var map = new CMap<string, int>();
+        
+            for (int i = 0; i < 10; i++)
+            {
+                map.Emplace(i.ToString(), i);
+            }
 
-        //    for (int i = 0; i < 10; i++)
-        //    {
-        //        map.Emplace(i.ToString(), i);
-        //    };
+            for (int i = 0; i < 10; i++)
+            {
+                Assert.True(map.Update(i.ToString(), i + 1, i), "TestTryUpdate:  FAILED.  TryUpdate failed!");
+                Assert.Equal(i + 1, map[i.ToString()]);
+            }
 
-        //    //test TryUpdate concurrently
-        //    map.Clear();
+            //test TryUpdate concurrently
+            map.Clear();
+            for (int i = 0; i < 1000; i++)
+            {
+                map.Emplace(i.ToString(), i);
+            }
 
-        //    for (int i = 0; i < 2; i++)
-        //    {
-        //        map.Emplace(i.ToString(), i);
-        //    }
+            var mres = new ManualResetEventSlim();
+            Task[] tasks = new Task[10];
+            ThreadLocal<ThreadData> updatedKeys = new ThreadLocal<ThreadData>(true);
+            for (int i = 0; i < tasks.Length; i++)
+            {
+                // We are creating the Task using TaskCreationOptions.LongRunning because...
+                // there is no guarantee that the Task will be created on another thread.
+                // There is also no guarantee that using this TaskCreationOption will force
+                // it to be run on another thread.
+                tasks[i] = Task.Factory.StartNew((obj) =>
+                {
+                    mres.Wait();
+                    int index = (((int)obj) + 1) + 1000;
+                    updatedKeys.Value = new ThreadData();
+                    updatedKeys.Value.ThreadIndex = index;
 
-        //    var mres = new ManualResetEventSlim();
-        //    Task[] tasks = new Task[10];
-        //    ThreadLocal<ThreadData> updatedKeys = new ThreadLocal<ThreadData>(true);
-        //    for (int i = 0; i < tasks.Length; i++)
-        //    {
-        //        // We are creating the Task using TaskCreationOptions.LongRunning because...
-        //        // there is no guarantee that the Task will be created on another thread.
-        //        // There is also no guarantee that using this TaskCreationOption will force
-        //        // it to be run on another thread.
-        //        tasks[i] = Task.Factory.StartNew((obj) =>
-        //        {
-        //            mres.Wait();
-        //            int index = Environment.CurrentManagedThreadId * 1000 + (((int)obj) + 1);
-        //            updatedKeys.Value = new ThreadData();
-        //            updatedKeys.Value.ThreadIndex = index;
+                    for (int j = 0; j < map.Count; j++)
+                    {
+                        if (map.Update(j.ToString(), index, j))
+                        {
+                            if (map[j.ToString()] != index)
+                            {
+                                updatedKeys.Value.Succeeded = false;
+                                return;
+                            }
+                            updatedKeys.Value.Keys.Add(j.ToString());
+                        }
+                    }
+                }, i, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+            }
 
-        //            for (int j = 0; j < map.Count; j++)
-        //            {
-        //                map.Get(j.ToString(), out var result);
+            mres.Set();
+            Task.WaitAll(tasks);
 
-        //                if (map.Update(j.ToString(), index))
-        //                {
-        //                    map.Get(j.ToString(), out var result2);
+            int numberSucceeded = 0;
+            int totalKeysUpdated = 0;
+            foreach (var threadData in updatedKeys.Values)
+            {
+                totalKeysUpdated += threadData.Keys.Count;
+                if (threadData.Succeeded)
+                {
+                    numberSucceeded++;
+                }
+            }
 
-        //                    if (result == result2)
-        //                    {
-        //                        updatedKeys.Value.Succeeded = false;
-        //                        return;
-        //                    }
-        //                    updatedKeys.Value.Keys.Add(j.ToString());
-        //                }
-        //            }
-        //        }, i, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
-        //    }
+            Assert.True(numberSucceeded == tasks.Length, "One or more threads failed!");
+            Assert.True(totalKeysUpdated == map.Count, string.Format("TestTryUpdate:  FAILED.  The updated keys count doesn't match the dictionary count, expected {0}, actual {1}", map.Count, totalKeysUpdated));
 
-        //    mres.Set();
-        //    Task.WaitAll(tasks, TimeSpan.FromSeconds(10));
-
-        //    int numberSucceeded = 0;
-        //    int totalKeysUpdated = 0;
-        //    foreach (var threadData in updatedKeys.Values)
-        //    {
-        //        totalKeysUpdated += threadData.Keys.Count;
-        //        if (threadData.Succeeded)
-        //        {
-        //            numberSucceeded++;
-        //        }
-        //    }
-
-        //    Assert.True(numberSucceeded == tasks.Length, "One or more threads failed!");
-        //    Assert.True(totalKeysUpdated == map.Count, string.Format("TestTryUpdate:  FAILED.  The updated keys count doesn't match the dictionary count, expected {0}, actual {1}", map.Count, totalKeysUpdated));
-        //    foreach (var value in updatedKeys.Values)
-        //    {
-        //        for (int i = 0; i < value.Keys.Count; i++)
-        //        {
-        //            Assert.True(map[value.Keys[i]] == value.ThreadIndex, $"TestTryUpdate: FAILED. The updated value doesn't match the thread index, expected {value.ThreadIndex} actual {map[value.Keys[i]]}");
-        //        }
-        //    }
-        //}
+            foreach (var value in updatedKeys.Values)
+            {
+                for (int i = 0; i < value.Keys.Count; i++)
+                {
+                    Assert.True(map[value.Keys[i]] == value.ThreadIndex, string.Format("TestTryUpdate:  FAILED.  The updated value doesn't match the thread index, expected {0} actual {1}", value.ThreadIndex, map[value.Keys[i]]));
+                }
+            }
+        }
 
         [Fact]
         public void Update_NonExistentKey_ShouldReturnFalse()

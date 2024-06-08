@@ -7,7 +7,7 @@ namespace Faster.Map.Concurrent.Benchmark
     {
         static void Main(string[] args)
         {          
-            BenchmarkRunner.Run<GetBenchmark>();
+            BenchmarkRunner.Run<UpdateBenchmark>();
         }
     }
 }

@@ -361,7 +361,8 @@ namespace Faster.Map.Concurrent
         }
 
         /// <summary>
-        /// The Update method updates the value associated with a given key in the hash table
+        /// This method demonstrates a sophisticated approach to updating values in a concurrent hash table, leveraging quadratic probing, atomic operations, and handle the ABA problem effectively. 
+        /// The use of aggressive inlining and careful memory management ensures that the method performs efficiently even under high concurrency.
         /// </summary>         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Update(TKey key, TValue newValue)
@@ -413,7 +414,89 @@ namespace Faster.Map.Concurrent
                         jumpDistance = 0;
                         entry.Exit();
                         goto start;
-                    }   
+                    }
+                }
+
+                // If the entry indicates an empty bucket, the key does not exist in the table
+                if (_emptyBucket == entry.Meta)
+                {
+                    return false;
+                }
+
+                // Increment the jump distance and calculate the next index using triangular probing
+                jumpDistance += 1;
+                index += jumpDistance;
+                index &= table.LengthMinusOne; // Ensure the index wraps around the table size
+            } while (true); // Continue probing until a matching entry is found or the table is exhausted
+        }
+
+        /// <summary>
+        /// The Update method is designed to update the value associated with a given key in a concurrent hash table.
+        /// The method uses aggressive inlining for performance optimization.
+        /// It calculates the hash code for the key and uses quadratic probing to find the correct bucket in the table.
+        /// If a matching entry is found, the method performs an atomic compare-and-swap operation to ensure thread safety. 
+        /// If the value matches the comparison value, it updates the value; otherwise, it retries or exits as necessary.
+        /// </summary>         
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Update(TKey key, TValue newValue, TValue comparisonValue)
+        {
+            // Calculate the hash code for the given key
+            var hashcode = key.GetHashCode();
+            byte jumpDistance = 0; // Initialize jump distance for quadratic probing
+
+            start:
+
+            // Get the current state of the table
+            var table = _table;
+            var index = table.GetBucket(hashcode); // Calculate the initial bucket index
+            var h2 = table.H2(hashcode); // Calculate the secondary hash
+
+            do
+            {
+                // Retrieve the entry from the table at the calculated index
+                ref var entry = ref Find(table.Entries, index);
+
+                // If the entry indicates a resize operation, perform the resize
+                if (_resizeBucket == entry.Meta)
+                {
+                    Resize(index); // Resize the table
+                    jumpDistance = 0; // Reset the jump distance
+                    goto start; // Restart the update process with the new table
+                }
+
+                // If the entry's metadata and key match, proceed with the update
+                if (h2 == entry.Meta && _comparer.Equals(key, entry.Key))
+                {
+                    // Guarantee that only one thread can access the critical section at a time
+                    // the enter method uses Interlocked.CompareExchange and thus provides a full memory fence, ensuring thread safety
+                    // And ensures that the changes made by one thread are visible to others
+                    entry.Enter();
+
+                    if (h2 == entry.Meta)
+                    {
+                        // A value can be changed multiple times between the reading and writing of the value by a thread.
+                        // This can lead to incorrect assumptions about the state of the value.
+                        // A common way to solve this problem is to track changes to the value.
+                        if (EqualityComparer<TValue>.Default.Equals(entry.Value, comparisonValue))
+                        {
+                            // Perform the critical section: update the value
+                            entry.Value = newValue;
+                            entry.Exit();
+                            return true;
+                        }
+
+                        entry.Exit();
+                        return false;
+                    }
+
+                    // Check if the table has been resized during the operation
+                    if (_table != table)
+                    {
+                        // If resized, restart with the new table
+                        jumpDistance = 0;
+                        entry.Exit();
+                        goto start;
+                    }
                 }
 
                 // If the entry indicates an empty bucket, the key does not exist in the table
@@ -505,10 +588,10 @@ namespace Faster.Map.Concurrent
         /// <summary>
         /// Clears this instance.
         /// </summary>
-        public void Clear() 
+        public void Clear()
         {
             var table = new Table(_table.Length, _loadFactor);
-            Interlocked.Exchange(ref _table, table);  
+            Interlocked.Exchange(ref _table, table);
         }
 
         /// <summary>
@@ -718,7 +801,7 @@ namespace Faster.Map.Concurrent
             /// <returns></returns>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public uint GetBucket(int hashcode) => _goldenRatio * (uint)hashcode >> _shift;
-                      
+
 
             internal void Migrate(Table mTable, uint index)
             {

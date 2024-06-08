@@ -1,32 +1,38 @@
-﻿using BenchmarkDotNet.Attributes;
-using NonBlocking;
-using System;
-using System.Collections.Concurrent;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
+using BenchmarkDotNet.Attributes;
+using Faster.Map.DenseMap;
+using Faster.Map.QuadMap;
+using Faster.Map.RobinHoodMap;
 
 namespace Faster.Map.Concurrent.Benchmark
 {
     [MarkdownExporterAttribute.GitHub]
     [MemoryDiagnoser]
-    public class GetBenchmark
+    public class UpdateBenchmark
     {
-        CMap<uint, uint> _map = new CMap<uint, uint>();
-        NonBlocking.ConcurrentDictionary<uint, uint> _block = new NonBlocking.ConcurrentDictionary<uint, uint>();
-        System.Collections.Concurrent.ConcurrentDictionary<uint, uint> _dic            ;
+        private CMap<uint, uint> _map;
+        private System.Collections.Concurrent.ConcurrentDictionary<uint, uint> _concurrentMap;
+        private NonBlocking.ConcurrentDictionary<uint, uint> _nonBlocking;
 
         [Params(1000000)]
         public uint Length { get; set; }
         private uint[] keys;
 
-        [Params(1, 8, 16, 32, 64, 128)] // Example thread counts to test scalability
+        private const int N = 1000000; // Adjust as needed for your scale
+
+        [Params(1, 8, 16, 32, 64, 128 /*, 256, 512*/)] // Example thread counts to test scalability
         public int NumberOfThreads { get; set; }
 
         [GlobalSetup]
         public void Setup()
         {
-            _dic = new System.Collections.Concurrent.ConcurrentDictionary<uint, uint>();
+            _map = new CMap<uint, uint>(2000000);
+            _nonBlocking = new NonBlocking.ConcurrentDictionary<uint, uint>(NumberOfThreads, 2000000);
+            _concurrentMap = new System.Collections.Concurrent.ConcurrentDictionary<uint, uint>(NumberOfThreads, 1000000);
+
             var output = File.ReadAllText("Numbers.txt");
             var splittedOutput = output.Split(',');
 
@@ -36,13 +42,54 @@ namespace Faster.Map.Concurrent.Benchmark
             {
                 keys[index] = uint.Parse(splittedOutput[index]);
             }
+        }
 
-            foreach (var key in keys)
+        [IterationSetup]
+        public void Clean()
+        {
+            _map = new CMap<uint, uint>(2000000);
+            _nonBlocking = new NonBlocking.ConcurrentDictionary<uint, uint>(NumberOfThreads, 2000000);
+            _concurrentMap = new System.Collections.Concurrent.ConcurrentDictionary<uint, uint>(NumberOfThreads, 1000000);
+
+        }
+
+
+        [Benchmark]
+        public void NonBlocking()
+        {
+            int numKeys = 1000000;
+            int segmentSize = numKeys / NumberOfThreads;
+
+            Parallel.For(0, NumberOfThreads, threadIndex =>
             {
-                _map.Emplace(key, key);
-                _block.TryAdd(key, key);
-                _dic.TryAdd(key, key);
-            }
+                int start = threadIndex * segmentSize;
+                int end = (threadIndex == NumberOfThreads - 1) ? numKeys : start + segmentSize;
+
+                for (uint i = (uint)start; i < end; i++)
+                {
+                    var key = keys[i];
+                    _nonBlocking[key] = 0;
+                }
+            });
+        }
+
+        [Benchmark]
+        public void CMap()
+        {
+            int numKeys = 1000000;
+            int segmentSize = numKeys / NumberOfThreads;
+
+            Parallel.For(0, NumberOfThreads, threadIndex =>
+            {
+                int start = threadIndex * segmentSize;
+                int end = (threadIndex == NumberOfThreads - 1) ? numKeys : start + segmentSize;
+
+                for (uint i = (uint)start; i < end; i++)
+                {
+                    var key = keys[i];
+                     _map.Update(key, 0);                
+                }
+            });
         }
 
         [Benchmark]
@@ -58,45 +105,12 @@ namespace Faster.Map.Concurrent.Benchmark
 
                 for (uint i = (uint)start; i < end; i++)
                 {
-                    _dic.TryGetValue(keys[i], out _);
+                    var key = keys[i];
+                    _concurrentMap[key] = 0;
                 }
             });
         }
 
-        [Benchmark]
-        public void NonBlocking()
-        {
-            int numKeys = 1000000;
-            int segmentSize = numKeys / NumberOfThreads;
 
-            Parallel.For(0, NumberOfThreads, threadIndex =>
-            {
-                int start = threadIndex * segmentSize;
-                int end = (threadIndex == NumberOfThreads - 1) ? numKeys : start + segmentSize;
-
-                for (uint i = (uint)start; i < end; i++)
-                {
-                    _block.TryGetValue(keys[i], out _);
-                }
-            });
-        }
-
-        [Benchmark]
-        public void CMap()
-        {
-            int numKeys = 1000000;       
-            int segmentSize = numKeys / NumberOfThreads;
-
-            Parallel.For(0, NumberOfThreads, threadIndex =>
-            {
-                int start = threadIndex * segmentSize;
-                int end = (threadIndex == NumberOfThreads - 1) ? numKeys : start + segmentSize;
-
-                for (uint i = (uint)start; i < end; i++)
-                {
-                    _map.Get(keys[i], out _);
-                }
-            });
-        }
     }
 }

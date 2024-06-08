@@ -10,7 +10,7 @@ namespace Faster.Map.Benchmark
     {
         static void Main(string[] args)
         {
-            BenchmarkRunner.Run<AddBenchmark>();
+            BenchmarkRunner.Run<UpdateBenchmark>();
         }
     }
 }

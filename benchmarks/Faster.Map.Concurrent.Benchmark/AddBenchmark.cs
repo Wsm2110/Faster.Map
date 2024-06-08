@@ -8,7 +8,7 @@ using Faster.Map.RobinHoodMap;
 
 namespace Faster.Map.Concurrent.Benchmark
 {
-
+    [MarkdownExporterAttribute.GitHub]
     [MemoryDiagnoser]
     public class AddBenchmark
     {
