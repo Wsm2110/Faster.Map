@@ -17,7 +17,8 @@ namespace Faster.Map.CMap.Tests
         [InlineData(20, 5000)]
         [InlineData(64, 5000)]
         [InlineData(16, 8)]
-
+        [InlineData(256, 20000)]
+        [InlineData(1, 20000 * 512)]
         public static void Assert_Emplace_With_Resize(int threads, int addsPerThread)
         {
             CMap<int, int> dict = new CMap<int, int>();
