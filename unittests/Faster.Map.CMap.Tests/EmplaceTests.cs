@@ -6,9 +6,10 @@ namespace Faster.Map.CMap.Tests
     public class EmplaceTests
     {
         [Theory]
-        [InlineData(1, 128)]
+        [InlineData(1, 512)]
         [InlineData(2, 10000)]
-        [InlineData(8, 4)]
+        [InlineData(4, 16)]
+        [InlineData(16, 4)]
         [InlineData(5, 2000)]
         [InlineData(4, 2000)]
         [InlineData(256, 2000)]
