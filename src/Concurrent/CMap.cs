@@ -7,6 +7,10 @@ using System;
 using System.Diagnostics;
 using System.Transactions;
 using System.Linq;
+using System.Data;
+using static System.Runtime.InteropServices.JavaScript.JSType;
+using System.Xml.Linq;
+using System.Collections;
 
 namespace Faster.Map.Concurrent
 {
@@ -102,6 +106,10 @@ namespace Faster.Map.Concurrent
 
         internal Table _migrationTable;
         internal Table _table;
+
+        internal Descriptor[] _state;
+        public HelpRecord[] _helpRecords;
+
         private const int _emptyBucket = -127;
         private const int _tombstone = -126;
         private const int _resizeBucket = -125;
@@ -146,7 +154,8 @@ namespace Faster.Map.Concurrent
         };
 
 #if DEBUG
-        Table[] _migrationTables = new Table[31];
+        internal Table[] _migrationTables = new Table[31];
+
 #endif
 
         #endregion
@@ -191,6 +200,9 @@ namespace Faster.Map.Concurrent
             _loadFactor = loadFactor;
             _keyComparer = keyComparer;
             _table = new Table(BitOperations.RoundUpToPowerOf2(initialCapacity), _loadFactor);
+
+            _state = new Descriptor[Environment.ProcessorCount];
+            _helpRecords = new HelpRecord[Environment.ProcessorCount];
         }
 
         #endregion
@@ -210,15 +222,14 @@ namespace Faster.Map.Concurrent
             var hashcode = key.GetHashCode(); // Get the hashcode of the key
             byte jumpDistance = 0; // Initialize jump distance for quadratic probing
 
-            start:
             var table = _table; // Get the current table
+            var index = table.GetBucket(hashcode); // Calculate initial bucket index
+            var h2 = table.H2(hashcode); // Calculate secondary hash for the entry metadata
 
             // Check if a resize is going on and it needs help, using a fast path.
             // If help is not wanted, the thread keeps moving forward making progress.
-            //  table.HelpResizeIfNeeded();
 
-            var index = table.GetBucket(hashcode); // Calculate initial bucket index
-            var h2 = table.H2(hashcode); // Calculate secondary hash for the entry metadata
+            HelpResizeIfNeeded();
 
             do
             {
@@ -240,21 +251,6 @@ namespace Faster.Map.Concurrent
 
                     Interlocked.Increment(ref table._count);
 
-                    //// Check if the table has been resized during the operation
-                    if (_table != table)
-                    {
-                        // If resized, restart with the new table
-                        jumpDistance = 0;
-                        goto start;
-                    }
-
-                    // Resize the table if the count exceeds the threshold
-                    if (table._count >= table.Threshold)
-                    {
-                        // Resize the table to accommodate more entries
-                        Resize();
-                    } 
-
                     return true; // Successfully inserted the entry
                 }
 
@@ -270,15 +266,12 @@ namespace Faster.Map.Concurrent
                     // Note this also means we dont need any explicit memorybarriers.
                     // This code, using Interlocked operations, will also work correctly on ARM architectures without needing additional explicit memory barriers.The memory ordering and visibility are managed by the Interlocked methods.
 
-                    //// Check if the table has been resized during the operation
-                    if (_table != table)
-                    {
-                        // If resized, restart with the new table
-                        jumpDistance = 0;
-                        goto start;
-                    }
-
                     Interlocked.Increment(ref table._count);
+
+                    if (table._state > 1)
+                    {
+                        Interlocked.Decrement(ref table._tickets);
+                    }
 
                     // Resize the table if the count exceeds the threshold
                     if (table._count >= table.Threshold)
@@ -295,22 +288,22 @@ namespace Faster.Map.Concurrent
                     return false;
                 }
 
-                // If the bucket is marked for resizing, perform the resize operation
-                if (entry.Meta == _resizeBucket)
-                {
-                    // Resize is in progress assist in migrating
-                    FastResize();
-                    // Reset jump distance
-                    jumpDistance = 0;
-                    // Restart insertion process after resizing
-                    goto start;
-                }
-
                 // Retry insertion due to a collision or another thread claiming the bucket
                 jumpDistance += 1; // Increment jump distance for quadratic probing
                 index += jumpDistance; // Calculate new index with jump distance
                 index &= table.LengthMinusOne; // Ensure the index is within table bounds
-            } while (true); // Continue retrying until insertion is successful
+            } while (jumpDistance < 5); // Continue retrying until insertion is successful
+
+            //slowpath - table is likely full, or clustering due to weak hashcode
+
+            WfEmplace();
+
+            return true;
+        }
+
+        private void WfEmplace()
+        {
+            Resize();
         }
 
         /// <summary>
@@ -713,36 +706,6 @@ namespace Faster.Map.Concurrent
 
         #region Private Methods
 
-        public void FastResize()
-        {
-            var table = _table;
-            var ctable = _migrationTable;
-
-            if (table != _table)
-            {
-                // Resize Happened
-                return;
-            }
-
-            table.Migrate(ctable);
-
-            if (table != _table)
-            {
-                // Resize Happened
-                return;
-            }
-
-            // This atomic operation attempts to update the main table reference from the old table to the new (migrated) table.
-            // It ensures that this change happens only if the current table is still the one that was originally read into table.
-            // This prevents lost updates and ensures that all threads see the new table once the migration is complete.
-            // Emphasize that the operation only succeeds if _table still referencestable, thereby preventing conflicts from concurrent resize operations.
-            if (table == Interlocked.CompareExchange(ref _table, ctable, table))
-            {
-                Interlocked.Exchange(ref table._completed, 1);
-            }
-        }
-
-
         /// <summary>
         /// This method is designed to be used in a highly concurrent environment where minimizing locking and blocking is crucial.
         /// The use of lock-free programming techniques helps to maximize scalability and performance by allowing multiple threads to operate in parallel with minimal interference.
@@ -766,6 +729,8 @@ namespace Faster.Map.Concurrent
                     var migrationTable = new Table(length << 1, _loadFactor);
                     //Interlocked.Exchange safely publishes the migrationTable to _migrationTable, ensuring visibility to other threads, which is crucial for the correctness of the migration.
                     Interlocked.Exchange(ref _migrationTable, migrationTable);
+
+                    Interlocked.Exchange(ref table._state, 1); //Pending resize
                     // Debug purposes
 #if DEBUG
                     Interlocked.Exchange(ref _migrationTables[index], migrationTable);
@@ -783,29 +748,43 @@ namespace Faster.Map.Concurrent
                 return;
             }
 
-            if (table != _table)
-            {
-                // Resize happened
-                return;
-            }
-
             table.Migrate(ctable);
-
-            if (table != _table)
-            {
-                // Resize happened
-                return;
-            }
 
             // This atomic operation attempts to update the main table reference from the old table to the new (migrated) table.
             // It ensures that this change happens only if the current table is still the one that was originally read into table.
             // This prevents lost updates and ensures that all threads see the new table once the migration is complete.
             // Emphasize that the operation only succeeds if _table still referencestable, thereby preventing conflicts from concurrent resize operations.
 
-            if (table == Interlocked.CompareExchange(ref _table, ctable, table))
+            if (table._count == ctable._count)
             {
-                Interlocked.Exchange(ref table._completed, 1);
+                Interlocked.CompareExchange(ref _table, ctable, table) == table);
             }
+        }
+
+        internal void HelpResizeIfNeeded()
+        {
+            var table = _table;
+            var migrationTable = _migrationTable;
+
+            if (table._state < 1)
+            {
+                return;
+            }
+
+            if (table._state == 1)
+            {
+                Interlocked.Increment(ref table._tickets);
+                return;
+            }
+
+            while (table._tickets > 0)
+            {
+                table.Migrate(migrationTable);
+            }
+
+            // sweep table one more time
+
+
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -816,6 +795,30 @@ namespace Faster.Map.Concurrent
         }
 
         #endregion
+
+        public record HelpRecord
+        {
+            int curTid = -1;
+            long lastPhase;
+            long nextCheck;
+
+            public HelpRecord()
+            {                
+                Reset();
+            }
+
+            void Reset()
+            {
+                curTid = (curTid + 1) % Environment.ProcessorCount;
+                lastPhase = _state[curTid].phase;
+                nextCheck = 0;
+            }
+        }
+
+        internal record Descriptor(long Phase, bool Pending, bool enqueue, Entry Entry);
+            
+        
+
 
         [StructLayout(LayoutKind.Sequential)]
         [DebuggerDisplay("key = {Key};  value = {Value}; meta {Meta};")]
@@ -856,7 +859,7 @@ namespace Faster.Map.Concurrent
             /// </summary>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Exit() => Interlocked.Exchange(ref state, 0);
-
+                    
         }
 
         internal class Table
@@ -868,6 +871,7 @@ namespace Faster.Map.Concurrent
             internal byte _completed = 0;
             internal byte _resizeInProgress;
             private uint _chunkSize;
+            internal byte _state;
 
             #endregion
 
@@ -881,6 +885,7 @@ namespace Faster.Map.Concurrent
             internal byte _complete;
             private uint _counter;
             private uint _chunkMax;
+            internal int _tickets;
 
             #endregion
 
@@ -889,7 +894,7 @@ namespace Faster.Map.Concurrent
             /// </summary>
             /// <param name="entries"></param>
             /// <param name="metadata"></param>
-            public Table(uint length, double _loadFactor)
+            internal Table(uint length, double _loadFactor)
             {
                 Length = length;
                 LengthMinusOne = length - 1;
@@ -960,35 +965,27 @@ namespace Faster.Map.Concurrent
             /// <param name="mTable"></param>
             internal void Migrate(Table mTable)
             {
-                uint end = _chunkSize;
                 uint index = 0;
 
-                while (mTable._count < _count)
+                do
                 {
-                    for (; index < end; ++index)
+                    ref var entry = ref Find(Entries, index);
+                    if (entry.Meta < 0 || entry.state == 1)
                     {
-                        ref var entry = ref Find(Entries, index);
-                        if (entry.Meta < 0 || entry.state == 1)
-                        {
-                            continue;
-                        }
-
-                        var result = Interlocked.Exchange(ref entry.Meta, _resizeBucket);
-                        if (result > -1)
-                        {                      
-                            mTable.EmplaceInternal(entry, result);
-                        }
+                        continue;
                     }
 
-                    var counterIndex = Interlocked.Increment(ref _counter) & _chunkMax;
-                    index = counterIndex * _chunkSize;
-                    end = index + _chunkSize;
+                    var result = Interlocked.Exchange(ref entry.Meta, _resizeBucket);
+                    if (result > -1)
+                    {
+                        mTable.EmplaceInternal(ref entry, result);
+                    }
 
-                    // Debug.Assert(end <= Entries.Length, $"{_chunkSize}");
-                }
+
+                } while (++index < Entries.Length);
             }
 
-            internal bool EmplaceInternal(Entry entry, sbyte meta)
+            internal bool EmplaceInternal(ref Entry entry, sbyte meta)
             {
                 byte jumpDistance = 0;
                 var hashcode = entry.Key.GetHashCode();
@@ -996,25 +993,13 @@ namespace Faster.Map.Concurrent
 
                 do
                 {
-                    Debug.Assert(meta > -1);
-                    Debug.Assert(entry.Meta == -125);
-
                     ref var location = ref Find(Entries, index);
-
-                    Debug.Assert(location.Meta != meta);
 
                     //Claim empty bucket
                     if (location.Meta == _emptyBucket && _emptyBucket == Interlocked.CompareExchange(ref location.Meta, meta, _emptyBucket))
                     {
-                        location.Key = entry.Key;
-                        location.Value = entry.Value;
-
-                        Debug.Assert(meta != -125);
-
+                        location = entry;
                         location.Meta = meta;
-
-                        Debug.Assert(location.Meta != -125);
-
 
                         Interlocked.Increment(ref _count);
                         return true;
@@ -1034,41 +1019,8 @@ namespace Faster.Map.Concurrent
                 return Unsafe.As<int, sbyte>(ref result);
             }
 
-            internal void SetResizeInProgress() => Interlocked.Exchange(ref _resizeInProgress, 1);
 
-            internal bool HelpResizeIfNeeded()
-            {
-                return true;
-            }
         }
 
-        public struct Random8
-        {
-            private static ulong _state;
-
-            public Random8(ulong seed)
-            {
-                _state = (Splitmix64Stateless(seed, 0) << 64) + Splitmix64Stateless(seed, 1);
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public byte Generate(byte bits)
-            {
-                _state *= 0xda942042e4dd58b5UL;
-                var result = _state >> bits;
-                return Unsafe.As<ulong, byte>(ref result);
-            }
-
-            private ulong Splitmix64Stateless(ulong seed, ulong index)
-            {
-                ulong result = seed + index;
-                result ^= result >> 30;
-                result *= 0xbf58476d1ce4e5b9UL;
-                result ^= result >> 27;
-                result *= 0x94d049bb133111ebUL;
-                result ^= result >> 31;
-                return result;
-            }
-        }
-    }
+    }  
 }

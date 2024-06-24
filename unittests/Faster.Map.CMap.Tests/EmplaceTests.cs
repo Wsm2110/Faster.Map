@@ -62,6 +62,11 @@ namespace Faster.Map.CMap.Tests
                 expectKeys.Add(i);
             }
 
+            if (expectKeys.Count != gotKeys.Count) 
+            {
+            
+            }
+
             Assert.True(expectKeys.Count == gotKeys.Count, $"Keys {expectKeys.Count} - {gotKeys.Count}");
 
             for (int i = 0; i < expectKeys.Count; i++)
