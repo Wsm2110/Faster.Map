@@ -18,12 +18,12 @@ namespace Faster.Map.Concurrent.Benchmark
         [Benchmark]
         public void Random8Benchmark()
         {
-            var random = new Random8(33);
+            //var random = new Random8(33);
 
-            for (int i = 0; i < 100; i++)
-            {
-                var x = random.Generate(63);
-            }
+            //for (int i = 0; i < 100; i++)
+            //{
+            //    var x = random.Generate(63);
+            //}
         }
 
 
