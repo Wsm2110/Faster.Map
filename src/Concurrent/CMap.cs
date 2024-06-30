@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System;
 using System.Diagnostics;
-using System.Runtime.InteropServices.JavaScript;
+using System.Linq;
 
 namespace Faster.Map.Concurrent
 {
@@ -26,7 +26,7 @@ namespace Faster.Map.Concurrent
         /// <value>
         /// The entry count.
         /// </value>
-        public int Count { get => (int)_table._count; }
+        public int Count { get => (int)_count; }
 
         /// <summary>
         /// Returns all the entries as KeyValuePair objects
@@ -143,6 +143,7 @@ namespace Faster.Map.Concurrent
             0x40000000,// 2^30
             0x80000000 // 2^31
         };
+        private uint _count;
 
 #if DEBUG
         Table[] _migrationTables = new Table[31];
@@ -208,17 +209,11 @@ namespace Faster.Map.Concurrent
         {
             var hashcode = key.GetHashCode(); // Get the hashcode of the key
             byte jumpDistance = 0; // Initialize jump distance for quadratic probing
+            var h2 = _table.H2(hashcode); // Calculate secondary hash for the entry metadata
 
-            // Resize the table if the count exceeds the threshold
-            if (_table._count >= _table.Threshold)
-            {
-                Resize(); // Resize the table to accommodate more entries
-            }
-
-            start: // Label for restarting the insertion process after resizing
-            var table = _table; // Get the current table
+            start:
+            var table = _table; // Get the current table            
             var index = table.GetBucket(hashcode); // Calculate initial bucket index
-            var h2 = table.H2(hashcode); // Calculate secondary hash for the entry metadata
 
             do
             {
@@ -238,20 +233,13 @@ namespace Faster.Map.Concurrent
                     // Note this also means we dont need any explicit memorybarriers.
                     // This code, using Interlocked operations, will also work correctly on ARM architectures without needing additional explicit memory barriers.The memory ordering and visibility are managed by the Interlocked methods.
 
-                    Interlocked.Increment(ref table._count);
-
-                    // Check if the table has been resized during the operation
-                    if (_table != table)
-                    {
-                        // If resized, restart with the new table
-                        jumpDistance = 0;
-                        goto start;
-                    }
+                    Interlocked.Increment(ref _count);
 
                     // Resize the table if the count exceeds the threshold
-                    if (table._count >= table.Threshold)
+                    if (_count >= table.Threshold)
                     {
-                        Resize(); // Resize the table to accommodate more entries
+                        // Resize the table to accommodate more entries
+                        Resize();
                     }
 
                     return true; // Successfully inserted the entry
@@ -269,18 +257,10 @@ namespace Faster.Map.Concurrent
                     // Note this also means we dont need any explicit memorybarriers.
                     // This code, using Interlocked operations, will also work correctly on ARM architectures without needing additional explicit memory barriers.The memory ordering and visibility are managed by the Interlocked methods.
 
-                    //// Check if the table has been resized during the operation
-                    if (_table != table)
-                    {
-                        // If resized, restart with the new table
-                        jumpDistance = 0;
-                        goto start;
-                    }
-
-                    Interlocked.Increment(ref table._count);
+                    Interlocked.Increment(ref _count);
 
                     // Resize the table if the count exceeds the threshold
-                    if (table._count >= table.Threshold)
+                    if (_count >= table.Threshold)
                     {
                         Resize(); // Resize the table to accommodate more entries
                     }
@@ -294,12 +274,11 @@ namespace Faster.Map.Concurrent
                     return false;
                 }
 
-                // If the bucket is marked for resizing, perform the resize operation
                 if (entry.Meta == _resizeBucket)
                 {
-                    Resize(); // Resize the table starting from the current index
-                    jumpDistance = 0; // Reset jump distance
-                    goto start; // Restart insertion process after resizing
+                    Resize();
+                    jumpDistance = 0;
+                    goto start;
                 }
 
                 // Retry insertion due to a collision or another thread claiming the bucket
@@ -321,13 +300,13 @@ namespace Faster.Map.Concurrent
             // Calculate the hashcode for the given key
             var hashcode = key.GetHashCode();
             byte jumpDistance = 0; // Initialize jump distance for quadratic probing
+            var h2 = _table.H2(hashcode); // Calculate the secondary hash
 
             start:
 
             // Get the current state of the table
             var table = _table;
             var index = table.GetBucket(hashcode); // Calculate the initial bucket index
-            var h2 = table.H2(hashcode); // Calculate the secondary hash
 
             do
             {
@@ -371,13 +350,13 @@ namespace Faster.Map.Concurrent
             // Calculate the hash code for the given key
             var hashcode = key.GetHashCode();
             byte jumpDistance = 0; // Initialize jump distance for quadratic probing
+            var h2 = _table.H2(hashcode); // Calculate the secondary hash
 
             start:
 
             // Get the current state of the table
             var table = _table;
             var index = table.GetBucket(hashcode); // Calculate the initial bucket index
-            var h2 = table.H2(hashcode); // Calculate the secondary hash
 
             do
             {
@@ -398,16 +377,7 @@ namespace Faster.Map.Concurrent
                         entry.Value = newValue;
                         entry.Exit();
                         return true;
-                    }
-
-                    // Check if the table has been resized during the operation
-                    if (_table != table)
-                    {
-                        // If resized, restart with the new table
-                        jumpDistance = 0;
-                        entry.Exit();
-                        goto start;
-                    }
+                    }   
                 }
 
                 // If the entry indicates an empty bucket, the key does not exist in the table
@@ -430,6 +400,89 @@ namespace Faster.Map.Concurrent
                 index &= table.LengthMinusOne; // Ensure the index wraps around the table size
             } while (true); // Continue probing until a matching entry is found or the table is exhausted
         }
+
+
+        /// <summary>
+        /// The Update method is designed to update the value associated with a given key in a concurrent hash table.
+        /// The method uses aggressive inlining for performance optimization.
+        /// It calculates the hash code for the key and uses quadratic probing to find the correct bucket in the table.
+        /// If a matching entry is found, the method performs an atomic compare-and-swap operation to ensure thread safety. 
+        /// If the value matches the comparison value, it updates the value; otherwise, it retries or exits as necessary.
+        /// </summary>         
+        /// <summary>
+        /// The Update method is designed to update the value associated with a given key in a concurrent hash table.
+        /// The method uses aggressive inlining for performance optimization.
+        /// It calculates the hash code for the key and uses quadratic probing to find the correct bucket in the table.
+        /// If a matching entry is found, the method performs an atomic compare-and-swap operation to ensure thread safety. 
+        /// If the value matches the comparison value, it updates the value; otherwise, it retries or exits as necessary.
+        /// </summary>         
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Update(TKey key, TValue newValue, TValue comparisonValue)
+        {
+            // Calculate the hash code for the given key
+            var hashcode = key.GetHashCode();
+            byte jumpDistance = 0; // Initialize jump distance for quadratic probing
+            var h2 = _table.H2(hashcode); // Calculate the secondary hash
+
+            start:
+
+            // Get the current state of the table
+            var table = _table;
+            var index = table.GetBucket(hashcode); // Calculate the initial bucket index
+
+            do
+            {
+                // Retrieve the entry from the table at the calculated index
+                ref var entry = ref Find(table.Entries, index);
+                     
+                // If the entry's metadata and key match, proceed with the update
+                if (h2 == entry.Meta && _keyComparer.Equals(key, entry.Key))
+                {
+                    // Guarantee that only one thread can access the critical section at a time
+                    // the enter method uses Interlocked.CompareExchange and thus provides a full memory fence, ensuring thread safety
+                    // And ensures that the changes made by one thread are visible to others
+                    entry.Enter();
+                    bool result = false;
+
+                    if (h2 == entry.Meta)
+                    {                      
+                        // A value can be changed multiple times between the reading and writing of the value by a thread.
+                        // This can lead to incorrect assumptions about the state of the value.
+                        // A common way to solve this problem is to track changes to the value.
+                        if (EqualityComparer<TValue>.Default.Equals(entry.Value, comparisonValue))
+                        {
+                            // Perform the critical section: update the value
+                            entry.Value = newValue;                         
+                            result = true;
+                        }                     
+                    }
+
+                    entry.Exit();
+
+                    return result;
+                }
+
+                // If the entry indicates a resize operation, perform the resize
+                if (_resizeBucket == entry.Meta)
+                {
+                    Resize(); // Resize the table
+                    jumpDistance = 0; // Reset the jump distance
+                    goto start; // Restart the update process with the new table
+                }
+
+                // If the entry indicates an empty bucket, the key does not exist in the table
+                if (_emptyBucket == entry.Meta)
+                {
+                    return false;
+                }
+
+                // Increment the jump distance and calculate the next index using triangular probing
+                jumpDistance += 1;
+                index += jumpDistance;
+                index &= table.LengthMinusOne; // Ensure the index wraps around the table size
+            } while (true); // Continue probing until a matching entry is found or the table is exhausted
+        }
+
 
         /// <summary>
         /// This method demonstrates a sophisticated approach to updating values in a concurrent hash table, leveraging quadratic probing, atomic operations, and handle the ABA problem effectively. 
@@ -460,7 +513,7 @@ namespace Faster.Map.Concurrent
                     // Guarantee that only one thread can access the critical section at a time
                     // the enter method uses Interlocked.CompareExchange and thus provides a full memory fence, ensuring thread safety
                     // And ensures that the changes made by one thread are visible to others
-                    entry.Enter();
+                    //   entry.Enter();
 
                     if (h2 == entry.Meta)
                     {
@@ -474,13 +527,13 @@ namespace Faster.Map.Concurrent
                         {
                             // If resized, restart with the new table
                             jumpDistance = 0;
-                            entry.Exit();
+                            //    entry.Exit();
                             goto start;
                         }
 
-                        entry.Exit();
+                        //   entry.Exit();
 
-                        Interlocked.Decrement(ref table._count);
+                        Interlocked.Decrement(ref _count);
 
                         return true;
                     }
@@ -498,88 +551,6 @@ namespace Faster.Map.Concurrent
                     Resize(); // Resize the table
                     jumpDistance = 0; // Reset the jump distance
                     goto start; // Restart the update process with the new table
-                }
-
-                // Increment the jump distance and calculate the next index using triangular probing
-                jumpDistance += 1;
-                index += jumpDistance;
-                index &= table.LengthMinusOne; // Ensure the index wraps around the table size
-            } while (true); // Continue probing until a matching entry is found or the table is exhausted
-        }
-
-        /// <summary>
-        /// The Update method is designed to update the value associated with a given key in a concurrent hash table.
-        /// The method uses aggressive inlining for performance optimization.
-        /// It calculates the hash code for the key and uses quadratic probing to find the correct bucket in the table.
-        /// If a matching entry is found, the method performs an atomic compare-and-swap operation to ensure thread safety. 
-        /// If the value matches the comparison value, it updates the value; otherwise, it retries or exits as necessary.
-        /// </summary>         
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Update(TKey key, TValue newValue, TValue comparisonValue)
-        {
-            // Calculate the hash code for the given key
-            var hashcode = key.GetHashCode();
-            byte jumpDistance = 0; // Initialize jump distance for quadratic probing
-
-            start:
-
-            // Get the current state of the table
-            var table = _table;
-            var index = table.GetBucket(hashcode); // Calculate the initial bucket index
-            var h2 = table.H2(hashcode); // Calculate the secondary hash
-
-            do
-            {
-                // Retrieve the entry from the table at the calculated index
-                ref var entry = ref Find(table.Entries, index);
-
-                // If the entry indicates a resize operation, perform the resize
-                if (_resizeBucket == entry.Meta)
-                {
-                    Resize(); // Resize the table
-                    jumpDistance = 0; // Reset the jump distance
-                    goto start; // Restart the update process with the new table
-                }
-
-                // If the entry's metadata and key match, proceed with the update
-                if (h2 == entry.Meta && _keyComparer.Equals(key, entry.Key))
-                {
-                    // Guarantee that only one thread can access the critical section at a time
-                    // the enter method uses Interlocked.CompareExchange and thus provides a full memory fence, ensuring thread safety
-                    // And ensures that the changes made by one thread are visible to others
-                    entry.Enter();
-
-                    if (h2 == entry.Meta)
-                    {
-                        // A value can be changed multiple times between the reading and writing of the value by a thread.
-                        // This can lead to incorrect assumptions about the state of the value.
-                        // A common way to solve this problem is to track changes to the value.
-                        if (EqualityComparer<TValue>.Default.Equals(entry.Value, comparisonValue))
-                        {
-                            // Perform the critical section: update the value
-                            entry.Value = newValue;
-                            entry.Exit();
-                            return true;
-                        }
-
-                        entry.Exit();
-                        return false;
-                    }
-
-                    // Check if the table has been resized during the operation
-                    if (_table != table)
-                    {
-                        // If resized, restart with the new table
-                        jumpDistance = 0;
-                        entry.Exit();
-                        goto start;
-                    }
-                }
-
-                // If the entry indicates an empty bucket, the key does not exist in the table
-                if (_emptyBucket == entry.Meta)
-                {
-                    return false;
                 }
 
                 // Increment the jump distance and calculate the next index using triangular probing
@@ -628,7 +599,7 @@ namespace Faster.Map.Concurrent
 
                         // Release the lock
                         entry.Exit();
-                        Interlocked.Decrement(ref table._count);
+                        Interlocked.Decrement(ref _count);
                         return true;
                     }
 
@@ -669,6 +640,7 @@ namespace Faster.Map.Concurrent
         {
             var table = new Table(_table.Length, _loadFactor);
             Interlocked.Exchange(ref _table, table);
+            Interlocked.Exchange(ref _count, 0);
         }
 
         /// <summary>
@@ -717,23 +689,19 @@ namespace Faster.Map.Concurrent
         {
             // These lines read the current table and its properties.
             // The use of local variables here is thread - safe as they only capture the state at a specific point in time and do not modify shared state.
+
             var table = _table;
             var length = table.Length;
             var index = BitOperations.Log2(length);
 
-            if (table._count < table.Threshold)
-            {
-                return;
-            }
-
             // Interlocked.CompareExchange is used to ensure that the resize operation initializes only once.
             // This operation is atomic and ensures that only one thread can set _powersOfTwo[index] from length to 0 at a time, which effectively controls the initialization of the new migration table.
-            if (table._count > table.Threshold && _powersOfTwo[index] > 0)
+            if (_count >= table.Threshold && _powersOfTwo[index] > 0)
             {
                 if (Interlocked.CompareExchange(ref _powersOfTwo[index], 0, length) == length)
                 {
                     // Create new snapshot using the metadata, entries array
-                    var migrationTable = new Table(length * 2, _loadFactor);
+                    var migrationTable = new Table(length << 1, _loadFactor);
                     //Interlocked.Exchange safely publishes the migrationTable to _migrationTable, ensuring visibility to other threads, which is crucial for the correctness of the migration.
                     Interlocked.Exchange(ref _migrationTable, migrationTable);
                     // Debug purposes
@@ -755,7 +723,7 @@ namespace Faster.Map.Concurrent
 
             if (table != _table)
             {
-                //already resized
+                // Resize happened
                 return;
             }
 
@@ -763,7 +731,7 @@ namespace Faster.Map.Concurrent
 
             if (table != _table)
             {
-                //already resized
+                // Resize happened
                 return;
             }
 
@@ -772,10 +740,12 @@ namespace Faster.Map.Concurrent
             // This prevents lost updates and ensures that all threads see the new table once the migration is complete.
             // Emphasize that the operation only succeeds if _table still referencestable, thereby preventing conflicts from concurrent resize operations.
 
-            if (table._count == ctable._count)
+
+            if (table._depletedCounter <= table._depleted)
             {
                 Interlocked.CompareExchange(ref _table, ctable, table);
             }
+
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -826,7 +796,6 @@ namespace Faster.Map.Concurrent
             /// </summary>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Exit() => Interlocked.Exchange(ref state, 0);
-
         }
 
         internal class Table
@@ -834,12 +803,11 @@ namespace Faster.Map.Concurrent
             #region Fields
             private byte _shift = 32;
             private const sbyte _bitmask = (1 << 6) - 1;
-            private const uint _goldenRatio = 0x9E3779B9; //2654435769; 
-            internal byte _completed = 0;
-            internal uint _migrationCount = 0;
-
+            private const uint _goldenRatio = 0x9E3779B9; //2654435769;          
             private uint _chunkSize;
+            internal long _depleted;
             private uint _chunkIndex;
+
             #endregion
 
             #region Properties
@@ -848,7 +816,9 @@ namespace Faster.Map.Concurrent
             public uint LengthMinusOne;
             public uint Threshold;
             public uint Length;
-            public uint _count;
+
+            private uint _chunkMax;
+            internal int _depletedCounter;
 
             #endregion
 
@@ -868,35 +838,33 @@ namespace Faster.Map.Concurrent
                 Entries.AsSpan().Fill(new Entry { Meta = _emptyBucket });
 
                 _chunkSize = DetermineChunkSize((uint)BitOperations.Log2(length));
+                _chunkMax = (length / _chunkSize) - 1;
+                _depleted = length * -125;
             }
 
             private static uint DetermineChunkSize(uint length)
             {
                 switch (length)
                 {
-                    case 0: return 16; // 1; // 2^0
-                    case 1: return 16; // 2; // 2^1
-                    case 2: return 16; // 4; // 2^2
-                    case 3: return 16; // 8; // 2^3
                     case 4: return 16; // 16; // 2^4
-                    case 5: return 16; // 32; // 2^5
-                    case 6: return 16; // 64; // 2^6
-                    case 7: return 16; // 128; // 2^7
-                    case 8: return 16; // 256; // 2^8
-                    case 9: return 16; // 512; // 2^9
-                    case 10: return 32; // 1024; // 2^10
-                    case 11: return 32; // 2048; // 2^11
-                    case 12: return 64; //4096; // 2^12
-                    case 13: return 128; //8192; // 2^13
-                    case 14: return 256; //16384; // 2^14
-                    case 15: return 512;  // 32768; // 2^15
+                    case 5: return 32; // 32; // 2^5
+                    case 6: return 64; // 64; // 2^6
+                    case 7: return 128; // 128; // 2^7
+                    case 8: return 256; // 256; // 2^8
+                    case 9: return 512; // 512; // 2^9
+                    case 10: return 1024; // 1024; // 2^10
+                    case 11: return 1024; // 2048; // 2^11
+                    case 12: return 1024; //4096; // 2^12
+                    case 13: return 1024; //8192; // 2^13
+                    case 14: return 1024; //16384; // 2^14
+                    case 15: return 1024;  // 32768; // 2^15
                     case 16: return 1024; // 65536; // 2^16
-                    case 17: return 2048; // 131072; // 2^17
-                    case 18: return 4096; //262144; // 2^18
-                    case 19: return 8192; //524288; // 2^19
-                    case 20: return 16384; // 1048576; // 2^20
-                    case 21: return 32768; // 2097152; // 2^21
-                    case 22: return 65536; // 4194304; // 2^22
+                    case 17: return 1024; // 131072; // 2^17
+                    case 18: return 1024; //262144; // 2^18
+                    case 19: return 1024; //524288; // 2^19
+                    case 20: return 1024; // 1048576; // 2^20
+                    case 21: return 1024; // 2097152; // 2^21
+                    case 22: return 16384; // 4194304; // 2^22
                     case 23: return 131072; // 8388608; // 2^23
                     case 24: return 262144; //16777216; // 2^24
                     case 25: return 524288; //33554432; // 2^25
@@ -918,44 +886,48 @@ namespace Faster.Map.Concurrent
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             internal uint GetBucket(int hashcode) => _goldenRatio * (uint)hashcode >> _shift;
 
+            /// <summary>
+            /// Mygrate and deplete all resources 
+            /// </summary>
+            /// <param name="mTable"></param>
             internal void Migrate(Table mTable)
             {
-                var chunkindex = Interlocked.Increment(ref _chunkIndex);
-                var end = chunkindex * _chunkSize;
-                var index = end - _chunkSize;
+                uint chunkIndex = Interlocked.Increment(ref _chunkIndex) & _chunkMax;
+                uint index = chunkIndex * _chunkSize;
+                uint end = index + _chunkSize;
 
-                if (end > Entries.Length)
-                {
-                    Interlocked.Exchange(ref _chunkIndex, 0);
-                    return;
-                }
-
-                for (; index < end; index++)
+                do
                 {
                     ref var entry = ref Find(Entries, index);
 
-                    // Entry is already resized, is in progress or the entry is locked
-                    if (entry.Meta is _resizeBucket or _inProgressMarker)
+                    var meta = entry.Meta;
+
+                    if (entry.Meta == _resizeBucket)
+                    {
+                        ++index;
+                        continue;
+                    }
+
+                    if (entry.Meta == _inProgressMarker)
                     {
                         continue;
                     }
 
-                    if (entry.state == 1)
+                    var result = Interlocked.CompareExchange(ref entry.Meta, _resizeBucket, meta);
+                    // Move leftover entries
+                    if (result == meta)
                     {
-                        continue;
+                        if (result > -1)
+                        {
+                            mTable.EmplaceInternal(ref entry, meta);
+                        }
+                        Interlocked.Add(ref _depletedCounter, _resizeBucket);
                     }
 
-                    // Sweep the bucket including empty and tombstones
-                    var result = Interlocked.Exchange(ref entry.Meta, _resizeBucket);
-                    // Only process the buckets with h2 data
-                    if (result > -1)
-                    {
-                        mTable.EmplaceInternal(ref entry, result);
-                    }
-                }
+                    ++index;
+                } while (index < end);
             }
 
-      
             internal bool EmplaceInternal(ref Entry entry, sbyte meta)
             {
                 byte jumpDistance = 0;
@@ -965,13 +937,13 @@ namespace Faster.Map.Concurrent
                 do
                 {
                     ref var location = ref Find(Entries, index);
+
                     //Claim empty bucket
                     if (location.Meta == _emptyBucket && _emptyBucket == Interlocked.CompareExchange(ref location.Meta, meta, _emptyBucket))
                     {
                         location = entry;
                         location.Meta = meta;
 
-                        Interlocked.Increment(ref _count);
                         return true;
                     }
 

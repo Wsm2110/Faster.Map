@@ -1,17 +1,20 @@
 ﻿using Faster.Map.Concurrent;
 using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Numerics;
 
 namespace Faster.Map.CMap.Tests
 {
     public class EmplaceTests
     {
         [Theory]
-        [InlineData(1, 128)]
+        [InlineData(1, 512)]
         [InlineData(2, 10000)]
-        [InlineData(8, 4)]
+        [InlineData(4, 16)]
+        [InlineData(16, 4)]
         [InlineData(5, 2000)]
         [InlineData(4, 2000)]
-        [InlineData(256, 2000)]
+        [InlineData(64, 8000)]
         [InlineData(5, 5000)]
         [InlineData(5, 2500)]
         [InlineData(20, 5000)]
@@ -19,8 +22,9 @@ namespace Faster.Map.CMap.Tests
         [InlineData(16, 8)]
         [InlineData(256, 20000)]
         [InlineData(1, 20000 * 512)]
+        [InlineData(256, 2000)]
         public static void Assert_Emplace_With_Resize(int threads, int addsPerThread)
-        {
+        {   
             CMap<int, int> dict = new CMap<int, int>();
 
             int count = threads;
