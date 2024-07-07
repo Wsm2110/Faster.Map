@@ -101,10 +101,11 @@ namespace Faster.Map.Concurrent
 
         internal Table _migrationTable;
         internal Table _table;
-        private const int _emptyBucket = -127;
-        private const int _tombstone = -126;
-        private const int _resizeBucket = -125;
-        private const int _inProgressMarker = -124;
+        private const sbyte _emptyBucket = -127;
+        private const sbyte _tombstone = -126;
+        private const sbyte _resizeBucket = -125;
+        private const sbyte _groupResized = -123;
+        private const sbyte _inProgressMarker = -124;
         private double _loadFactor;
 
         private readonly IEqualityComparer<TKey> _keyComparer;
@@ -239,7 +240,7 @@ namespace Faster.Map.Concurrent
                     if (_count >= table.Threshold)
                     {
                         // Resize the table to accommodate more entries
-                        Resize();
+                        Resize(table);
                     }
 
                     return true; // Successfully inserted the entry
@@ -262,7 +263,7 @@ namespace Faster.Map.Concurrent
                     // Resize the table if the count exceeds the threshold
                     if (_count >= table.Threshold)
                     {
-                        Resize(); // Resize the table to accommodate more entries
+                        Resize(table); // Resize the table to accommodate more entries
                     }
 
                     return true; // Successfully inserted the entry
@@ -274,9 +275,9 @@ namespace Faster.Map.Concurrent
                     return false;
                 }
 
-                if (entry.Meta == _resizeBucket)
+                if (entry.Meta is _resizeBucket or _groupResized)
                 {
-                    Resize();
+                    Resize(table);
                     jumpDistance = 0;
                     goto start;
                 }
@@ -328,7 +329,7 @@ namespace Faster.Map.Concurrent
 
                 if (entry.Meta == _resizeBucket)
                 {
-                    Resize(); // Perform the resize operation
+                    Resize(table); // Perform the resize operation
                     jumpDistance = 0; // Reset the jump distance
                     goto start; // Restart the lookup process with the new table
                 }
@@ -377,7 +378,7 @@ namespace Faster.Map.Concurrent
                         entry.Value = newValue;
                         entry.Exit();
                         return true;
-                    }   
+                    }
                 }
 
                 // If the entry indicates an empty bucket, the key does not exist in the table
@@ -389,7 +390,7 @@ namespace Faster.Map.Concurrent
                 // If the entry indicates a resize operation, perform the resize
                 if (_resizeBucket == entry.Meta)
                 {
-                    Resize(); // Resize the table
+                    Resize(table); // Resize the table
                     jumpDistance = 0; // Reset the jump distance
                     goto start; // Restart the update process with the new table
                 }
@@ -434,7 +435,7 @@ namespace Faster.Map.Concurrent
             {
                 // Retrieve the entry from the table at the calculated index
                 ref var entry = ref Find(table.Entries, index);
-                     
+
                 // If the entry's metadata and key match, proceed with the update
                 if (h2 == entry.Meta && _keyComparer.Equals(key, entry.Key))
                 {
@@ -445,16 +446,16 @@ namespace Faster.Map.Concurrent
                     bool result = false;
 
                     if (h2 == entry.Meta)
-                    {                      
+                    {
                         // A value can be changed multiple times between the reading and writing of the value by a thread.
                         // This can lead to incorrect assumptions about the state of the value.
                         // A common way to solve this problem is to track changes to the value.
                         if (EqualityComparer<TValue>.Default.Equals(entry.Value, comparisonValue))
                         {
                             // Perform the critical section: update the value
-                            entry.Value = newValue;                         
+                            entry.Value = newValue;
                             result = true;
-                        }                     
+                        }
                     }
 
                     entry.Exit();
@@ -465,7 +466,7 @@ namespace Faster.Map.Concurrent
                 // If the entry indicates a resize operation, perform the resize
                 if (_resizeBucket == entry.Meta)
                 {
-                    Resize(); // Resize the table
+                    Resize(table); // Resize the table
                     jumpDistance = 0; // Reset the jump distance
                     goto start; // Restart the update process with the new table
                 }
@@ -548,7 +549,7 @@ namespace Faster.Map.Concurrent
                 // If the entry indicates a resize operation, perform the resize
                 if (_resizeBucket == entry.Meta)
                 {
-                    Resize(); // Resize the table
+                    Resize(table); // Resize the table
                     jumpDistance = 0; // Reset the jump distance
                     goto start; // Restart the update process with the new table
                 }
@@ -619,7 +620,7 @@ namespace Faster.Map.Concurrent
                 // If the entry indicates a resize operation, perform the resize
                 if (_resizeBucket == entry.Meta)
                 {
-                    Resize(); // Resize the table
+                    Resize(table); // Resize the table
                     jumpDistance = 0; // Reset the jump distance
                     goto start; // Restart the update process with the new table
                 }
@@ -685,23 +686,26 @@ namespace Faster.Map.Concurrent
         /// This method is designed to be used in a highly concurrent environment where minimizing locking and blocking is crucial.
         /// The use of lock-free programming techniques helps to maximize scalability and performance by allowing multiple threads to operate in parallel with minimal interference.
         /// </summary>
-        public void Resize()
+        internal void Resize(Table table)
         {
             // These lines read the current table and its properties.
             // The use of local variables here is thread - safe as they only capture the state at a specific point in time and do not modify shared state.
 
-            var table = _table;
-            var length = table.Length;
-            var index = BitOperations.Log2(length);
+            if (table.Length < _table.Length)
+            {
+                return;
+            }
+
+            var index = BitOperations.Log2(table.Length);
 
             // Interlocked.CompareExchange is used to ensure that the resize operation initializes only once.
             // This operation is atomic and ensures that only one thread can set _powersOfTwo[index] from length to 0 at a time, which effectively controls the initialization of the new migration table.
-            if (_count >= table.Threshold && _powersOfTwo[index] > 0)
+            if (_powersOfTwo[index] > 0)
             {
-                if (Interlocked.CompareExchange(ref _powersOfTwo[index], 0, length) == length)
+                if (Interlocked.CompareExchange(ref _powersOfTwo[index], 0, table.Length) == table.Length)
                 {
                     // Create new snapshot using the metadata, entries array
-                    var migrationTable = new Table(length << 1, _loadFactor);
+                    var migrationTable = new Table(table.Length << 1, _loadFactor);
                     //Interlocked.Exchange safely publishes the migrationTable to _migrationTable, ensuring visibility to other threads, which is crucial for the correctness of the migration.
                     Interlocked.Exchange(ref _migrationTable, migrationTable);
                     // Debug purposes
@@ -741,7 +745,7 @@ namespace Faster.Map.Concurrent
             // Emphasize that the operation only succeeds if _table still referencestable, thereby preventing conflicts from concurrent resize operations.
 
 
-            if (table._depletedCounter <= table._depleted)
+            if (table._depletedCounter == table._depleted)
             {
                 Interlocked.CompareExchange(ref _table, ctable, table);
             }
@@ -806,7 +810,7 @@ namespace Faster.Map.Concurrent
             private const uint _goldenRatio = 0x9E3779B9; //2654435769;          
             private uint _chunkSize;
             internal long _depleted;
-            private uint _chunkIndex;
+            private uint _groupIndex;
 
             #endregion
 
@@ -817,8 +821,9 @@ namespace Faster.Map.Concurrent
             public uint Threshold;
             public uint Length;
 
-            private uint _chunkMax;
+            private uint _groups;
             internal int _depletedCounter;
+            private int _chunkJackpot;
 
             #endregion
 
@@ -838,8 +843,9 @@ namespace Faster.Map.Concurrent
                 Entries.AsSpan().Fill(new Entry { Meta = _emptyBucket });
 
                 _chunkSize = DetermineChunkSize((uint)BitOperations.Log2(length));
-                _chunkMax = (length / _chunkSize) - 1;
+                _groups = (length / _chunkSize) - 1;
                 _depleted = length * -125;
+                _chunkJackpot = (int)(_chunkSize * _resizeBucket);
             }
 
             private static uint DetermineChunkSize(uint length)
@@ -892,40 +898,60 @@ namespace Faster.Map.Concurrent
             /// <param name="mTable"></param>
             internal void Migrate(Table mTable)
             {
-                uint chunkIndex = Interlocked.Increment(ref _chunkIndex) & _chunkMax;
-                uint index = chunkIndex * _chunkSize;
-                uint end = index + _chunkSize;
-
-                do
+                while (_depletedCounter > _depleted)
                 {
+                    // process chunks
+                    uint groupIndex = Interlocked.Increment(ref _groupIndex) & _groups;
+                    uint index = groupIndex * _chunkSize;
+                    uint end = index + _chunkSize;
+
                     ref var entry = ref Find(Entries, index);
 
                     var meta = entry.Meta;
 
-                    if (entry.Meta == _resizeBucket)
+                    // The first slot acts as a special marking indicating if this group is being resized
+                    if (entry.Meta is not _groupResized)
                     {
-                        ++index;
-                        continue;
-                    }
+                        var result = Interlocked.CompareExchange(ref entry.Meta, _groupResized, meta);
+                        if (result != meta)
+                        {
+                            // Cas failed, which means some other thread has claimed this group
+                            return;
+                        }
 
-                    if (entry.Meta == _inProgressMarker)
-                    {
-                        continue;
-                    }
-
-                    var result = Interlocked.CompareExchange(ref entry.Meta, _resizeBucket, meta);
-                    // Move leftover entries
-                    if (result == meta)
-                    {
+                        // Cas succeeded
                         if (result > -1)
                         {
-                            mTable.EmplaceInternal(ref entry, meta);
-                        }
-                        Interlocked.Add(ref _depletedCounter, _resizeBucket);
-                    }
+                            mTable.EmplaceInternal(ref entry, result);
+                        }// Entry has been moved succesfully
+                       
+                        ++index;
 
-                    ++index;
-                } while (index < end);
+                        // Process all entries in group
+                        do
+                        {
+                            entry = ref Find(Entries, index);
+                            meta = entry.Meta;
+
+                            if (meta is _inProgressMarker)
+                            {
+                                continue;
+                            }
+
+                            result = Interlocked.Exchange(ref entry.Meta, _resizeBucket);
+
+                            if (result > -1)
+                            {
+                                mTable.EmplaceInternal(ref entry, result);
+                            }
+
+                            ++index;
+                        } while (index < end);
+
+                        // only update the depleted counter once every entry in this block is resized
+                        Interlocked.Add(ref _depletedCounter, _chunkJackpot);
+                    }
+                }
             }
 
             internal bool EmplaceInternal(ref Entry entry, sbyte meta)
