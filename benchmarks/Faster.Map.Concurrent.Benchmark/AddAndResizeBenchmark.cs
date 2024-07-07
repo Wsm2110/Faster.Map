@@ -47,15 +47,15 @@ namespace Faster.Map.Concurrent.Benchmark
             _concurrentMap = new System.Collections.Concurrent.ConcurrentDictionary<uint, uint>();
         }
 
-        //[Benchmark]
-        //public void NonBlocking()
-        //{
-        //    Parallel.For(0, N, new ParallelOptions { MaxDegreeOfParallelism = NumberOfThreads }, i =>
-        //    {
-        //        var key = keys[i];
-        //        _nonBlocking.TryAdd(key, key);
-        //    });
-        //}
+        [Benchmark]
+        public void NonBlocking()
+        {
+            Parallel.For(0, N, new ParallelOptions { MaxDegreeOfParallelism = NumberOfThreads }, i =>
+            {
+                var key = keys[i];
+                _nonBlocking.TryAdd(key, key);
+            });
+        }
 
         [Benchmark]
         public void CMap()
@@ -63,20 +63,18 @@ namespace Faster.Map.Concurrent.Benchmark
             Parallel.For(0, N, new ParallelOptions { MaxDegreeOfParallelism = NumberOfThreads }, i =>
             {
                 var key = keys[i];
-                _map.Emplace(keys[i], 0);
+                _map.Emplace(key, key);
             });
         }
 
-        //[Benchmark]
-        //public void ConcurrentDictionary()
-        //{
-        //    Parallel.For(0, N, new ParallelOptions { MaxDegreeOfParallelism = NumberOfThreads }, i =>
-        //    {
-        //        var key = keys[i];
-        //        _concurrentMap.TryAdd(key, key);
-        //    });
-        //}
-
-
+        [Benchmark]
+        public void ConcurrentDictionary()
+        {
+            Parallel.For(0, N, new ParallelOptions { MaxDegreeOfParallelism = NumberOfThreads }, i =>
+            {
+                var key = keys[i];
+                _concurrentMap.TryAdd(key, key);
+            });
+        }
     }
 }

@@ -275,7 +275,7 @@ namespace Faster.Map.Concurrent
                     return false;
                 }
 
-                if (entry.Meta is _resizeBucket or _groupResized)
+                if (entry.Meta == _resizeBucket || entry.Meta == _groupResized)
                 {
                     Resize(table);
                     jumpDistance = 0;
@@ -327,11 +327,11 @@ namespace Faster.Map.Concurrent
                     return false;
                 }
 
-                if (entry.Meta == _resizeBucket)
+                if (entry.Meta == _resizeBucket || entry.Meta == _groupResized)
                 {
-                    Resize(table); // Perform the resize operation
-                    jumpDistance = 0; // Reset the jump distance
-                    goto start; // Restart the lookup process with the new table
+                    Resize(table);
+                    jumpDistance = 0;
+                    goto start;
                 }
 
                 // Increment the jump distance and calculate the next index using triangular probing
@@ -388,11 +388,11 @@ namespace Faster.Map.Concurrent
                 }
 
                 // If the entry indicates a resize operation, perform the resize
-                if (_resizeBucket == entry.Meta)
+                if (entry.Meta == _resizeBucket || entry.Meta == _groupResized)
                 {
-                    Resize(table); // Resize the table
-                    jumpDistance = 0; // Reset the jump distance
-                    goto start; // Restart the update process with the new table
+                    Resize(table);
+                    jumpDistance = 0;
+                    goto start;
                 }
 
                 // Increment the jump distance and calculate the next index using triangular probing
@@ -401,7 +401,6 @@ namespace Faster.Map.Concurrent
                 index &= table.LengthMinusOne; // Ensure the index wraps around the table size
             } while (true); // Continue probing until a matching entry is found or the table is exhausted
         }
-
 
         /// <summary>
         /// The Update method is designed to update the value associated with a given key in a concurrent hash table.
@@ -464,11 +463,12 @@ namespace Faster.Map.Concurrent
                 }
 
                 // If the entry indicates a resize operation, perform the resize
-                if (_resizeBucket == entry.Meta)
+
+                if (entry.Meta == _resizeBucket || entry.Meta == _groupResized)
                 {
-                    Resize(table); // Resize the table
-                    jumpDistance = 0; // Reset the jump distance
-                    goto start; // Restart the update process with the new table
+                    Resize(table);
+                    jumpDistance = 0;
+                    goto start;
                 }
 
                 // If the entry indicates an empty bucket, the key does not exist in the table
@@ -547,7 +547,8 @@ namespace Faster.Map.Concurrent
                 }
 
                 // If the entry indicates a resize operation, perform the resize
-                if (_resizeBucket == entry.Meta)
+
+                if (entry.Meta == _resizeBucket || entry.Meta == _groupResized)
                 {
                     Resize(table); // Resize the table
                     jumpDistance = 0; // Reset the jump distance
@@ -618,7 +619,7 @@ namespace Faster.Map.Concurrent
                 }
 
                 // If the entry indicates a resize operation, perform the resize
-                if (_resizeBucket == entry.Meta)
+                if (entry.Meta == _resizeBucket || entry.Meta == _groupResized)
                 {
                     Resize(table); // Resize the table
                     jumpDistance = 0; // Reset the jump distance
@@ -744,7 +745,6 @@ namespace Faster.Map.Concurrent
             // This prevents lost updates and ensures that all threads see the new table once the migration is complete.
             // Emphasize that the operation only succeeds if _table still referencestable, thereby preventing conflicts from concurrent resize operations.
 
-
             if (table._depletedCounter == table._depleted)
             {
                 Interlocked.CompareExchange(ref _table, ctable, table);
@@ -820,10 +820,9 @@ namespace Faster.Map.Concurrent
             public uint LengthMinusOne;
             public uint Threshold;
             public uint Length;
-
-            private uint _groups;
+            private uint _groupsMinusOne;          
             internal int _depletedCounter;
-            private int _chunkJackpot;
+            private int _jackpot;
 
             #endregion
 
@@ -843,9 +842,9 @@ namespace Faster.Map.Concurrent
                 Entries.AsSpan().Fill(new Entry { Meta = _emptyBucket });
 
                 _groupSize = DetermineChunkSize((uint)BitOperations.Log2(length));
-                _groups = (length / _groupSize) - 1;
+                _groupsMinusOne = (length / _groupSize) - 1;          
                 _depleted = length * -125;
-                _chunkJackpot = (int)(_groupSize * _resizeBucket);
+                _jackpot = (int)(_groupSize * _resizeBucket);
             }
 
             private static uint DetermineChunkSize(uint length)
@@ -900,10 +899,9 @@ namespace Faster.Map.Concurrent
             {
                 while (_depletedCounter > _depleted)
                 {
-                    // process groups
-                    uint groupIndex = Interlocked.Increment(ref _groupIndex) & _groups;
+                    uint groupIndex = Interlocked.Increment(ref _groupIndex) & _groupsMinusOne;
                     uint index = groupIndex * _groupSize;
-                    uint end = index + _groupSize;
+                    uint end = index + _groupSize;                
 
                     ref var entry = ref Find(Entries, index);
 
@@ -922,8 +920,8 @@ namespace Faster.Map.Concurrent
                         // Cas succeeded
                         if (result > -1)
                         {
-                            mTable.EmplaceInternal(ref entry, result);
                             // Entry has been moved succesfully
+                            mTable.EmplaceInternal(ref entry, result);
                         }
 
                         ++index;
@@ -949,8 +947,8 @@ namespace Faster.Map.Concurrent
                             ++index;
                         } while (index < end);
 
-                        // only update the depleted counter once every entry in this block is resized
-                        Interlocked.Add(ref _depletedCounter, _chunkJackpot);
+                        // only update the depleted counter once when every entry in this block has been moved to the new table
+                        Interlocked.Add(ref _depletedCounter, _jackpot);
                     }
                 }
             }
