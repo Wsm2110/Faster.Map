@@ -808,7 +808,7 @@ namespace Faster.Map.Concurrent
             private byte _shift = 32;
             private const sbyte _bitmask = (1 << 6) - 1;
             private const uint _goldenRatio = 0x9E3779B9; //2654435769;          
-            private uint _chunkSize;
+            private uint _groupSize;
             internal long _depleted;
             private uint _groupIndex;
 
@@ -842,10 +842,10 @@ namespace Faster.Map.Concurrent
                 Entries = GC.AllocateUninitializedArray<Entry>((int)length);
                 Entries.AsSpan().Fill(new Entry { Meta = _emptyBucket });
 
-                _chunkSize = DetermineChunkSize((uint)BitOperations.Log2(length));
-                _groups = (length / _chunkSize) - 1;
+                _groupSize = DetermineChunkSize((uint)BitOperations.Log2(length));
+                _groups = (length / _groupSize) - 1;
                 _depleted = length * -125;
-                _chunkJackpot = (int)(_chunkSize * _resizeBucket);
+                _chunkJackpot = (int)(_groupSize * _resizeBucket);
             }
 
             private static uint DetermineChunkSize(uint length)
@@ -865,11 +865,11 @@ namespace Faster.Map.Concurrent
                     case 14: return 1024; //16384; // 2^14
                     case 15: return 1024;  // 32768; // 2^15
                     case 16: return 1024; // 65536; // 2^16
-                    case 17: return 1024; // 131072; // 2^17
-                    case 18: return 1024; //262144; // 2^18
-                    case 19: return 1024; //524288; // 2^19
-                    case 20: return 1024; // 1048576; // 2^20
-                    case 21: return 1024; // 2097152; // 2^21
+                    case 17: return 2048; // 131072; // 2^17
+                    case 18: return 2048; //262144; // 2^18
+                    case 19: return 4096; //524288; // 2^19
+                    case 20: return 8192; // 1048576; // 2^20
+                    case 21: return 8192; // 2097152; // 2^21
                     case 22: return 16384; // 4194304; // 2^22
                     case 23: return 131072; // 8388608; // 2^23
                     case 24: return 262144; //16777216; // 2^24
@@ -900,10 +900,10 @@ namespace Faster.Map.Concurrent
             {
                 while (_depletedCounter > _depleted)
                 {
-                    // process chunks
+                    // process groups
                     uint groupIndex = Interlocked.Increment(ref _groupIndex) & _groups;
-                    uint index = groupIndex * _chunkSize;
-                    uint end = index + _chunkSize;
+                    uint index = groupIndex * _groupSize;
+                    uint end = index + _groupSize;
 
                     ref var entry = ref Find(Entries, index);
 
@@ -923,8 +923,9 @@ namespace Faster.Map.Concurrent
                         if (result > -1)
                         {
                             mTable.EmplaceInternal(ref entry, result);
-                        }// Entry has been moved succesfully
-                       
+                            // Entry has been moved succesfully
+                        }
+
                         ++index;
 
                         // Process all entries in group
@@ -954,6 +955,7 @@ namespace Faster.Map.Concurrent
                 }
             }
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             internal bool EmplaceInternal(ref Entry entry, sbyte meta)
             {
                 byte jumpDistance = 0;
@@ -969,7 +971,6 @@ namespace Faster.Map.Concurrent
                     {
                         location = entry;
                         location.Meta = meta;
-
                         return true;
                     }
 
