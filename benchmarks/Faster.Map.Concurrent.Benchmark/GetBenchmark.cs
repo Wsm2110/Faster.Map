@@ -20,7 +20,7 @@ namespace Faster.Map.Concurrent.Benchmark
         public uint Length { get; set; }
         private uint[] keys;
 
-        [Params(1, 8, 16, 32, 64, 128)] // Example thread counts to test scalability
+        [Params(1, 2, 4, 8, 16)] // Example thread counts to test scalability
         public int NumberOfThreads { get; set; }
 
         [GlobalSetup]

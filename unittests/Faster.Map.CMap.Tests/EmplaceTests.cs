@@ -24,7 +24,7 @@ namespace Faster.Map.CMap.Tests
         [InlineData(1, 20000 * 512)]
         [InlineData(256, 2000)]
         public static void Assert_Emplace_With_Resize(int threads, int addsPerThread)
-        {   
+        {
             CMap<int, int> dict = new CMap<int, int>();
 
             int count = threads;
@@ -160,7 +160,7 @@ namespace Faster.Map.CMap.Tests
         [InlineData(64)]
         public void Assert_Emplace_With_RandomNumbers(int numberOfThreads)
         {
-            var map = new CMap<uint, uint>(2000000, 0.8);
+            var map = new CMap<uint, uint>();
             var N = 1000000;
             var output = File.ReadAllText("Numbers.txt");
             var splittedOutput = output.Split(',');
@@ -189,7 +189,7 @@ namespace Faster.Map.CMap.Tests
 
         }
 
-    
-       
+
+
     }
 }
