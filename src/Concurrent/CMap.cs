@@ -461,7 +461,6 @@ namespace Faster.Map.Concurrent
             } while (true); // Continue probing until a matching entry is found or the table is exhausted
         }
 
-
         /// <summary>
         /// This method demonstrates a sophisticated approach to updating values in a concurrent hash table, leveraging quadratic probing, atomic operations, and handle the ABA problem effectively. 
         /// The use of aggressive inlining and careful memory management ensures that the method performs efficiently even under high concurrency.
@@ -578,7 +577,7 @@ namespace Faster.Map.Concurrent
 
                         // Release the lock
                         entry.Exit();
-                        //    Interlocked.Decrement(ref _counter);
+                        _counter.Decrement();
                         return true;
                     }
 
@@ -619,7 +618,7 @@ namespace Faster.Map.Concurrent
         {
             var table = new Table(_table.Length, _loadFactor);
             Interlocked.Exchange(ref _table, table);
-            //  Interlocked.Exchange(ref _counter, 0);
+            Interlocked.Exchange(ref _counter, new ThreadLocalCounter());
         }
 
         /// <summary>

@@ -32,6 +32,11 @@ namespace Faster.Map.Concurrent
             return sum;
         }
 
+        internal void Decrement()
+        {
+            threadLocalCell.Value.Decrement();
+        }
+
         private class Cell
         {
             private int value;
@@ -39,6 +44,11 @@ namespace Faster.Map.Concurrent
             public void Increment()
             {
                 Interlocked.Increment(ref value);
+            }
+
+            public void Decrement()
+            {
+                Interlocked.Decrement(ref value);
             }
 
             public long Get()
