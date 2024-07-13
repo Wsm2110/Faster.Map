@@ -1,6 +1,6 @@
 # Faster.Map
 
-Faster.Map is a collection of high-performance hashmaps implemented in C#, each tailored to provide lightning-fast key-value pair operations. Whether you're dealing with large datasets or demanding real-time applications, Faster.Map offers optimized solutions for efficient data retrieval and manipulation.
+Faster.Map is a collection of high-performance (concurrent) hashmaps implemented in C#
 
 ## Features:
 
