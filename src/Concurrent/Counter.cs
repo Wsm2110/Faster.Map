@@ -1,6 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -9,22 +8,39 @@ namespace Faster.Map.Concurrent
 {
     // Uses multiple internal counters to reduce contention. Each thread updates its own counter, and the final value is obtained by summing all internal counters.
     public class Counter
-    {        
-        private static int NumStripes = Environment.ProcessorCount * 4; // Should be a power of 2
-        private readonly Cell[] cells = new Cell[NumStripes];
+    {
+        private int NumStripes; // Should be a power of 2
+        private int NumStripedMinusOne;
+        public readonly Cell[] cells;
 
         public Counter()
         {
-            for (int i = 0; i < cells.Length; i++)
+            NumStripes = Environment.ProcessorCount * 4;
+            NumStripedMinusOne = NumStripes - 1;
+            cells = new Cell[NumStripes];
+            for (int i = 0; i < NumStripes; i++)
             {
                 cells[i] = new Cell();
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private ref Cell Find(Cell[] array, int index)
+        {
+            ref var arr0 = ref MemoryMarshal.GetArrayDataReference(array);
+            return ref Unsafe.Add(ref arr0, index);
+        }
+
         public void Increment()
         {
-            int stripe = Thread.CurrentThread.ManagedThreadId & NumStripes - 1;
+            int stripe = Thread.CurrentThread.ManagedThreadId & NumStripedMinusOne;
             Find(cells, stripe).Increment();
+        }
+
+        public void Decrement()
+        {
+            int stripe = Thread.CurrentThread.ManagedThreadId & NumStripedMinusOne;
+            cells[stripe].Decrement();
         }
 
         public long Sum()
@@ -37,26 +53,26 @@ namespace Faster.Map.Concurrent
             return sum;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ref T Find<T>(T[] array, int index)
+        [DebuggerDisplay("{value}")]
+        public class Cell
         {
-            ref var arr0 = ref MemoryMarshal.GetArrayDataReference(array);
-            return ref Unsafe.Add(ref arr0, index);
-        }
-
-        private class Cell
-        {
-            private int value;
+            private long Value;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Increment()
             {
-                Interlocked.Increment(ref value);
+                Interlocked.Increment(ref Value);
             }
-            
-            public int Get()
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void Decrement()
             {
-                return value;
+                Interlocked.Decrement(ref Value);
+            }
+
+            public long Get()
+            {
+                return Interlocked.Read(ref Value);
             }
         }
     }

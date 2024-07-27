@@ -591,6 +591,7 @@ namespace Faster.Map.QuadMap
 
         #endregion
 
+        [StructLayout(LayoutKind.Sequential)]
         internal struct Entry
         {
             public sbyte Metadata;

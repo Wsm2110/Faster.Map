@@ -1,45 +1,33 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
-using System;
-using System.Diagnostics;
-using System.Linq;
 
 namespace Faster.Map.Concurrent
 {
     /// <summary>
-    /// This hashmap uses the following
-    /// Open addressing  
-    /// Quadratic probing
-    /// Fibonacci hashing
-    /// Default loadfactor is 0.5
+    /// Concurrent hashmap with open addressing, quadratic probing, and Fibonacci hashing. Default load factor is 0.5.
     /// </summary>
     public class CMap<TKey, TValue> where TKey : notnull
     {
         #region Properties
 
         /// <summary>
-        /// Gets or sets how many elements are stored in the map
+        /// Gets the number of elements stored in the map.
         /// </summary>
-        /// <value>
-        /// The entry count.
-        /// </value>
-        public int Count { get => (int)_counter.Sum(); }
+        public int Count => (int)_counter.Sum();
 
         /// <summary>
-        /// Returns all the entries as KeyValuePair objects
+        /// Returns all the entries as KeyValuePair objects.
         /// </summary>
-        /// <value>
-        /// The entries.
-        /// </value>
         public IEnumerable<KeyValuePair<TKey, TValue>> Entries
         {
             get
             {
                 var table = _table;
-
                 for (int i = table.Entries.Length - 1; i >= 0; i--)
                 {
                     var entry = table.Entries[i];
@@ -52,11 +40,8 @@ namespace Faster.Map.Concurrent
         }
 
         /// <summary>
-        /// Returns all keys
+        /// Returns all keys.
         /// </summary>
-        /// <value>
-        /// The keys.
-        /// </value>
         public IEnumerable<TKey> Keys
         {
             get
@@ -74,11 +59,8 @@ namespace Faster.Map.Concurrent
         }
 
         /// <summary>
-        /// Returns all Values
+        /// Returns all values.
         /// </summary>
-        /// <value>
-        /// The keys.
-        /// </value>
         public IEnumerable<TValue> Values
         {
             get
@@ -107,48 +89,19 @@ namespace Faster.Map.Concurrent
         private const sbyte _groupResized = -123;
         private const sbyte _inProgressMarker = -124;
         private double _loadFactor;
-
         private readonly IEqualityComparer<TKey> _keyComparer;
-
-        uint[] _powersOfTwo = {
-            0x1,       // 2^0
-            0x2,       // 2^1
-            0x4,       // 2^2
-            0x8,       // 2^3
-            0x10,      // 2^4
-            0x20,      // 2^5
-            0x40,      // 2^6
-            0x80,      // 2^7
-            0x100,     // 2^8
-            0x200,     // 2^9
-            0x400,     // 2^10
-            0x800,     // 2^11
-            0x1000,    // 2^12
-            0x2000,    // 2^13
-            0x4000,    // 2^14
-            0x8000,    // 2^15
-            0x10000,   // 2^16
-            0x20000,   // 2^17
-            0x40000,   // 2^18
-            0x80000,   // 2^19
-            0x100000,  // 2^20
-            0x200000,  // 2^21
-            0x400000,  // 2^22
-            0x800000,  // 2^23
-            0x1000000, // 2^24
-            0x2000000, // 2^25
-            0x4000000, // 2^26
-            0x8000000, // 2^27
-            0x10000000,// 2^28
-            0x20000000,// 2^29
-            0x40000000,// 2^30
-            0x80000000 // 2^31
+        private readonly uint[] _powersOfTwo = {
+            0x1, 0x2, 0x4, 0x8, 0x10, 0x20, 0x40, 0x80,
+            0x100, 0x200, 0x400, 0x800, 0x1000, 0x2000,
+            0x4000, 0x8000, 0x10000, 0x20000, 0x40000,
+            0x80000, 0x100000, 0x200000, 0x400000, 0x800000,
+            0x1000000, 0x2000000, 0x4000000, 0x8000000,
+            0x10000000, 0x20000000, 0x40000000, 0x80000000
         };
-
-        private ThreadLocalCounter _counter = new ThreadLocalCounter();
+        private Counter _counter;
 
 #if DEBUG
-        Table[] _migrationTables = new Table[31];
+        private Table[] _migrationTables = new Table[31];
 #endif
 
         #endregion
@@ -156,29 +109,29 @@ namespace Faster.Map.Concurrent
         #region Constructor
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="CMap{TKey,TValue}"/> class.
+        /// Initializes a new instance of the <see cref="CMap{TKey,TValue}"/> class with default settings.
         /// </summary>
         public CMap() : this(16, 0.5d, EqualityComparer<TKey>.Default) { }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="CMap{TKey,TValue}"/> class.
+        /// Initializes a new instance of the <see cref="CMap{TKey,TValue}"/> class with the specified initial capacity.
         /// </summary>
-        /// <param name="initialCapacity">The length of the hashmap. Will always take the closest power of two</param>
+        /// <param name="initialCapacity">The length of the hashmap. Will always take the closest power of two.</param>
         public CMap(uint initialCapacity) : this(initialCapacity, 0.5d, EqualityComparer<TKey>.Default) { }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="CMap{TKey,TValue}"/> class.
+        /// Initializes a new instance of the <see cref="CMap{TKey,TValue}"/> class with the specified initial capacity and load factor.
         /// </summary>
-        /// <param name="initialCapacity">The length of the hashmap. Will always take the closest power of two</param>
-        /// <param name="loadFactor">The loadfactor determines when the hashmap will resize(default is 0.5d) i.e size 32 loadfactor 0.5 hashmap will resize at 16</param>
+        /// <param name="initialCapacity">The length of the hashmap. Will always take the closest power of two.</param>
+        /// <param name="loadFactor">The load factor determines when the hashmap will resize (default is 0.5).</param>
         public CMap(uint initialCapacity, double loadFactor) : this(initialCapacity, loadFactor, EqualityComparer<TKey>.Default) { }
 
         /// <summary>
-        /// Initializes a new instance of class.
+        /// Initializes a new instance of the <see cref="CMap{TKey,TValue}"/> class with the specified settings.
         /// </summary>
-        /// <param name="initialCapacity">The length of the hashmap. Will always take the closest power of two</param>
-        /// <param name="loadFactor">The loadfactor determines when the hashmap will resize(default is 0.5d) i.e size 32 loadfactor 0.5 hashmap will resize at 16</param>
-        /// <param name="keyComparer">Used to compare keys to resolve hashcollisions</param>
+        /// <param name="initialCapacity">The length of the hashmap. Will always take the closest power of two.</param>
+        /// <param name="loadFactor">The load factor determines when the hashmap will resize (default is 0.5).</param>
+        /// <param name="keyComparer">Used to compare keys to resolve hash collisions.</param>
         public CMap(uint initialCapacity, double loadFactor, IEqualityComparer<TKey> keyComparer)
         {
             if (initialCapacity <= 0 || loadFactor <= 0 || loadFactor > 1)
@@ -193,6 +146,7 @@ namespace Faster.Map.Concurrent
             _loadFactor = loadFactor;
             _keyComparer = keyComparer;
             _table = new Table(BitOperations.RoundUpToPowerOf2(initialCapacity), _loadFactor);
+            _counter = new Counter();
         }
 
         #endregion
@@ -200,21 +154,20 @@ namespace Faster.Map.Concurrent
         #region Public Methods
 
         /// <summary>
-        /// This method, Emplace, is designed to insert a key-value pair into a hash table while ensuring thread safety and managing collisions through quadratic probing. 
-        /// It also handles dynamic resizing of the table when a certain threshold is reached.
+        /// Inserts a key-value pair into the hash table. Ensures thread safety and manages collisions through quadratic probing. Handles dynamic resizing of the table when a threshold is reached.
         /// </summary>
-        /// <param name="key">The key.</param>
-        /// <param name="value">The value.</param>
-        /// <returns></returns>
+        /// <param name="key">The key to insert.</param>
+        /// <param name="value">The value to insert.</param>
+        /// <returns>True if the key-value pair was inserted, false if the key already exists.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Emplace(TKey key, TValue value)
         {
             var hashcode = key.GetHashCode(); // Get the hashcode of the key
-            var h2 = _table.H2(hashcode); // Calculate secondary hash for the entry metadata                      
+            var h2 = _table.H2(hashcode); // Calculate secondary hash for the entry metadata
 
             start:
             byte jumpDistance = 0; // Initialize jump distance for quadratic probing
-            var table = _table; // Get the current table            
+            var table = _table; // Get the current table
             var index = table.GetBucket(hashcode); // Calculate initial bucket index
 
             do
@@ -230,11 +183,6 @@ namespace Faster.Map.Concurrent
                     entry.Value = value;
                     entry.Meta = h2;
 
-                    // Interlocked operations provide a full memory fence, meaning they ensure all preceding memory writes are completed and visible to other threads before the Interlocked operation completes.
-                    // This means that when you perform an Interlocked operation, it guarantees that any changes made to other variables(not just the variable involved in the Interlocked operation) are also visible to other threads.
-                    // Note this also means we dont need any explicit memorybarriers.
-                    // This code, using Interlocked operations, will also work correctly on ARM architectures without needing additional explicit memory barriers.The memory ordering and visibility are managed by the Interlocked methods.
-
                     _counter.Increment();
 
                     return true; // Successfully inserted the entry
@@ -246,11 +194,6 @@ namespace Faster.Map.Concurrent
                     entry.Key = key;
                     entry.Value = value;
                     entry.Meta = h2;
-
-                    // Interlocked operations provide a full memory fence, meaning they ensure all preceding memory writes are completed and visible to other threads before the Interlocked operation completes.
-                    // This means that when you perform an Interlocked operation, it guarantees that any changes made to other variables(not just the variable involved in the Interlocked operation) are also visible to other threads.
-                    // Note this also means we dont need any explicit memorybarriers.
-                    // This code, using Interlocked operations, will also work correctly on ARM architectures without needing additional explicit memory barriers.The memory ordering and visibility are managed by the Interlocked methods.
 
                     _counter.Increment();
 
@@ -269,28 +212,26 @@ namespace Faster.Map.Concurrent
                 index &= table.LengthMinusOne; // Ensure the index is within table bounds
             } while (jumpDistance <= table.MaxJumpDistance); // Continue retrying until insertion is successful
 
-            // queue
+            // Trigger resize if necessary and restart insertion
             Resize(table);
 
             goto start;
         }
 
         /// <summary>
-        /// The Get method retrieves a value from a concurrent hash table based on a key.
+        /// Retrieves a value from the hash table based on the key.
         /// </summary>
-        /// <param name="key"></param>
-        /// <param name="value"></param>
-        /// <returns></returns>
+        /// <param name="key">The key to retrieve the value for.</param>
+        /// <param name="value">The value associated with the key, if found.</param>
+        /// <returns>True if the key was found, false otherwise.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Get(TKey key, out TValue value)
         {
-            // Calculate the hashcode for the given key
-            var hashcode = key.GetHashCode();
+            var hashcode = key.GetHashCode(); // Calculate the hashcode for the given key
             byte jumpDistance = 0; // Initialize jump distance for quadratic probing
             var h2 = _table.H2(hashcode); // Calculate the secondary hash
 
-            // Get the current state of the table
-            var table = _table;
+            var table = _table; // Get the current state of the table
             var index = table.GetBucket(hashcode); // Calculate the initial bucket index
 
             do
@@ -319,21 +260,21 @@ namespace Faster.Map.Concurrent
         }
 
         /// <summary>
-        /// This method demonstrates a sophisticated approach to updating values in a concurrent hash table, leveraging quadratic probing, atomic operations, and handle the ABA problem effectively. 
-        /// The use of aggressive inlining and careful memory management ensures that the method performs efficiently even under high concurrency.
-        /// </summary>         
+        /// Updates the value associated with a key in the hash table. Ensures thread safety and manages the ABA problem.
+        /// </summary>
+        /// <param name="key">The key to update.</param>
+        /// <param name="newValue">The new value to associate with the key.</param>
+        /// <returns>True if the key was found and updated, false otherwise.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Update(TKey key, TValue newValue)
         {
-            // Calculate the hash code for the given key
-            var hashcode = key.GetHashCode();
+            var hashcode = key.GetHashCode(); // Calculate the hash code for the given key
             byte jumpDistance = 0; // Initialize jump distance for quadratic probing
             var h2 = _table.H2(hashcode); // Calculate the secondary hash
 
             start:
 
-            // Get the current state of the table
-            var table = _table;
+            var table = _table; // Get the current state of the table
             var index = table.GetBucket(hashcode); // Calculate the initial bucket index
 
             do
@@ -345,8 +286,6 @@ namespace Faster.Map.Concurrent
                 if (h2 == entry.Meta && _keyComparer.Equals(key, entry.Key))
                 {
                     // Guarantee that only one thread can access the critical section at a time
-                    // the enter method uses Interlocked.CompareExchange and thus provides a full memory fence, ensuring thread safety
-                    // And ensures that the changes made by one thread are visible to others
                     entry.Enter();
 
                     if (h2 == entry.Meta)
@@ -380,31 +319,22 @@ namespace Faster.Map.Concurrent
         }
 
         /// <summary>
-        /// The Update method is designed to update the value associated with a given key in a concurrent hash table.
-        /// The method uses aggressive inlining for performance optimization.
-        /// It calculates the hash code for the key and uses quadratic probing to find the correct bucket in the table.
-        /// If a matching entry is found, the method performs an atomic compare-and-swap operation to ensure thread safety. 
-        /// If the value matches the comparison value, it updates the value; otherwise, it retries or exits as necessary.
-        /// </summary>         
-        /// <summary>
-        /// The Update method is designed to update the value associated with a given key in a concurrent hash table.
-        /// The method uses aggressive inlining for performance optimization.
-        /// It calculates the hash code for the key and uses quadratic probing to find the correct bucket in the table.
-        /// If a matching entry is found, the method performs an atomic compare-and-swap operation to ensure thread safety. 
-        /// If the value matches the comparison value, it updates the value; otherwise, it retries or exits as necessary.
-        /// </summary>         
+        /// Updates the value associated with a key if it matches the comparison value. Ensures thread safety.
+        /// </summary>
+        /// <param name="key">The key to update.</param>
+        /// <param name="newValue">The new value to associate with the key.</param>
+        /// <param name="comparisonValue">The value to compare against the current value.</param>
+        /// <returns>True if the key was found and the value was updated, false otherwise.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Update(TKey key, TValue newValue, TValue comparisonValue)
         {
-            // Calculate the hash code for the given key
-            var hashcode = key.GetHashCode();
+            var hashcode = key.GetHashCode(); // Calculate the hash code for the given key
             byte jumpDistance = 0; // Initialize jump distance for quadratic probing
             var h2 = _table.H2(hashcode); // Calculate the secondary hash
 
             start:
 
-            // Get the current state of the table
-            var table = _table;
+            var table = _table; // Get the current state of the table
             var index = table.GetBucket(hashcode); // Calculate the initial bucket index
 
             do
@@ -416,26 +346,17 @@ namespace Faster.Map.Concurrent
                 if (h2 == entry.Meta && _keyComparer.Equals(key, entry.Key))
                 {
                     // Guarantee that only one thread can access the critical section at a time
-                    // the enter method uses Interlocked.CompareExchange and thus provides a full memory fence, ensuring thread safety
-                    // And ensures that the changes made by one thread are visible to others
                     entry.Enter();
                     bool result = false;
 
-                    if (h2 == entry.Meta)
+                    if (h2 == entry.Meta && EqualityComparer<TValue>.Default.Equals(entry.Value, comparisonValue))
                     {
-                        // A value can be changed multiple times between the reading and writing of the value by a thread.
-                        // This can lead to incorrect assumptions about the state of the value.
-                        // A common way to solve this problem is to track changes to the value.
-                        if (EqualityComparer<TValue>.Default.Equals(entry.Value, comparisonValue))
-                        {
-                            // Perform the critical section: update the value
-                            entry.Value = newValue;
-                            result = true;
-                        }
+                        // Perform the critical section: update the value
+                        entry.Value = newValue;
+                        result = true;
                     }
 
                     entry.Exit();
-
                     return result;
                 }
 
@@ -462,20 +383,19 @@ namespace Faster.Map.Concurrent
         }
 
         /// <summary>
-        /// This method demonstrates a sophisticated approach to updating values in a concurrent hash table, leveraging quadratic probing, atomic operations, and handle the ABA problem effectively. 
-        /// The use of aggressive inlining and careful memory management ensures that the method performs efficiently even under high concurrency.
-        /// </summary>         
+        /// Removes the entry associated with the specified key from the hash table.
+        /// </summary>
+        /// <param name="key">The key to remove.</param>
+        /// <returns>True if the key was found and removed, false otherwise.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Remove(TKey key)
         {
-            // Calculate the hash code for the given key
-            var hashcode = key.GetHashCode();
+            var hashcode = key.GetHashCode(); // Calculate the hash code for the given key
             byte jumpDistance = 0; // Initialize jump distance for quadratic probing
 
             start:
 
-            // Get the current state of the table
-            var table = _table;
+            var table = _table; // Get the current state of the table
             var index = table.GetBucket(hashcode); // Calculate the initial bucket index
             var h2 = table.H2(hashcode); // Calculate the secondary hash
 
@@ -488,9 +408,7 @@ namespace Faster.Map.Concurrent
                 if (h2 == entry.Meta && _keyComparer.Equals(key, entry.Key))
                 {
                     // Guarantee that only one thread can access the critical section at a time
-                    // the enter method uses Interlocked.CompareExchange and thus provides a full memory fence, ensuring thread safety
-                    // And ensures that the changes made by one thread are visible to others
-                    //   entry.Enter();
+                    entry.Enter();
 
                     if (h2 == entry.Meta)
                     {
@@ -504,13 +422,13 @@ namespace Faster.Map.Concurrent
                         {
                             // If resized, restart with the new table
                             jumpDistance = 0;
-                            //    entry.Exit();
+                            entry.Exit();
                             goto start;
                         }
 
-                        //   entry.Exit();
+                        entry.Exit();
 
-                        //  Interlocked.Decrement(ref _counter);
+                        _counter.Decrement();
 
                         return true;
                     }
@@ -538,17 +456,21 @@ namespace Faster.Map.Concurrent
             } while (true); // Continue probing until a matching entry is found or the table is exhausted
         }
 
+        /// <summary>
+        /// Removes the entry associated with the specified key from the hash table and outputs the value.
+        /// </summary>
+        /// <param name="key">The key to remove.</param>
+        /// <param name="value">The value associated with the key, if found.</param>
+        /// <returns>True if the key was found and removed, false otherwise.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Remove(TKey key, out TValue value)
         {
-            // Calculate the hash code for the given key
-            var hashcode = key.GetHashCode();
+            var hashcode = key.GetHashCode(); // Calculate the hash code for the given key
             byte jumpDistance = 0; // Initialize jump distance for quadratic probing
 
             start:
 
-            // Get the current state of the table
-            var table = _table;
+            var table = _table; // Get the current state of the table
             var index = table.GetBucket(hashcode); // Calculate the initial bucket index
             var h2 = table.H2(hashcode); // Calculate the secondary hash
 
@@ -561,8 +483,6 @@ namespace Faster.Map.Concurrent
                 if (h2 == entry.Meta && _keyComparer.Equals(key, entry.Key))
                 {
                     // Guarantee that only one thread can access the critical section at a time
-                    // the enter method uses Interlocked.CompareExchange and thus provides a full memory fence, ensuring thread safety
-                    // And ensures that the changes made by one thread are visible to others
                     entry.Enter();
 
                     // Double-checked locking to prevent multiple threads from removing simultaneously
@@ -612,28 +532,21 @@ namespace Faster.Map.Concurrent
         }
 
         /// <summary>
-        /// Clears this instance.
+        /// Clears all entries from the hash table.
         /// </summary>
         public void Clear()
         {
             var table = new Table(_table.Length, _loadFactor);
             Interlocked.Exchange(ref _table, table);
-            Interlocked.Exchange(ref _counter, new ThreadLocalCounter());
+            Interlocked.Exchange(ref _counter, new Counter());
         }
 
         /// <summary>
-        /// Gets or sets the value by using a Tkey
+        /// Gets or sets the value associated with the specified key.
         /// </summary>
-        /// <value>
-        /// The 
-        /// </value>
-        /// <param name="key">The key.</param>
-        /// <returns></returns>
-        /// <exception cref="KeyNotFoundException">
-        /// Unable to find entry - {key.GetType().FullName} key - {key.GetHashCode()}
-        /// or
-        /// Unable to find entry - {key.GetType().FullName} key - {key.GetHashCode()}
-        /// </exception>
+        /// <param name="key">The key to get or set the value for.</param>
+        /// <returns>The value associated with the specified key.</returns>
+        /// <exception cref="KeyNotFoundException">Thrown if the key is not found when getting or setting the value.</exception>
         public TValue this[TKey key]
         {
             get
@@ -647,7 +560,6 @@ namespace Faster.Map.Concurrent
             }
             set
             {
-                //Change to add or update
                 if (!Emplace(key, value))
                 {
                     throw new KeyNotFoundException($"Unable to find entry - {key.GetType().FullName} key - {key.GetHashCode()}");
@@ -657,77 +569,68 @@ namespace Faster.Map.Concurrent
 
         #endregion
 
-        #region Private Methods
+        #region Internal Methods
 
         /// <summary>
-        /// This method is designed to be used in a highly concurrent environment where minimizing locking and blocking is crucial.
-        /// The use of lock-free programming techniques helps to maximize scalability and performance by allowing multiple threads to operate in parallel with minimal interference.
+        /// Resizes the hash table to accommodate more entries. Ensures thread safety during the resize operation.
         /// </summary>
+        /// <param name="table">The current table to resize.</param>
         internal void Resize(Table table)
         {
-            // These lines read the current table and its properties.
-            // The use of local variables here is thread - safe as they only capture the state at a specific point in time and do not modify shared state.
-
+            // Ensure that the current table is not larger than the new table. Indicates it already resized
             if (table.Length < _table.Length)
             {
                 return;
             }
 
+            // Calculate the log base 2 of the table length to find the power of two index
             var index = BitOperations.Log2(table.Length);
 
-            // Interlocked.CompareExchange is used to ensure that the resize operation initializes only once.
-            // This operation is atomic and ensures that only one thread can set _powersOfTwo[index] from length to 0 at a time, which effectively controls the initialization of the new migration table.
+            // Check if the resize has already been initiated for this size
             if (_powersOfTwo[index] > 0)
             {
+                // Atomically set the power of two index to 0 if it matches the table length
                 if (Interlocked.CompareExchange(ref _powersOfTwo[index], 0, table.Length) == table.Length)
                 {
-                    // Create new snapshot using the metadata, entries array
+                    // Create a new migration table with double the current table's length
                     var migrationTable = new Table(table.Length << 1, _loadFactor);
-                    //Interlocked.Exchange safely publishes the migrationTable to _migrationTable, ensuring visibility to other threads, which is crucial for the correctness of the migration.
+
+                    // Atomically update the migration table reference
                     Interlocked.Exchange(ref _migrationTable, migrationTable);
-                    // Debug purposes
-#if DEBUG
+#if DEBUG            
                     Interlocked.Exchange(ref _migrationTables[index], migrationTable);
 #endif
                 }
             }
 
+            // Retrieve the current migration table reference
             var ctable = _migrationTable;
 
-            // There could be a scenario where ctable is null when accessed. The check if (ctable == null) is vital and must be retained to ensure thread safety.
-            // This can only happen when threads are racing. one allocating and the others dont
+            // Ensure the migration table is not null and has a different length from the current table
             if (ctable == null || table.Length == ctable.Length)
             {
-                //waiting for a new allocated table
                 return;
             }
 
-            if (table != _table)
-            {
-                // Resize happened
-                return;
-            }
-
+            // Migrate the entries from the current table to the migration table
             table.Migrate(ctable);
 
-            if (table != _table)
-            {
-                // Resize happened
-                return;
-            }
-
-            // This atomic operation attempts to update the main table reference from the old table to the new (migrated) table.
-            // It ensures that this change happens only if the current table is still the one that was originally read into table.
-            // This prevents lost updates and ensures that all threads see the new table once the migration is complete.
-            // Emphasize that the operation only succeeds if _table still referencestable, thereby preventing conflicts from concurrent resize operations.
-
+            // Check if the migration is complete
             if (table._depletedCounter == table._depleted)
             {
+                // Atomically update the main table reference to the new migrated table
                 Interlocked.CompareExchange(ref _table, ctable, table);
             }
-
         }
 
+
+        /// <summary>
+        /// Finds an element in the array at the specified index.
+        /// </summary>
+        /// <typeparam name="T">The type of element in the array.</typeparam>
+        /// <param name="array">The array to search.</param>
+        /// <param name="index">The index to find the element at.</param>
+        /// <returns>A reference to the element at the specified index.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ref T Find<T>(T[] array, uint index)
         {
@@ -738,32 +641,30 @@ namespace Faster.Map.Concurrent
         #endregion
 
         [StructLayout(LayoutKind.Sequential)]
-        [DebuggerDisplay("key = {Key};  value = {Value}; meta {Meta};")]
-
-        internal struct Entry(TKey key, TValue value)
+        [DebuggerDisplay("key = {Key}; value = {Value}; meta {Meta};")]
+        internal struct Entry
         {
             internal byte state;
             internal sbyte Meta;
-            internal TKey Key = key;
-            internal TValue Value = value;
+            internal TKey Key;
+            internal TValue Value;
 
+            /// <summary>
+            /// Enters a critical section by acquiring a lock. Ensures thread safety.
+            /// </summary>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Enter()
             {
-                int spinCount = 1; // Initial spin count
+                int spinCount = 1;
 
                 while (true)
                 {
-                    // Attempt to set state to 1 (locked) if it is currently 0 (unlocked)
                     if (Interlocked.CompareExchange(ref state, 1, 0) == 0)
                     {
                         return;
                     }
 
-                    // Optional: Exponential backoff to reduce contention
                     Thread.SpinWait(spinCount);
-
-                    // Exponential backoff: Increase the spin count, but cap it to prevent excessive delays
                     if (spinCount < 1024)
                     {
                         spinCount *= 2;
@@ -772,7 +673,7 @@ namespace Faster.Map.Concurrent
             }
 
             /// <summary>
-            /// Release the lock by setting lockByte to 0 (unlocked)
+            /// Exits the critical section by releasing the lock.
             /// </summary>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Exit() => Interlocked.Exchange(ref state, 0);
@@ -781,10 +682,11 @@ namespace Faster.Map.Concurrent
         internal class Table
         {
             #region Fields
+
             private byte _shift = 32;
             private const sbyte _bitmask = (1 << 6) - 1;
-            private const uint _goldenRatio = 0x9E3779B9; //2654435769;          
-            private uint _groupSize;
+            private const uint _goldenRatio = 0x9E3779B9;
+            internal uint _groupSize;
             internal int _depleted;
             private uint _groupIndex;
 
@@ -798,16 +700,15 @@ namespace Faster.Map.Concurrent
             public uint Length;
             private uint _groupsMinusOne;
             internal int _depletedCounter;
-
             public byte MaxJumpDistance { get; internal set; }
 
             #endregion
 
             /// <summary>
-            /// Creates a snapshot of the current state
+            /// Creates a new table with the specified length and load factor.
             /// </summary>
-            /// <param name="entries"></param>
-            /// <param name="metadata"></param>
+            /// <param name="length">The length of the table.</param>
+            /// <param name="_loadFactor">The load factor of the table.</param>
             public Table(uint length, double _loadFactor)
             {
                 Length = length;
@@ -818,150 +719,184 @@ namespace Faster.Map.Concurrent
                 Entries = GC.AllocateUninitializedArray<Entry>((int)length);
                 Entries.AsSpan().Fill(new Entry { Meta = _emptyBucket });
 
-                _groupSize = DetermineChunkSize((uint)BitOperations.Log2(length));
+                _groupSize = DetermineChunkSize((uint)BitOperations.Log2(length), Environment.ProcessorCount);
                 _groupsMinusOne = (length / _groupSize) - 1;
                 _depleted = (int)(length / _groupSize);
-
                 MaxJumpDistance = (byte)(BitOperations.Log2(length) + 1);
             }
 
-            private static uint DetermineChunkSize(uint length)
+            /// <summary>
+            /// Determines the chunk size based on the length and number of CPU cores.
+            /// </summary>
+            /// <param name="length">The length of the table.</param>
+            /// <param name="cpuCores">The number of CPU cores.</param>
+            /// <returns>The chunk size.</returns>
+            private static uint DetermineChunkSize(uint length, int cpuCores)
             {
-                switch (length)
+                return length switch
                 {
-                    case 4: return 16; // 16; // 2^4
-                    case 5: return 32; // 32; // 2^5
-                    case 6: return 64; // 64; // 2^6
-                    case 7: return 128; // 128; // 2^7
-                    case 8: return 256; // 256; // 2^8
-                    case 9: return 512; // 512; // 2^9
-                    case 10: return 1024; // 1024; // 2^10
-                    case 11: return 1024; // 2048; // 2^11
-                    case 12: return 1024; //4096; // 2^12
-                    case 13: return 1024; //8192; // 2^13
-                    case 14: return 1024; //16384; // 2^14
-                    case 15: return 1024;  // 32768; // 2^15
-                    case 16: return 1024; // 65536; // 2^16
-                    case 17: return 2048; // 131072; // 2^17
-                    case 18: return 2048; //262144; // 2^18
-                    case 19: return 4096; //524288; // 2^19
-                    case 20: return 8192; // 1048576; // 2^20
-                    case 21: return 8192; // 2097152; // 2^21
-                    case 22: return 8192; // 4194304; // 2^22
-                    case 23: return 8192; // 8388608; // 2^23
-                    case 24: return 8192; //16777216; // 2^24
-                    case 25: return 8192; //33554432; // 2^25
-                    case 26: return 8192; //67108864; // 2^26
-                    case 27: return 8192; //134217728; // 2^27
-                    case 28: return 8192; //268435456; // 2^28
-                    case 29: return 8192; // 536870912; // 2^29
-                    case 30: return 8192; //1073741824; // 2^30
-                    case 31: return 8192; //2147483648; // 2^31
-                    default: return 16;
-                }
+                    4 => 16,
+                    5 => 32,
+                    6 => 64,
+                    7 => 128,
+                    8 => 256,
+                    9 => 512,
+                    10 => 1024,
+                    11 => 1024,
+                    12 => 1024,
+                    13 => 1024,
+                    14 => 1024,
+                    15 => 1024,
+                    16 => 1024,
+                    17 => 2048,
+                    18 => 2048,
+                    19 => 4096,
+                    20 => 8192,
+                    21 => 8192,
+                    22 => 16384,
+                    23 => 16384,
+                    24 => 16384,
+                    25 => 16384,
+                    26 => 16384,
+                    27 => 16384,
+                    28 => 16384,
+                    29 => 16384,
+                    30 => 16384,
+                    31 => 16384,
+                    _ => 16,
+                };
             }
 
             /// <summary>
-            /// 
+            /// Calculates the initial bucket index using the golden ratio.
             /// </summary>
-            /// <param name="hashcode"></param>
-            /// <returns></returns>
+            /// <param name="hashcode">The hash code of the key.</param>
+            /// <returns>The bucket index.</returns>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             internal uint GetBucket(int hashcode) => _goldenRatio * (uint)hashcode >> _shift;
 
             /// <summary>
-            /// Mygrate and deplete all resources 
+            /// Migrates entries from the current table to the specified table.
             /// </summary>
-            /// <param name="mTable"></param>
+            /// <param name="mTable">The table to migrate entries to.</param>
+            /// <summary>
+            /// Migrates entries from the current table to the specified migration table.
+            /// This method ensures thread safety by using atomic operations to claim groups of entries
+            /// and move them to the new table, while other threads may still be accessing the old table.
+            /// </summary>
+            /// <param name="mTable">The migration table to move entries to.</param>
             internal void Migrate(Table mTable)
             {
+                // Continue migrating until all groups are depleted
                 while (_depletedCounter < _depleted)
                 {
+                    // Atomically increment the group index and wrap around if necessary
                     uint groupIndex = Interlocked.Increment(ref _groupIndex) & _groupsMinusOne;
                     uint index = groupIndex * _groupSize;
                     uint end = index + _groupSize;
 
+                    // Find the first entry in the group
                     ref var entry = ref Find(Entries, index);
-
                     var meta = entry.Meta;
 
-                    // The first slot acts as a special marking indicating if this group is being resized
+                    // Check if the group has already been resized
                     if (entry.Meta != _groupResized)
                     {
+                        // Atomically mark the group as being resized
                         var result = Interlocked.CompareExchange(ref entry.Meta, _groupResized, meta);
                         if (result != meta)
                         {
-                            // Cas failed, which means some other thread has claimed this group
+                            // Another thread has claimed this group, exit to retry another group
                             return;
                         }
 
-                        // Cas succeeded
+                        // If the entry is valid, migrate it to the new table
                         if (result > -1)
                         {
-                            // Entry has been moved succesfully
                             mTable.EmplaceInternal(ref entry, result);
                         }
 
+                        // Move to the next entry in the group
                         ++index;
 
-                        // Process all entries in group
+                        // Process all entries in the group
                         do
                         {
                             entry = ref Find(Entries, index);
                             meta = entry.Meta;
 
-                            if (meta is _inProgressMarker)
+                            // Skip entries that are in progress
+                            if (meta == _inProgressMarker)
                             {
                                 continue;
                             }
 
+                            // Atomically mark the entry as being resized
                             result = Interlocked.CompareExchange(ref entry.Meta, _resizeBucket, meta);
 
+                            // If the entry is valid and the compare-and-swap succeeded, migrate the entry
                             if (result == meta && result > -1)
                             {
                                 mTable.EmplaceInternal(ref entry, result);
                             }
 
+                            // If the compare-and-swap failed, retry the current entry
                             if (result != meta)
                             {
                                 continue;
                             }
 
+                            // Move to the next entry in the group
                             ++index;
                         } while (index < end);
 
-                        // only update the depleted counter once when every entry in this block has been moved to the new table
+                        // Increment the depleted counter once the entire group is processed
                         Interlocked.Increment(ref _depletedCounter);
                     }
                 }
             }
 
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            /// <summary>
+            /// Inserts an entry into the hash table during migration. This method ensures thread safety by using atomic operations
+            /// to place entries into empty buckets and handles collisions with quadratic probing.
+            /// </summary>
+            /// <param name="entry">The entry to insert.</param>
+            /// <param name="meta">The metadata associated with the entry.</param>
+            /// <returns>True if the entry was successfully inserted, false otherwise.</returns>
             internal bool EmplaceInternal(ref Entry entry, sbyte meta)
             {
-                byte jumpDistance = 0;
-                var hashcode = entry.Key.GetHashCode();
-                var index = GetBucket(hashcode);
+                byte jumpDistance = 0; // Initialize jump distance for quadratic probing
+                var hashcode = entry.Key.GetHashCode(); // Calculate the hashcode of the key
+                var index = GetBucket(hashcode); // Calculate the initial bucket index using the hashcode
 
                 do
                 {
+                    // Retrieve the location in the table at the calculated index
                     ref var location = ref Find(Entries, index);
 
-                    //Claim empty bucket
+                    // Check if the bucket is empty and try to claim it
                     if (location.Meta == _emptyBucket && _emptyBucket == Interlocked.CompareExchange(ref location.Meta, meta, _emptyBucket))
                     {
+                        // Place the entry in the bucket
                         location = entry;
                         location.Meta = meta;
-                        return true;
+                        return true; // Successfully inserted the entry
                     }
 
-                    //spot taken i
+                    // Increment the jump distance for quadratic probing
                     jumpDistance += 1;
+                    // Calculate the next index using the updated jump distance
                     index += jumpDistance;
+                    // Ensure the index wraps around the table size
                     index &= LengthMinusOne;
-                } while (true);
+                } while (true); // Continue probing until an empty bucket is found
             }
 
+            /// <summary>
+            /// Calculates the secondary hash value for the hash code.
+            /// </summary>
+            /// <param name="hashcode">The hash code of the key.</param>
+            /// <returns>The secondary hash value.</returns>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             internal sbyte H2(int hashcode)
             {

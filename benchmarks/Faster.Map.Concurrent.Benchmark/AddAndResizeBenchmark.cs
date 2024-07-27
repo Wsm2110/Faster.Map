@@ -18,7 +18,7 @@ namespace Faster.Map.Concurrent.Benchmark
 
         private const int N = 1000000; // Adjust as needed for your scale
 
-        [Params(1, 2, 4, 8, 16)] // Example thread counts to test scalability
+        [Params(1, 2, 4, 8, 16, 32)] // Example thread counts to test scalability
         public int NumberOfThreads { get; set; }
 
         [GlobalSetup]
@@ -47,15 +47,15 @@ namespace Faster.Map.Concurrent.Benchmark
             _concurrentMap = new System.Collections.Concurrent.ConcurrentDictionary<uint, uint>();
         }
 
-        [Benchmark]
-        public void NonBlocking()
-        {
-            Parallel.For(0, N, new ParallelOptions { MaxDegreeOfParallelism = NumberOfThreads }, i =>
-            {
-                var key = keys[i];
-                _nonBlocking.TryAdd(key, key);
-            });
-        }
+        //[Benchmark]
+        //public void NonBlocking()
+        //{
+        //    Parallel.For(0, N, new ParallelOptions { MaxDegreeOfParallelism = NumberOfThreads }, i =>
+        //    {
+        //        var key = keys[i];
+        //        _nonBlocking.TryAdd(key, key);
+        //    });
+        //}
 
         [Benchmark]
         public void CMap()
@@ -67,14 +67,14 @@ namespace Faster.Map.Concurrent.Benchmark
             });
         }
 
-        [Benchmark]
-        public void ConcurrentDictionary()
-        {
-            Parallel.For(0, N, new ParallelOptions { MaxDegreeOfParallelism = NumberOfThreads }, i =>
-            {
-                var key = keys[i];
-                _concurrentMap.TryAdd(key, key);
-            });
-        }
+        //[Benchmark]
+        //public void ConcurrentDictionary()
+        //{
+        //    Parallel.For(0, N, new ParallelOptions { MaxDegreeOfParallelism = NumberOfThreads }, i =>
+        //    {
+        //        var key = keys[i];
+        //        _concurrentMap.TryAdd(key, key);
+        //    });
+        //}
     }
 }

@@ -13,7 +13,7 @@ namespace Faster.Map.Concurrent.Benchmark
 #else
 			var config = ManualConfig.CreateMinimumViable ();
 #endif
-            BenchmarkRunner.Run<AddBenchmark>();
+            BenchmarkRunner.Run<AddResizeBenchmark>();
         }
     }
 }

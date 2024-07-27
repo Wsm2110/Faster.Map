@@ -852,7 +852,6 @@ namespace Faster.Map.DenseMap
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static uint H2(uint hashcode) => hashcode & 0b01111111;
 
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ref sbyte Find(sbyte[] array, uint index)
         {
@@ -872,6 +871,7 @@ namespace Faster.Map.DenseMap
 
         #endregion
 
+        [StructLayout(LayoutKind.Sequential)]
         public struct Entry
         {
             public TKey Key;

@@ -58,14 +58,14 @@ namespace Faster.Map.Benchmark
             }
         }
 
-        //[Benchmark]
-        //public void DenseMap()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        _denseMap.Get(key, out var result);
-        //    }
-        //}
+        [Benchmark]
+        public void DenseMap()
+        {
+            foreach (var key in keys)
+            {
+                _denseMap.Get(key, out var result);
+            }
+        }
 
         [Benchmark]
         public void RobinhoodMap()
@@ -76,14 +76,14 @@ namespace Faster.Map.Benchmark
             }
         }
 
-        //[Benchmark]
-        //public void QuadMap()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        _quadMap.Get(key, out var result);
-        //    }
-        //}
+        [Benchmark]
+        public void QuadMap()
+        {
+            foreach (var key in keys)
+            {
+                _quadMap.Get(key, out var result);
+            }
+        }
 
         [Benchmark]
         public void Dictionary()
