@@ -10,16 +10,16 @@
       Add robinhood hashmap and quadratic hashmap
     </PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/Wsm2110/Faster.Map</PackageProjectUrl>
-    <AssemblyVersion>5.0.4</AssemblyVersion>
-    <FileVersion>5.0.4</FileVersion>
+    <AssemblyVersion>6.0.0</AssemblyVersion>
+    <FileVersion>6.0.0</FileVersion>
     <Title>Fastest .net hashmap</Title>
-    <Version>5.0.4</Version>
+    <Version>6.0.0</Version>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Description>Cutting-edge NuGet package offering high-performance hash map implementations leveraging SIMD (Single Instruction, Multiple Data) instructions. This innovative library combines the efficiency of SIMD operations with advanced hashing techniques </Description>
     <RepositoryUrl>https://github.com/Wsm2110/Faster.Map</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageTags>Hashmap Hashtable Dictionary Faster.map performance, simd, robinhood hashing, swisstable, absl</PackageTags>
+    <PackageTags>Hashmap Hashtable Dictionary Faster.map performance, concurrency, simd, robinhood hashing, swisstable, absl</PackageTags>
   </PropertyGroup>
 
   <PropertyGroup>

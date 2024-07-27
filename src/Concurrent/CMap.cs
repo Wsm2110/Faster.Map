@@ -640,31 +640,55 @@ namespace Faster.Map.Concurrent
 
         #endregion
 
+        /// <summary>
+        /// Represents an entry in the hash table.
+        /// </summary>
         [StructLayout(LayoutKind.Sequential)]
-        [DebuggerDisplay("key = {Key}; value = {Value}; meta {Meta};")]
+        [DebuggerDisplay("key = {Key}; value = {Value}; meta = {Meta};")]
         internal struct Entry
         {
+            /// <summary>
+            /// The state of the entry, used for locking. 0 indicates unlocked, 1 indicates locked.
+            /// </summary>
             internal byte state;
+
+            /// <summary>
+            /// Metadata associated with the entry. This is used to indicate the state of the entry,
+            /// such as whether it is empty, a tombstone, in-progress, or not empty (H2 hash)
+            /// </summary>
             internal sbyte Meta;
+
+            /// <summary>
+            /// The key of the entry.
+            /// </summary>
             internal TKey Key;
+
+            /// <summary>
+            /// The value of the entry.
+            /// </summary>
             internal TValue Value;
 
             /// <summary>
             /// Enters a critical section by acquiring a lock. Ensures thread safety.
+            /// This method uses a spin lock with exponential backoff to reduce contention.
             /// </summary>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Enter()
             {
-                int spinCount = 1;
+                int spinCount = 1; // Initialize spin count for exponential backoff
 
                 while (true)
                 {
+                    // Attempt to acquire the lock by setting the state to 1 if it is currently 0
                     if (Interlocked.CompareExchange(ref state, 1, 0) == 0)
                     {
-                        return;
+                        return; // Lock acquired successfully, exit the method
                     }
 
+                    // Perform a spin wait to allow other threads to progress
                     Thread.SpinWait(spinCount);
+
+                    // Increment the spin count exponentially, but cap it to prevent excessive delays
                     if (spinCount < 1024)
                     {
                         spinCount *= 2;
@@ -683,24 +707,84 @@ namespace Faster.Map.Concurrent
         {
             #region Fields
 
+            /// <summary>
+            /// The bit shift value used in hash calculation to determine bucket index.
+            /// </summary>
             private byte _shift = 32;
+
+            /// <summary>
+            /// The bitmask value used for secondary hash calculation.
+            /// </summary>
             private const sbyte _bitmask = (1 << 6) - 1;
+
+            /// <summary>
+            /// A constant value based on the golden ratio, used for hash calculation.
+            /// </summary>
             private const uint _goldenRatio = 0x9E3779B9;
+
+            /// <summary>
+            /// The size of each group of entries for migration purposes.
+            /// </summary>
             internal uint _groupSize;
+
+            /// <summary>
+            /// The total number of groups in the table.
+            /// </summary>
             internal int _depleted;
+
+            /// <summary>
+            /// The current index of the group being processed during migration.
+            /// </summary>
             private uint _groupIndex;
 
             #endregion
 
             #region Properties
 
+            /// <summary>
+            /// The array of entries in the hash table.
+            /// </summary>
             public Entry[] Entries;
+
+            /// <summary>
+            /// Length of the table minus one, used for efficient modulus operations.
+            /// </summary>
             public uint LengthMinusOne;
+
+            /// <summary>
+            /// Threshold for resizing the table, based on the load factor.
+            /// </summary>
             public uint Threshold;
+
+            /// <summary>
+            /// The current length of the table.
+            /// </summary>
             public uint Length;
+
+            /// <summary>
+            /// The number of groups minus one, used for group indexing.
+            /// </summary>
             private uint _groupsMinusOne;
+
+            /// <summary>
+            /// Counter for the number of depleted groups during migration.
+            /// </summary>
             internal int _depletedCounter;
+
+            /// <summary>
+            /// The maximum distance to jump during quadratic probing.
+            /// </summary>
             public byte MaxJumpDistance { get; internal set; }
+
+            #endregion
+
+            #region Constructor
+
+            /// <summary>
+            /// Creates a new table with the specified length and load factor.
+            /// </summary>
+            /// <param name="length">The length of the table.</param>
+            /// <param name="_loadFactor">The load factor of the table.</param>
 
             #endregion
 
