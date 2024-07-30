@@ -62,9 +62,46 @@ BenchmarkDotNet v0.13.8, Windows 11 (10.0.22621.2428/22H2/2022Update/SunValley2)
 
 ### Updating a million keys
 
+| Method               | Length  | NumberOfThreads | Mean       | Error     | StdDev    | Gen0      | Gen1      | Allocated   |
+|--------------------- |-------- |---------------- |-----------:|----------:|----------:|----------:|----------:|------------:|
+| NonBlocking          | 1000000 | 1               | 110.841 ms | 1.3908 ms | 1.2329 ms | 2000.0000 | 1000.0000 | 23440.22 KB |
+| CMap                 | 1000000 | 1               |  11.152 ms | 0.2222 ms | 0.5323 ms |         - |         - |     2.72 KB |
+| ConcurrentDictionary | 1000000 | 1               | 132.459 ms | 2.3686 ms | 2.9955 ms | 4000.0000 | 3000.0000 | 39065.22 KB |
+| NonBlocking          | 1000000 | 8               |  60.482 ms | 1.1947 ms | 2.2145 ms | 2000.0000 | 1000.0000 | 23446.65 KB |
+| CMap                 | 1000000 | 8               |   2.854 ms | 0.0818 ms | 0.2400 ms |         - |         - |     4.38 KB |
+| ConcurrentDictionary | 1000000 | 8               | 137.022 ms | 2.7136 ms | 2.9035 ms | 4000.0000 | 3000.0000 | 39066.82 KB |
+| NonBlocking          | 1000000 | 16              |  57.862 ms | 1.1253 ms | 1.6494 ms | 2000.0000 | 1000.0000 | 23448.46 KB |
+| CMap                 | 1000000 | 16              |   2.694 ms | 0.1004 ms | 0.2914 ms |         - |         - |     5.79 KB |
+| ConcurrentDictionary | 1000000 | 16              | 117.916 ms | 2.1711 ms | 2.5003 ms | 4000.0000 | 3000.0000 | 39068.76 KB |
+| NonBlocking          | 1000000 | 32              |  54.942 ms | 1.0894 ms | 1.6306 ms | 2000.0000 | 1000.0000 | 23448.55 KB |
+| CMap                 | 1000000 | 32              |   2.270 ms | 0.0621 ms | 0.1782 ms |         - |         - |     5.91 KB |
+| ConcurrentDictionary | 1000000 | 32              | 105.303 ms | 1.9129 ms | 1.6957 ms | 4000.0000 | 3000.0000 |  39068.7 KB |
+| NonBlocking          | 1000000 | 64              |  53.919 ms | 1.0430 ms | 1.1593 ms | 2000.0000 | 1000.0000 |  23448.4 KB |
+| CMap                 | 1000000 | 64              |   2.312 ms | 0.0961 ms | 0.2678 ms |         - |         - |     5.79 KB |
+| ConcurrentDictionary | 1000000 | 64              |  95.727 ms | 1.4824 ms | 1.5223 ms | 4000.0000 | 3000.0000 | 39068.57 KB |
+| NonBlocking          | 1000000 | 128             |  56.711 ms | 1.1341 ms | 2.1301 ms | 2000.0000 | 1000.0000 |  23448.4 KB |
+| CMap                 | 1000000 | 128             |   2.228 ms | 0.0875 ms | 0.2552 ms |         - |         - |     5.85 KB |
+| ConcurrentDictionary | 1000000 | 128             |  88.947 ms | 1.7320 ms | 2.1905 ms | 4000.0000 | 3000.0000 |  39068.6 KB |
 
 ### Removing a million keys
 
+| Method               | Length  | NumberOfThreads | Mean      | Error     | StdDev    | Allocated |
+|--------------------- |-------- |---------------- |----------:|----------:|----------:|----------:|
+| ConcurrentDictionary | 1000000 | 1               |  5.594 ms | 0.0988 ms | 0.1319 ms |   1.73 KB |
+| NonBlocking          | 1000000 | 1               | 21.099 ms | 0.1544 ms | 0.1444 ms |   1.75 KB |
+| CMap                 | 1000000 | 1               | 36.303 ms | 0.5778 ms | 0.5405 ms |   1.79 KB |
+| ConcurrentDictionary | 1000000 | 2               |  2.587 ms | 0.0511 ms | 0.0588 ms |   1.95 KB |
+| NonBlocking          | 1000000 | 2               | 12.340 ms | 0.0987 ms | 0.0875 ms |   2.01 KB |
+| CMap                 | 1000000 | 2               | 18.938 ms | 0.3257 ms | 0.3046 ms |   2.04 KB |
+| ConcurrentDictionary | 1000000 | 4               |  1.354 ms | 0.0253 ms | 0.0249 ms |   2.43 KB |
+| NonBlocking          | 1000000 | 4               |  6.945 ms | 0.0739 ms | 0.0691 ms |   2.52 KB |
+| CMap                 | 1000000 | 4               | 10.878 ms | 0.2120 ms | 0.2442 ms |    2.5 KB |
+| ConcurrentDictionary | 1000000 | 8               |  1.265 ms | 0.0251 ms | 0.0279 ms |   3.36 KB |
+| NonBlocking          | 1000000 | 8               |  5.499 ms | 0.0965 ms | 0.0902 ms |   3.49 KB |
+| CMap                 | 1000000 | 8               |  8.702 ms | 0.1719 ms | 0.4312 ms |    3.4 KB |
+| ConcurrentDictionary | 1000000 | 16              |  1.014 ms | 0.0170 ms | 0.0142 ms |   4.71 KB |
+| NonBlocking          | 1000000 | 16              |  5.129 ms | 0.0960 ms | 0.0898 ms |   4.84 KB |
+| CMap                 | 1000000 | 16              |  5.670 ms | 0.1088 ms | 0.1336 ms |    4.9 KB |
  
 ### Add and resize
 
@@ -85,8 +122,3 @@ BenchmarkDotNet v0.13.8, Windows 11 (10.0.22621.2428/22H2/2022Update/SunValley2)
 | NonBlocking          | 1000000 | 16              | 183.48 ms | 6.264 ms | 18.370 ms | 183.82 ms |  5000.0000 |  3000.0000 | 1000.0000 |  80.72 MB |
 | CMap                 | 1000000 | 16              |  24.41 ms | 1.583 ms |  4.464 ms |  23.26 ms |          - |          - |         - |  48.01 MB |
 | ConcurrentDictionary | 1000000 | 16              | 342.46 ms | 6.179 ms |  7.588 ms | 339.73 ms | 11000.0000 | 10000.0000 | 3000.0000 |  99.37 MB |
-
-### Add string benchmark
-
-
-### Create StringWrapperBenchmark (cached hashcode)
