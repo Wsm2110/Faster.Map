@@ -281,20 +281,25 @@ namespace Faster.Map.Concurrent
             {
                 // Retrieve the entry from the table at the calculated index
                 ref var entry = ref Find(table.Entries, index);
-
                 // If the entry's metadata and key match, proceed with the update
                 if (h2 == entry.Meta && _keyComparer.Equals(key, entry.Key))
                 {
                     // Guarantee that only one thread can access the critical section at a time
                     entry.Enter();
 
+                    var result = false;
+
                     if (h2 == entry.Meta)
                     {
                         // Perform the critical section: update the value
                         entry.Value = newValue;
-                        entry.Exit();
-                        return true;
+                        result = true;                       
                     }
+
+                    // Release lock 
+                    entry.Exit();
+
+                    return result;
                 }
 
                 // If the entry indicates an empty bucket, the key does not exist in the table
@@ -392,13 +397,13 @@ namespace Faster.Map.Concurrent
         {
             var hashcode = key.GetHashCode(); // Calculate the hash code for the given key
             byte jumpDistance = 0; // Initialize jump distance for quadratic probing
+            var h2 = _table.H2(hashcode); // Calculate the secondary hash
 
             start:
 
             var table = _table; // Get the current state of the table
             var index = table.GetBucket(hashcode); // Calculate the initial bucket index
-            var h2 = table.H2(hashcode); // Calculate the secondary hash
-
+           
             do
             {
                 // Retrieve the entry from the table at the calculated index
@@ -410,28 +415,24 @@ namespace Faster.Map.Concurrent
                     // Guarantee that only one thread can access the critical section at a time
                     entry.Enter();
 
+                    bool result = false;
+
                     if (h2 == entry.Meta)
                     {
                         // reset current entry
                         entry.Meta = _tombstone;
                         entry.Key = default;
-                        entry.Value = default;
+                        entry.Value = default;  
 
-                        // Check if the table has been resized during the operation
-                        if (_table != table)
-                        {
-                            // If resized, restart with the new table
-                            jumpDistance = 0;
-                            entry.Exit();
-                            goto start;
-                        }
-
-                        entry.Exit();
-
+                        // Decrease counter by 1
                         _counter.Decrement();
-
-                        return true;
+                        result = true;
                     }
+
+                    // Release lock
+                    entry.Exit();
+
+                    return result;
                 }
 
                 // If the entry indicates an empty bucket, the key does not exist in the table
@@ -467,13 +468,13 @@ namespace Faster.Map.Concurrent
         {
             var hashcode = key.GetHashCode(); // Calculate the hash code for the given key
             byte jumpDistance = 0; // Initialize jump distance for quadratic probing
+            var h2 = _table.H2(hashcode); // Calculate the secondary hash
 
             start:
 
             var table = _table; // Get the current state of the table
             var index = table.GetBucket(hashcode); // Calculate the initial bucket index
-            var h2 = table.H2(hashcode); // Calculate the secondary hash
-
+            
             do
             {
                 // Retrieve the entry from the table at the calculated index
