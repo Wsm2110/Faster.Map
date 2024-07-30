@@ -61,11 +61,11 @@ Console.WriteLine(retrievedValue); // Output: "value1"
 The mean is divided by the length
 
 ``` ini
-BenchmarkDotNet v0.13.8, Windows 11 (10.0.22621.2428/22H2/2022Update/SunValley2)
+BenchmarkDotNet v0.13.12, Windows 11 (10.0.22631.3880/23H2/2023Update/SunValley3)
 12th Gen Intel Core i5-12500H, 1 CPU, 16 logical and 12 physical cores
-.NET SDK 8.0.100-rc.1.23463.5
-  [Host]     : .NET 8.0.0 (8.0.23.41904), X64 RyuJIT AVX2
-  DefaultJob : .NET 8.0.0 (8.0.23.41904), X64 RyuJIT AVX2 
+.NET SDK 9.0.100-preview.2.24157.14
+  [Host]     : .NET 9.0.0 (9.0.24.12805), X64 RyuJIT AVX2
+  DefaultJob : .NET 9.0.0 (9.0.24.12805), X64 RyuJIT AVX2
 ```
 ### Retrieving a million pre-generated keys
 
