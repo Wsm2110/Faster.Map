@@ -768,12 +768,7 @@ namespace Faster.Map.Concurrent
             /// Length of the table minus one, used for efficient modulus operations.
             /// </summary>
             public uint LengthMinusOne;
-
-            /// <summary>
-            /// Threshold for resizing the table, based on the load factor.
-            /// </summary>
-            public uint Threshold;
-
+           
             /// <summary>
             /// The current length of the table.
             /// </summary>

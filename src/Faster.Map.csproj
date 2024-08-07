@@ -6,8 +6,10 @@
     <TargetFrameworks>net9.0</TargetFrameworks>
     <LangVersion>Latest</LangVersion>
     <Authors>Wiljan Ruizendaal</Authors>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <CopyRight>MIT</CopyRight>
     <PackageReleaseNotes>
-      Add robinhood hashmap and quadratic hashmap
+     Moving on to .NET 90, introducing CMAP which is a concurrent hashmap
     </PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/Wsm2110/Faster.Map</PackageProjectUrl>
     <AssemblyVersion>6.0.0</AssemblyVersion>
@@ -15,11 +17,13 @@
     <Title>Fastest .net hashmap</Title>
     <Version>6.0.0</Version>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-    <Description>Cutting-edge NuGet package offering high-performance hash map implementations leveraging SIMD (Single Instruction, Multiple Data) instructions. This innovative library combines the efficiency of SIMD operations with advanced hashing techniques </Description>
+    <Description>
+      Incredibly fast (concurrent) hashmap
+   </Description>
     <RepositoryUrl>https://github.com/Wsm2110/Faster.Map</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageTags>Hashmap Hashtable Dictionary Faster.map performance, concurrency, simd, robinhood hashing, swisstable, absl</PackageTags>
+    <PackageTags>Hashmap Hashtable Dictionary Faster.map performance, concurrency, simd, concurrenthashmap concurrentdictionary</PackageTags>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -34,11 +38,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="..\README.md" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Update="../README.md" Link="README.md">
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
     </None>

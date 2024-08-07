@@ -2,8 +2,12 @@
 using Faster.Map.Core;
 using Faster.Map.DenseMap;
 using Faster.Map.RobinHoodMap;
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Numerics;
 
 namespace Faster.Map.Benchmark
 {
@@ -13,25 +17,25 @@ namespace Faster.Map.Benchmark
     {
         #region Fields
 
-        private DenseMap<StringWrapper, StringWrapper> _denseMap = new();
-        private Dictionary<StringWrapper, StringWrapper> dic = new();
-        private RobinhoodMap<StringWrapper, StringWrapper> _robinhoodMap = new();
-    
+        private DenseMap<StringWrapper, StringWrapper> _denseMap;
+        private Dictionary<StringWrapper, StringWrapper> _dictionary;
+        private RobinhoodMap<StringWrapper, StringWrapper> _robinhoodMap;
+
         private string[] keys;
 
         #endregion
 
         #region Properties
 
-        [ParamsAttribute(1000000)]
-        public int Length { get; set; }
+        [Params(1000, 10000, 100000, 400000, 900000, 1000000)]
+        public uint Length { get; set; }
 
         #endregion
 
         /// <summary>
-        /// Generate a million Keys
+        /// Generate a million Keys and shuffle them afterwards
         /// </summary>
-       [GlobalSetup]
+        [GlobalSetup]
         public void Setup()
         {
             var output = File.ReadAllText("Numbers.txt");
@@ -44,21 +48,28 @@ namespace Faster.Map.Benchmark
                 keys[index] = splittedOutput[index];
             }
 
+            // round of length to power of 2 prevent resizing
+            uint length = BitOperations.RoundUpToPowerOf2(Length) * 2;
+            int dicLength = HashHelpers.GetPrime((int)Length);
+
+            _denseMap = new DenseMap<StringWrapper, StringWrapper>(length);
+            _dictionary = new Dictionary<StringWrapper, StringWrapper>(dicLength);
+            _robinhoodMap = new RobinhoodMap<StringWrapper, StringWrapper>(length);
+
             foreach (var key in keys)
             {
-               dic.Add(key, key);
+                _dictionary.Add(key, key);
                 _denseMap.Emplace(key, key);
-                _robinhoodMap.Emplace(key, key);             
+                _robinhoodMap.Emplace(key, key);
             }
         }
-
 
         [Benchmark]
         public void DenseMap()
         {
             foreach (var key in keys)
             {
-                _denseMap.Get(key, out var _);
+                _denseMap.Get(key, out var result);
             }
         }
 
@@ -67,16 +78,16 @@ namespace Faster.Map.Benchmark
         {
             foreach (var key in keys)
             {
-                _robinhoodMap.Get(key, out var _);
+                _robinhoodMap.Get(key, out var result);
             }
         }
 
-        [Benchmark(Baseline = true)]
+        [Benchmark]
         public void Dictionary()
         {
             foreach (var key in keys)
             {
-                dic.TryGetValue(key, out var _);
+                _dictionary.TryGetValue(key, out var result);
             }
         }
 

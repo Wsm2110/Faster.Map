@@ -8,6 +8,7 @@ using System.IO;
 namespace Faster.Map.Benchmark
 {
     [MarkdownExporterAttribute.GitHub]
+    [MemoryDiagnoserAttribute]
     public class AddAndResizeBenchmark
     {
         #region Fields
@@ -22,8 +23,9 @@ namespace Faster.Map.Benchmark
 
         #region Properties
 
-        [ParamsAttribute(1000000)]
-        public int Length { get; set; }
+
+        [Params(1000, 10000, 100000, 400000, 900000, 1000000)]
+        public uint Length { get; set; }
 
         #endregion
 

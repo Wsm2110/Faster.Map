@@ -2,9 +2,11 @@
 using Faster.Map.DenseMap;
 using Faster.Map.RobinHoodMap;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 
 namespace Faster.Map.Benchmark
 {
@@ -14,18 +16,18 @@ namespace Faster.Map.Benchmark
     {
         #region Fields
 
-        private DenseMap<string, string> _denseMap = new DenseMap<string, string>();
-        private Dictionary<string, string> dic = new Dictionary<string, string>();
-        private RobinhoodMap<string, string> _robinhoodMap = new RobinhoodMap<string, string>();
-     
+        private DenseMap<string, string> _denseMap;
+        private Dictionary<string, string> _dictionary;
+        private RobinhoodMap<string, string> _robinhoodMap;
+
         private string[] keys;
 
         #endregion
 
         #region Properties
 
-        [ParamsAttribute(/*1, 10, 100, 1000, 10000, 100000*/ 1000000)]
-        public int Length { get; set; }
+        [Params(1000, 10000, 100000, 400000, 900000, 1000000)]
+        public uint Length { get; set; }
 
         #endregion
 
@@ -45,12 +47,19 @@ namespace Faster.Map.Benchmark
                 keys[index] = splittedOutput[index];
             }
 
+            // round of length to power of 2 prevent resizing
+            uint length = BitOperations.RoundUpToPowerOf2(Length) * 2;
+            int dicLength = HashHelpers.GetPrime((int)Length);
+
+            _denseMap = new DenseMap<string, string>(length);
+            _dictionary = new Dictionary<string, string>(dicLength);
+            _robinhoodMap = new RobinhoodMap<string, string>(length);
+
             foreach (var key in keys)
             {
-                 _denseMap.Emplace(key, key);
+                _dictionary.Add(key, key);
+                _denseMap.Emplace(key, key);
                 _robinhoodMap.Emplace(key, key);
-                dic.Add(key, key);
-          
             }
         }
 
@@ -77,7 +86,7 @@ namespace Faster.Map.Benchmark
         {
             foreach (var key in keys)
             {
-                dic.TryGetValue(key, out var result);
+                _dictionary.TryGetValue(key, out var result);
             }
         }
 
