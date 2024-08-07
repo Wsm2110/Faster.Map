@@ -26,7 +26,7 @@ namespace Faster.Map.Benchmark
 
         #region Properties
 
-        [Params(1000000)]
+        [Params(900000)]
         public uint Length { get; set; }
 
         #endregion

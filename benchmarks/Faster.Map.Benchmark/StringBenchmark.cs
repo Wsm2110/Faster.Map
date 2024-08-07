@@ -2,7 +2,6 @@
 using Faster.Map.DenseMap;
 using Faster.Map.QuadMap;
 using Faster.Map.RobinHoodMap;
-using Microsoft.Collections.Extensions;
 using System;
 using System.Collections.Generic;
 using System.IO;

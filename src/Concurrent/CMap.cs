@@ -97,7 +97,7 @@ namespace Faster.Map.Concurrent
             0x1000000, 0x2000000, 0x4000000, 0x8000000,
             0x10000000, 0x20000000, 0x40000000, 0x80000000
         };
-        private ThreadLocalCounter _counter;
+        private Counter _counter;
 
 #if DEBUG
         private Table[] _migrationTables = new Table[31];
@@ -138,7 +138,7 @@ namespace Faster.Map.Concurrent
      
             _keyComparer = keyComparer;
             _table = new Table(BitOperations.RoundUpToPowerOf2(initialCapacity));
-            _counter = new ThreadLocalCounter();
+            _counter = new Counter();
         }
 
         #endregion
@@ -556,7 +556,7 @@ namespace Faster.Map.Concurrent
         {
             var table = new Table(_table.Length);
             Interlocked.Exchange(ref _table, table);
-            Interlocked.Exchange(ref _counter, new ThreadLocalCounter());
+            Interlocked.Exchange(ref _counter, new Counter());
         }
 
         /// <summary>

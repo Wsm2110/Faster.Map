@@ -11,9 +11,9 @@ namespace Faster.Map.Benchmark
             //BenchmarkRunner.Run<AddAndResizeBenchmark>();
             //BenchmarkRunner.Run<UpdateBenchmark>();
             //BenchmarkRunner.Run<RemoveBenchmark>();
-            BenchmarkRunner.Run<GetBenchmark>();
+            //  BenchmarkRunner.Run<GetBenchmark>();
             //BenchmarkRunner.Run<StringBenchmark>();
-           // BenchmarkRunner.Run<StringWrapperBenchmark>();
+            // BenchmarkRunner.Run<StringWrapperBenchmark>();
         }
     }
 }
