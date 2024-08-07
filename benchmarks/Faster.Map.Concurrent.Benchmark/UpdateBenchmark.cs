@@ -4,7 +4,6 @@ using System.IO;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
 using Faster.Map.DenseMap;
-using Faster.Map.QuadMap;
 using Faster.Map.RobinHoodMap;
 
 namespace Faster.Map.Concurrent.Benchmark
