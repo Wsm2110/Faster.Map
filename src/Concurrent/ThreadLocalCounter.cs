@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 
 namespace Faster.Map.Concurrent
@@ -24,15 +25,9 @@ namespace Faster.Map.Concurrent
             threadLocalCell.Value.Increment();
         }
 
-        public long Sum()
+        public int Sum()
         {
-            long sum = 0;
-            var uniqueCells = new HashSet<Cell>(threadLocalCell.Values);
-            foreach (var cell in uniqueCells)
-            {
-                sum += cell.Get();
-            }
-            return sum;
+            return threadLocalCell.Values.Sum(i => i._value);
         }
 
         internal void Decrement()
@@ -40,23 +35,33 @@ namespace Faster.Map.Concurrent
             threadLocalCell.Value.Decrement();
         }
 
-        private class Cell
+        internal class Cell
         {
-            private int value;
+            internal int _value;
 
             public void Increment()
             {
-                ++value;
+                // Interlocked operations provide a full memory fence, meaning they ensure all preceding memory writes are completed and visible to other threads before the Interlocked operation completes.
+                // This means that when you perform an Interlocked operation, it guarantees that any changes made to other variables(not just the variable involved in the Interlocked operation) are also visible to other threads.
+                // Note this also means we dont need any explicit memorybarriers.
+                // This code, using Interlocked operations, will also work correctly on ARM architectures without needing additional explicit memory barriers.The memory ordering and visibility are managed by the Interlocked methods.
+
+                Interlocked.Increment(ref _value);
             }
 
             public void Decrement()
             {
-                --value;
+                // Interlocked operations provide a full memory fence, meaning they ensure all preceding memory writes are completed and visible to other threads before the Interlocked operation completes.
+                // This means that when you perform an Interlocked operation, it guarantees that any changes made to other variables(not just the variable involved in the Interlocked operation) are also visible to other threads.
+                // Note this also means we dont need any explicit memorybarriers.
+                // This code, using Interlocked operations, will also work correctly on ARM architectures without needing additional explicit memory barriers.The memory ordering and visibility are managed by the Interlocked methods.
+
+                Interlocked.Decrement(ref _value);
             }
 
             public long Get()
             {
-                return value;
+                return _value;
             }
         }
     }

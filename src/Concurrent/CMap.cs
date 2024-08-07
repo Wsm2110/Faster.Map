@@ -87,8 +87,7 @@ namespace Faster.Map.Concurrent
         private const sbyte _tombstone = -126;
         private const sbyte _resizeBucket = -125;
         private const sbyte _groupResized = -123;
-        private const sbyte _inProgressMarker = -124;
-        private double _loadFactor;
+        private const sbyte _claimed = -124;     
         private readonly IEqualityComparer<TKey> _keyComparer;
         private readonly uint[] _powersOfTwo = {
             0x1, 0x2, 0x4, 0x8, 0x10, 0x20, 0x40, 0x80,
@@ -98,7 +97,7 @@ namespace Faster.Map.Concurrent
             0x1000000, 0x2000000, 0x4000000, 0x8000000,
             0x10000000, 0x20000000, 0x40000000, 0x80000000
         };
-        private Counter _counter;
+        private ThreadLocalCounter _counter;
 
 #if DEBUG
         private Table[] _migrationTables = new Table[31];
@@ -111,20 +110,13 @@ namespace Faster.Map.Concurrent
         /// <summary>
         /// Initializes a new instance of the <see cref="CMap{TKey,TValue}"/> class with default settings.
         /// </summary>
-        public CMap() : this(16, 0.5d, EqualityComparer<TKey>.Default) { }
+        public CMap() : this(16, EqualityComparer<TKey>.Default) { }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="CMap{TKey,TValue}"/> class with the specified initial capacity.
         /// </summary>
         /// <param name="initialCapacity">The length of the hashmap. Will always take the closest power of two.</param>
-        public CMap(uint initialCapacity) : this(initialCapacity, 0.5d, EqualityComparer<TKey>.Default) { }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="CMap{TKey,TValue}"/> class with the specified initial capacity and load factor.
-        /// </summary>
-        /// <param name="initialCapacity">The length of the hashmap. Will always take the closest power of two.</param>
-        /// <param name="loadFactor">The load factor determines when the hashmap will resize (default is 0.5).</param>
-        public CMap(uint initialCapacity, double loadFactor) : this(initialCapacity, loadFactor, EqualityComparer<TKey>.Default) { }
+        public CMap(uint initialCapacity) : this(initialCapacity, EqualityComparer<TKey>.Default) { }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="CMap{TKey,TValue}"/> class with the specified settings.
@@ -132,21 +124,21 @@ namespace Faster.Map.Concurrent
         /// <param name="initialCapacity">The length of the hashmap. Will always take the closest power of two.</param>
         /// <param name="loadFactor">The load factor determines when the hashmap will resize (default is 0.5).</param>
         /// <param name="keyComparer">Used to compare keys to resolve hash collisions.</param>
-        public CMap(uint initialCapacity, double loadFactor, IEqualityComparer<TKey> keyComparer)
+        public CMap(uint initialCapacity, IEqualityComparer<TKey> keyComparer)
         {
-            if (initialCapacity <= 0 || loadFactor <= 0 || loadFactor > 1)
+            if (initialCapacity <= 0)
             {
-                throw new ArgumentOutOfRangeException(nameof(initialCapacity) + " or " + nameof(loadFactor));
+                throw new ArgumentOutOfRangeException(nameof(initialCapacity));
             }
 
             if (initialCapacity < 16)
             {
                 initialCapacity = 16;
             }
-            _loadFactor = loadFactor;
+     
             _keyComparer = keyComparer;
-            _table = new Table(BitOperations.RoundUpToPowerOf2(initialCapacity), _loadFactor);
-            _counter = new Counter();
+            _table = new Table(BitOperations.RoundUpToPowerOf2(initialCapacity));
+            _counter = new ThreadLocalCounter();
         }
 
         #endregion
@@ -175,8 +167,8 @@ namespace Faster.Map.Concurrent
                 // Retrieve the metadata for the current entry
                 ref var entry = ref Find(table.Entries, index);
 
-                // Check if the bucket is empty and try to claim it
-                if (_emptyBucket == entry.Meta && Interlocked.CompareExchange(ref entry.Meta, _inProgressMarker, _emptyBucket) == _emptyBucket)
+                // Check if the bucket is empty and try to claim it by setting a _claimed marker
+                if (_emptyBucket == entry.Meta && Interlocked.CompareExchange(ref entry.Meta, _claimed, _emptyBucket) == _emptyBucket)
                 {
                     // Place the key and value in the entry
                     entry.Key = key;
@@ -189,11 +181,16 @@ namespace Faster.Map.Concurrent
                 }
 
                 // Check if the bucket contains a tombstone and try to claim it
-                if (_tombstone == entry.Meta && Interlocked.CompareExchange(ref entry.Meta, _inProgressMarker, _tombstone) == _tombstone)
+                if (_tombstone == entry.Meta && Interlocked.CompareExchange(ref entry.Meta, _claimed, _tombstone) == _tombstone)
                 {
                     entry.Key = key;
                     entry.Value = value;
                     entry.Meta = h2;
+
+                    // Interlocked operations provide a full memory fence, meaning they ensure all preceding memory writes are completed and visible to other threads before the Interlocked operation completes.
+                    // This means that when you perform an Interlocked operation, it guarantees that any changes made to other variables(not just the variable involved in the Interlocked operation) are also visible to other threads.
+                    // Note this also means we dont need any explicit memorybarriers.
+                    // This code, using Interlocked operations, will also work correctly on ARM architectures without needing additional explicit memory barriers.The memory ordering and visibility are managed by the Interlocked methods.
 
                     _counter.Increment();
 
@@ -206,11 +203,19 @@ namespace Faster.Map.Concurrent
                     return false;
                 }
 
-                // Retry insertion due to a collision or another thread claiming the bucket
-                jumpDistance += 1; // Increment jump distance for quadratic probing
-                index += jumpDistance; // Calculate new index with jump distance
-                index &= table.LengthMinusOne; // Ensure the index is within table bounds
-            } while (jumpDistance <= table.MaxJumpDistance); // Continue retrying until insertion is successful
+                // In a hash map of size m = 2km = 2k, using quadratic probing with a properly chosen sequence(triangular numbers) ensures that every bucket is visited at least once before the sequence repeats.
+                // This is particularly important in ensuring that the hash map can handle collisions efficiently without getting stuck in an infinite loop or missing potential empty slots.
+                // Constants used in quadratic probing are triangular numbers. Triangular numbers are 1, 3, 6, 10, etc.
+                jumpDistance += 1;
+                index += jumpDistance;
+                index &= table.LengthMinusOne;
+
+                // The hash table does not automatically resize when a loadfactor threshold is reached. This reduces contention, as multiple threads aren't competing to trigger a resize.
+                // Instead, resizing is only triggered when necessary, based on specific conditions that indicate the table is becoming too full(jumpDistance exceeds table.MaxJumpDistance).
+                // Note. Inserting crap will result in a crappy hashmap. Use a proper hashing algorithm.
+                // Note. In most cases this hashmap will resize when the capacity is at 60-80%. Often it will resize at 80% or more wich is perfectly fine since the probe distance is bounded by the 'MaxJumpDistance'
+          
+            } while (jumpDistance <= table.MaxJumpDistance);
 
             // Trigger resize if necessary and restart insertion
             Resize(table);
@@ -227,12 +232,11 @@ namespace Faster.Map.Concurrent
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Get(TKey key, out TValue value)
         {
-            var hashcode = key.GetHashCode(); // Calculate the hashcode for the given key
-            byte jumpDistance = 0; // Initialize jump distance for quadratic probing
-            var h2 = _table.H2(hashcode); // Calculate the secondary hash
-
-            var table = _table; // Get the current state of the table
-            var index = table.GetBucket(hashcode); // Calculate the initial bucket index
+            var hashcode = key.GetHashCode();         
+            var h2 = _table.H2(hashcode); 
+            var table = _table; 
+            var index = table.GetBucket(hashcode);
+            byte jumpDistance = 0;
 
             do
             {
@@ -252,11 +256,14 @@ namespace Faster.Map.Concurrent
                     return false;
                 }
 
-                // Increment the jump distance and calculate the next index using triangular probing
+                // In a hash map of size m = 2km = 2k, using quadratic probing with a properly chosen sequence(related to triangular numbers) ensures that every bucket is visited at least once before the sequence repeats.
+                // This is particularly important in ensuring that the hash map can handle collisions efficiently without getting stuck in an infinite loop or missing potential empty slots.
+                // Constants used in quadratic probing are triangular numbers. Triangular numbers are 1, 3, 6, 10, etc.
+
                 jumpDistance += 1;
                 index += jumpDistance;
-                index &= table.LengthMinusOne; // Ensure the index wraps around the table size
-            } while (true); // Continue probing until a result is found or the table is exhausted
+                index &= table.LengthMinusOne; // Ensure the index wraps around the table size preventing out of bounds exceptions
+            } while (true);
         }
 
         /// <summary>
@@ -268,14 +275,13 @@ namespace Faster.Map.Concurrent
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Update(TKey key, TValue newValue)
         {
-            var hashcode = key.GetHashCode(); // Calculate the hash code for the given key
-            byte jumpDistance = 0; // Initialize jump distance for quadratic probing
-            var h2 = _table.H2(hashcode); // Calculate the secondary hash
+            var hashcode = key.GetHashCode();
+            byte jumpDistance = 0; 
+            var h2 = _table.H2(hashcode); 
 
             start:
-
-            var table = _table; // Get the current state of the table
-            var index = table.GetBucket(hashcode); // Calculate the initial bucket index
+            var table = _table;
+            var index = table.GetBucket(hashcode);
 
             do
             {
@@ -289,11 +295,12 @@ namespace Faster.Map.Concurrent
 
                     var result = false;
 
+                    // There is a possibility meta has changed while locking this entry
                     if (h2 == entry.Meta)
                     {
                         // Perform the critical section: update the value
                         entry.Value = newValue;
-                        result = true;                       
+                        result = true;
                     }
 
                     // Release lock 
@@ -308,7 +315,7 @@ namespace Faster.Map.Concurrent
                     return false;
                 }
 
-                // If the entry indicates a resize operation, perform the resize
+                // If the entry indicates a resize operation, help other threads resizing
                 if (entry.Meta == _resizeBucket || entry.Meta == _groupResized)
                 {
                     Resize(table);
@@ -316,11 +323,14 @@ namespace Faster.Map.Concurrent
                     goto start;
                 }
 
-                // Increment the jump distance and calculate the next index using triangular probing
+                // In a hash map of size m = 2km = 2k, using quadratic probing with a properly chosen sequence(related to triangular numbers) ensures that every bucket is visited at least once before the sequence repeats.
+                // This is particularly important in ensuring that the hash map can handle collisions efficiently without getting stuck in an infinite loop or missing potential empty slots.
+                // Constants used in quadratic probing are triangular numbers. Triangular numbers are 1, 3, 6, 10, etc.
+
                 jumpDistance += 1;
                 index += jumpDistance;
-                index &= table.LengthMinusOne; // Ensure the index wraps around the table size
-            } while (true); // Continue probing until a matching entry is found or the table is exhausted
+                index &= table.LengthMinusOne; // Ensure the index wraps around the table size, preventing out of bounds exceptions
+            } while (true); 
         }
 
         /// <summary>
@@ -333,14 +343,14 @@ namespace Faster.Map.Concurrent
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Update(TKey key, TValue newValue, TValue comparisonValue)
         {
-            var hashcode = key.GetHashCode(); // Calculate the hash code for the given key
-            byte jumpDistance = 0; // Initialize jump distance for quadratic probing
-            var h2 = _table.H2(hashcode); // Calculate the secondary hash
+            var hashcode = key.GetHashCode(); 
+            byte jumpDistance = 0; 
+            var h2 = _table.H2(hashcode);
 
             start:
 
-            var table = _table; // Get the current state of the table
-            var index = table.GetBucket(hashcode); // Calculate the initial bucket index
+            var table = _table; 
+            var index = table.GetBucket(hashcode); 
 
             do
             {
@@ -354,7 +364,7 @@ namespace Faster.Map.Concurrent
                     entry.Enter();
                     bool result = false;
 
-                    if (h2 == entry.Meta && EqualityComparer<TValue>.Default.Equals(entry.Value, comparisonValue))
+                    if (EqualityComparer<TValue>.Default.Equals(entry.Value, comparisonValue))
                     {
                         // Perform the critical section: update the value
                         entry.Value = newValue;
@@ -365,7 +375,7 @@ namespace Faster.Map.Concurrent
                     return result;
                 }
 
-                // If the entry indicates a resize operation, perform the resize
+                // If the entry indicates a resize operation, perform the resize helping other threads 
 
                 if (entry.Meta == _resizeBucket || entry.Meta == _groupResized)
                 {
@@ -380,11 +390,14 @@ namespace Faster.Map.Concurrent
                     return false;
                 }
 
-                // Increment the jump distance and calculate the next index using triangular probing
+                // In a hash map of size m = 2km = 2k, using quadratic probing with a properly chosen sequence(related to triangular numbers) ensures that every bucket is visited at least once before the sequence repeats.
+                // This is particularly important in ensuring that the hash map can handle collisions efficiently without getting stuck in an infinite loop or missing potential empty slots.
+                // Constants used in quadratic probing are triangular numbers. Triangular numbers are 1, 3, 6, 10, etc.
+
                 jumpDistance += 1;
                 index += jumpDistance;
-                index &= table.LengthMinusOne; // Ensure the index wraps around the table size
-            } while (true); // Continue probing until a matching entry is found or the table is exhausted
+                index &= table.LengthMinusOne; // Ensure the index wraps around the table size, preventing out of bounds eceptions
+            } while (true); 
         }
 
         /// <summary>
@@ -395,15 +408,15 @@ namespace Faster.Map.Concurrent
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Remove(TKey key)
         {
-            var hashcode = key.GetHashCode(); // Calculate the hash code for the given key
-            byte jumpDistance = 0; // Initialize jump distance for quadratic probing
-            var h2 = _table.H2(hashcode); // Calculate the secondary hash
+            var hashcode = key.GetHashCode(); 
+            byte jumpDistance = 0; 
+            var h2 = _table.H2(hashcode);
 
             start:
 
-            var table = _table; // Get the current state of the table
-            var index = table.GetBucket(hashcode); // Calculate the initial bucket index
-           
+            var table = _table; 
+            var index = table.GetBucket(hashcode); 
+
             do
             {
                 // Retrieve the entry from the table at the calculated index
@@ -422,7 +435,7 @@ namespace Faster.Map.Concurrent
                         // reset current entry
                         entry.Meta = _tombstone;
                         entry.Key = default;
-                        entry.Value = default;  
+                        entry.Value = default;
 
                         // Decrease counter by 1
                         _counter.Decrement();
@@ -441,7 +454,7 @@ namespace Faster.Map.Concurrent
                     return false;
                 }
 
-                // If the entry indicates a resize operation, perform the resize
+                // If the entry indicates a resize operation, perform the resize helping other threads in the process
 
                 if (entry.Meta == _resizeBucket || entry.Meta == _groupResized)
                 {
@@ -450,11 +463,14 @@ namespace Faster.Map.Concurrent
                     goto start; // Restart the update process with the new table
                 }
 
-                // Increment the jump distance and calculate the next index using triangular probing
+                // In a hash map of size m = 2km = 2k, using quadratic probing with a properly chosen sequence(related to triangular numbers) ensures that every bucket is visited at least once before the sequence repeats.
+                // This is particularly important in ensuring that the hash map can handle collisions efficiently without getting stuck in an infinite loop or missing potential empty slots.
+                // Constants used in quadratic probing are triangular numbers. Triangular numbers are 1, 3, 6, 10, etc.
+
                 jumpDistance += 1;
                 index += jumpDistance;
-                index &= table.LengthMinusOne; // Ensure the index wraps around the table size
-            } while (true); // Continue probing until a matching entry is found or the table is exhausted
+                index &= table.LengthMinusOne; // Ensure the index wraps around the table size, preventing out of bounds exceptions
+            } while (true); 
         }
 
         /// <summary>
@@ -474,7 +490,7 @@ namespace Faster.Map.Concurrent
 
             var table = _table; // Get the current state of the table
             var index = table.GetBucket(hashcode); // Calculate the initial bucket index
-            
+
             do
             {
                 // Retrieve the entry from the table at the calculated index
@@ -485,7 +501,7 @@ namespace Faster.Map.Concurrent
                 {
                     // Guarantee that only one thread can access the critical section at a time
                     entry.Enter();
-
+                  
                     // Double-checked locking to prevent multiple threads from removing simultaneously
                     if (h2 == entry.Meta)
                     {
@@ -523,12 +539,13 @@ namespace Faster.Map.Concurrent
                     goto start; // Restart the update process with the new table
                 }
 
-                // Increment the jump distance and calculate the next index using triangular probing
+                // In a hash map of size m = 2km = 2k, using quadratic probing with a properly chosen sequence(related to triangular numbers) ensures that every bucket is visited at least once before the sequence repeats.
+                // This is particularly important in ensuring that the hash map can handle collisions efficiently without getting stuck in an infinite loop or missing potential empty slots.
+                // Constants used in quadratic probing are triangular numbers. Triangular numbers are 1, 3, 6, 10, etc.
+
                 jumpDistance += 1;
                 index += jumpDistance;
-                index &= table.LengthMinusOne; // Ensure the index wraps around the table size
-
-                // Continue probing until a matching entry is found or the table is exhausted
+                index &= table.LengthMinusOne; // Ensure the index wraps around the table size, preventing out of bounds exceptions           
             } while (true);
         }
 
@@ -537,9 +554,9 @@ namespace Faster.Map.Concurrent
         /// </summary>
         public void Clear()
         {
-            var table = new Table(_table.Length, _loadFactor);
+            var table = new Table(_table.Length);
             Interlocked.Exchange(ref _table, table);
-            Interlocked.Exchange(ref _counter, new Counter());
+            Interlocked.Exchange(ref _counter, new ThreadLocalCounter());
         }
 
         /// <summary>
@@ -594,7 +611,7 @@ namespace Faster.Map.Concurrent
                 if (Interlocked.CompareExchange(ref _powersOfTwo[index], 0, table.Length) == table.Length)
                 {
                     // Create a new migration table with double the current table's length
-                    var migrationTable = new Table(table.Length << 1, _loadFactor);
+                    var migrationTable = new Table(table.Length << 1);
 
                     // Atomically update the migration table reference
                     Interlocked.Exchange(ref _migrationTable, migrationTable);
@@ -716,7 +733,7 @@ namespace Faster.Map.Concurrent
             /// <summary>
             /// The bitmask value used for secondary hash calculation.
             /// </summary>
-            private const sbyte _bitmask = (1 << 6) - 1;
+            private const sbyte _bitmask = (1 << 7) - 1;
 
             /// <summary>
             /// A constant value based on the golden ratio, used for hash calculation.
@@ -794,11 +811,10 @@ namespace Faster.Map.Concurrent
             /// </summary>
             /// <param name="length">The length of the table.</param>
             /// <param name="_loadFactor">The load factor of the table.</param>
-            public Table(uint length, double _loadFactor)
+            public Table(uint length)
             {
                 Length = length;
-                LengthMinusOne = length - 1;
-                Threshold = (uint)(Length * _loadFactor);
+                LengthMinusOne = length - 1;       
                 _shift = (byte)(_shift - BitOperations.Log2(length));
 
                 Entries = GC.AllocateUninitializedArray<Entry>((int)length);
@@ -872,7 +888,7 @@ namespace Faster.Map.Concurrent
             /// <param name="mTable">The migration table to move entries to.</param>
             internal void Migrate(Table mTable)
             {
-                // Continue migrating until all groups are depleted
+                // Continue migrating until all groups are depleted of resources
                 while (_depletedCounter < _depleted)
                 {
                     // Atomically increment the group index and wrap around if necessary
@@ -895,7 +911,7 @@ namespace Faster.Map.Concurrent
                             return;
                         }
 
-                        // If the entry is valid, migrate it to the new table
+                        // If the entry is valid having an meta > 1 migrate it to the new table
                         if (result > -1)
                         {
                             mTable.EmplaceInternal(ref entry, result);
@@ -911,8 +927,9 @@ namespace Faster.Map.Concurrent
                             meta = entry.Meta;
 
                             // Skip entries that are in progress
-                            if (meta == _inProgressMarker)
+                            if (meta == _claimed)
                             {
+                                // Note we arent actually increasing the index, we just retry
                                 continue;
                             }
 
@@ -968,13 +985,14 @@ namespace Faster.Map.Concurrent
                         return true; // Successfully inserted the entry
                     }
 
-                    // Increment the jump distance for quadratic probing
-                    jumpDistance += 1;
-                    // Calculate the next index using the updated jump distance
-                    index += jumpDistance;
-                    // Ensure the index wraps around the table size
-                    index &= LengthMinusOne;
-                } while (true); // Continue probing until an empty bucket is found
+                    // In a hash map of size m = 2km = 2k, using quadratic probing with a properly chosen sequence(related to triangular numbers) ensures that every bucket is visited at least once before the sequence repeats.
+                    // This is particularly important in ensuring that the hash map can handle collisions efficiently without getting stuck in an infinite loop or missing potential empty slots.
+                    // Constants used in quadratic probing are triangular numbers. Triangular numbers are 1, 3, 6, 10, etc.
+
+                    jumpDistance += 1;                    
+                    index += jumpDistance;                  
+                    index &= LengthMinusOne; // Ensure the index wraps around the table size, preventing out of bounds exceptions       
+                } while (true); 
             }
 
             /// <summary>
