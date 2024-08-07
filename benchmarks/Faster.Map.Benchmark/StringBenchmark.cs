@@ -1,6 +1,5 @@
 ﻿using BenchmarkDotNet.Attributes;
 using Faster.Map.DenseMap;
-using Faster.Map.QuadMap;
 using Faster.Map.RobinHoodMap;
 using System;
 using System.Collections.Generic;
@@ -18,8 +17,7 @@ namespace Faster.Map.Benchmark
         private DenseMap<string, string> _denseMap = new DenseMap<string, string>();
         private Dictionary<string, string> dic = new Dictionary<string, string>();
         private RobinhoodMap<string, string> _robinhoodMap = new RobinhoodMap<string, string>();
-        private QuadMap<string, string> _quadMap = new QuadMap<string, string>();
-
+     
         private string[] keys;
 
         #endregion
@@ -52,8 +50,7 @@ namespace Faster.Map.Benchmark
                  _denseMap.Emplace(key, key);
                 _robinhoodMap.Emplace(key, key);
                 dic.Add(key, key);
-            
-                _quadMap.Emplace(key, key);
+          
             }
         }
 
@@ -72,15 +69,6 @@ namespace Faster.Map.Benchmark
             foreach (var key in keys)
             {
                 _robinhoodMap.Get(key, out var result);
-            }
-        }
-
-        [Benchmark]
-        public void QuadMap()
-        {
-            foreach (var key in keys)
-            {
-                _quadMap.Get(key, out var result);
             }
         }
 

@@ -1,14 +1,7 @@
 # Faster.Map
 
-Faster.Map is a collection of high-performance hashmaps implemented in C#, each tailored to provide lightning-fast key-value pair operations. Whether you're dealing with large datasets or demanding real-time applications, Faster.Map offers optimized solutions for efficient data retrieval and manipulation.
-
-## Features:
-
-* Optimized Performance: Each hashmap in Faster.Map is finely tuned for performance, ensuring rapid key-value pair operations even under heavy workloads.
-* Memory Efficiency: Designed with memory optimization in mind, Faster.Map minimizes overhead to maximize efficiency, making it suitable for resource-constrained environments.
-* Variety of Implementations: Choose from different hashmap implementations, including DenseMap with SIMD instructions, RobinHoodMap with linear probing, and QuadMap using triangular numbers, each offering unique advantages for specific use cases.
-* Common Interface: All hashmaps in Faster.Map share the same set of functions, including Emplace, Get(), Update(), Remove(), and GetOrUpdate(), providing consistency and ease of use across implementations.
-
+The goal of Faster.Map is to create a more efficient and performant alternative to the Dictionary and ConcurrentDictionary classes provided by .NET.
+These standard collections are widely used for key-value pair storage in .NET applications, but they have certain limitations, particularly in high-performance and concurrent scenarios.
 
 ## Available Implementations:
 
@@ -17,10 +10,7 @@ Faster.Map is a collection of high-performance hashmaps implemented in C#, each 
         Ideal for scenarios demanding high throughput and optimal CPU utilization.
 * RobinHoodMap with Linear Probing:
         Employs linear probing to resolve hash collisions, reducing the likelihood of clustering and improving access speed.
-        Suitable for applications where a balance between performance and simplicity is required.
-* QuadMap using Triangular Numbers:
-        Utilizes triangular numbers to achieve a balanced distribution of keys, minimizing collisions and enhancing lookup efficiency.
-        Offers a unique approach to hashmap implementation, ideal for specialized use cases. 
+        Suitable for applications where a balance between performance and simplicity is required. 
 * CMap  is a high-performance, thread-safe, lockfree concurrent hash map that uses open addressing, quadratic probing, and Fibonacci hashing to manage key-value pairs. The default load factor is set to 0.5, meaning the hash map will resize when it is half full.
 
 * Installation:
@@ -69,117 +59,72 @@ BenchmarkDotNet v0.13.12, Windows 11 (10.0.22631.3880/23H2/2023Update/SunValley3
 ```
 ### Retrieving a million pre-generated keys
 
-| Method       | Length  | Mean per Operation | Error per Operation | StdDev per Operation | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
-|------------- |-------- |-------------------:|---------------------:|---------------------:|------:|--------:|----------:|----------:|------------:|
-| DenseMap     | 1       |           1.681 ns |           0.0295 ns  |           0.0276 ns  |  0.96 |    0.02 |     312 B |         - |          NA |
-| RobinhoodMap | 1       |           1.539 ns |           0.0473 ns  |           0.0443 ns  |  0.88 |    0.03 |     181 B |         - |          NA |
-| QuadMap      | 1       |           1.491 ns |           0.0336 ns  |           0.0297 ns  |  0.85 |    0.02 |     220 B |         - |          NA |
-| Dictionary   | 1       |           1.744 ns |           0.0223 ns  |           0.0186 ns  |  1.00 |    0.00 |     413 B |         - |          NA |
-|              |         |                    |                      |                      |       |         |           |           |             |
-| DenseMap     | 10      |           1.703 ns |           0.0220 ns  |           0.0206 ns  |  0.92 |    0.02 |     312 B |         - |          NA |
-| RobinhoodMap | 10      |           1.640 ns |           0.0090 ns  |           0.0075 ns  |  0.89 |    0.01 |     182 B |         - |          NA |
-| QuadMap      | 10      |           1.344 ns |           0.0139 ns  |           0.0130 ns  |  0.73 |    0.01 |     220 B |         - |          NA |
-| Dictionary   | 10      |           1.845 ns |           0.0274 ns  |           0.0256 ns  |  1.00 |    0.00 |     412 B |         - |          NA |
-|              |         |                    |                      |                      |       |         |           |           |             |
-| DenseMap     | 100     |           1.571 ns |           0.0146 ns  |           0.0136 ns  |  0.72 |    0.01 |     284 B |         - |          NA |
-| RobinhoodMap | 100     |           1.429 ns |           0.0286 ns  |           0.0329 ns  |  0.66 |    0.02 |     182 B |         - |          NA |
-| QuadMap      | 100     |           1.470 ns |           0.0240 ns  |           0.0225 ns  |  0.68 |    0.01 |     221 B |         - |          NA |
-| Dictionary   | 100     |           2.176 ns |           0.0341 ns  |           0.0302 ns  |  1.00 |    0.00 |     420 B |         - |          NA |
-|              |         |                    |                      |                      |       |         |           |           |             |
-| DenseMap     | 1000    |           1.715 ns |           0.0282 ns  |           0.0264 ns  |  0.55 |    0.01 |     312 B |         - |          NA |
-| RobinhoodMap | 1000    |           1.648 ns |           0.0293 ns  |           0.0275 ns  |  0.52 |    0.01 |     182 B |         - |          NA |
-| QuadMap      | 1000    |           1.677 ns |           0.0320 ns  |           0.0300 ns  |  0.53 |    0.01 |     220 B |         - |          NA |
-| Dictionary   | 1000    |           3.145 ns |           0.0341 ns  |           0.0319 ns  |  1.00 |    0.00 |     412 B |         - |          NA |
-|              |         |                    |                      |                      |       |         |           |           |             |
-| DenseMap     | 10000   |           1.895 ns |           0.0174 ns  |           0.0162 ns  |  0.23 |    0.00 |     284 B |         - |          NA |
-| RobinhoodMap | 10000   |           1.866 ns |           0.0236 ns  |           0.0221 ns  |  0.22 |    0.00 |     182 B |         - |          NA |
-| QuadMap      | 10000   |           2.311 ns |           0.0297 ns  |           0.0278 ns  |  0.27 |    0.00 |     221 B |         - |          NA |
-| Dictionary   | 10000   |           8.417 ns |           0.0880 ns  |           0.0823 ns  |  1.00 |    0.00 |     412 B |         - |          NA |
-|              |         |                    |                      |                      |       |         |           |           |             |
-| DenseMap     | 100000  |           2.797 ns |           0.0265 ns  |           0.0235 ns  |  0.23 |    0.00 |     289 B |         - |        0.00 |
-| RobinhoodMap | 100000  |           5.519 ns |           0.0554 ns  |           0.0491 ns  |  0.45 |    0.01 |     182 B |         - |        0.00 |
-| QuadMap      | 100000  |           6.072 ns |           0.1147 ns  |           0.1073 ns  |  0.50 |    0.01 |     221 B |         - |        0.00 |
-| Dictionary   | 100000  |          12.264 ns |           0.2075 ns  |           0.1941 ns  |  1.00 |    0.00 |     412 B |       1 B |        1.00 |
-|              |         |                    |                      |                      |       |         |           |           |             |
-| DenseMap     | 1000000 |          11.881 ns |           0.2330 ns  |           0.2773 ns  |  0.60 |    0.02 |     289 B |       1 B |        0.04 |
-| RobinhoodMap | 1000000 |          11.664 ns |           0.2040 ns  |           0.1809 ns  |  0.59 |    0.01 |     182 B |       1 B |        0.04 |
-| QuadMap      | 1000000 |          15.003 ns |           0.0696 ns  |           0.0617 ns  |  0.75 |    0.01 |     221 B |      12 B |        0.52 |
-| Dictionary   | 1000000 |          19.925 ns |           0.3739 ns  |           0.3314 ns  |  1.00 |    0.00 |     412 B |      23 B |        1.00 |
-
-
+| Method       | Length  | Mean          | Error       | StdDev      | Ratio | RatioSD | Code Size | Allocated | Alloc Ratio |
+|--------------|---------|---------------|-------------|-------------|-------|---------|-----------|-----------|-------------|
+| DenseMap     | 1000    |     0.001561 ms |  0.0000298 ms |  0.0000306 ms |  0.55 |   0.01 |    312 B |         - |         NA  |
+| RobinhoodMap | 1000    |     0.001453 ms |  0.0000072 ms |  0.0000063 ms |  0.52 |   0.00 |    182 B |         - |         NA  |
+| Dictionary   | 1000    |     0.002817 ms |  0.0000157 ms |  0.0000123 ms |  1.00 |   0.01 |    412 B |         - |         NA  |
+| DenseMap     | 10000   |     0.018443 ms |  0.0001868 ms |  0.0001560 ms |  0.25 |   0.01 |    312 B |         - |         NA  |
+| RobinhoodMap | 10000   |     0.048846 ms |  0.0000682 ms |  0.0000570 ms |  0.65 |   0.02 |    182 B |         - |         NA  |
+| Dictionary   | 10000   |     0.074840 ms |  0.0013760 ms |  0.0034011 ms |  1.00 |   0.06 |    412 B |         - |         NA  |
+| DenseMap     | 100000  |     0.302329 ms |  0.0018030 ms |  0.0016865 ms |  0.28 |   0.00 |    289 B |         - |       0.00  |
+| RobinhoodMap | 100000  |     0.525929 ms |  0.0020816 ms |  0.0018453 ms |  0.48 |   0.00 |    182 B |       1 B |       1.00  |
+| Dictionary   | 100000  |     1.091758 ms |  0.0026861 ms |  0.0022430 ms |  1.00 |   0.00 |    393 B |       1 B |       1.00  |
+| DenseMap     | 400000  |     1.966361 ms |  0.0391485 ms |  0.0366195 ms |  0.40 |   0.01 |    289 B |       3 B |       0.50  |
+| RobinhoodMap | 400000  |     2.377139 ms |  0.0238691 ms |  0.0223271 ms |  0.48 |   0.01 |    182 B |       3 B |       0.50  |
+| Dictionary   | 400000  |     4.901921 ms |  0.0584053 ms |  0.0517748 ms |  1.00 |   0.01 |    412 B |       6 B |       1.00  |
+| DenseMap     | 900000  |     9.743361 ms |  0.0631023 ms |  0.0559385 ms |  0.60 |   0.01 |    289 B |      12 B |       0.52  |
+| RobinhoodMap | 900000  |     8.845731 ms |  0.0784927 ms |  0.0734222 ms |  0.55 |   0.01 |    182 B |      12 B |       0.52  |
+| Dictionary   | 900000  |    16.156572 ms |  0.1954894 ms |  0.1632425 ms |  1.00 |   0.01 |    412 B |      23 B |       1.00  |
+| DenseMap     | 1000000 |    11.216461 ms |  0.1142519 ms |  0.0954055 ms |  0.65 |   0.01 |    289 B |      12 B |       0.52  |
+| RobinhoodMap | 1000000 |    11.368053 ms |  0.0775996 ms |  0.0687900 ms |  0.66 |   0.01 |    182 B |      12 B |       0.52  |
+| Dictionary   | 1000000 |    17.346513 ms |  0.1926637 ms |  0.1504191 ms |  1.00 |   0.01 |    412 B |      23 B |       1.00  |
 
 ### Adding a million keys
 
-| Method       | Length  | Mean          | Error       | StdDev        | Median        |
-|--------------|---------|---------------|-------------|---------------|---------------|
-| DenseMap     | 1       |      2.386 ns |   0.1922 ns |     0.5515 ns |      2.400 ns |
-| RobinhoodMap | 1       |      2.119 ns |   0.1589 ns |     0.4509 ns |      2.200 ns |
-| QuadMap      | 1       |      1.920 ns |   0.1392 ns |     0.3972 ns |      1.900 ns |
-| Dictionary   | 1       |      2.350 ns |   0.1711 ns |     0.4826 ns |      2.200 ns |
-|              |         |               |             |               |               |
-| DenseMap     | 10      |      3.398 ns |   0.3427 ns |     0.9667 ns |      3.450 ns |
-| RobinhoodMap | 10      |      1.920 ns |   0.2966 ns |     0.8462 ns |      1.500 ns |
-| QuadMap      | 10      |      1.880 ns |   0.2944 ns |     0.8398 ns |      1.800 ns |
-| Dictionary   | 10      |      1.727 ns |   0.2253 ns |     0.6205 ns |      1.550 ns |
-|              |         |               |             |               |               |
-| DenseMap     | 100     |     11.574 ns |   1.1192 ns |     3.1385 ns |     11.400 ns |
-| RobinhoodMap | 100     |     10.112 ns |   0.8784 ns |     2.4632 ns |     10.000 ns |
-| QuadMap      | 100     |      5.642 ns |   0.6559 ns |     1.8607 ns |      5.300 ns |
-| Dictionary   | 100     |      8.330 ns |   1.2318 ns |     3.5542 ns |      6.500 ns |
-|              |         |               |             |               |               |
-| DenseMap     | 1000    |     82.654 ns |  10.0903 ns |    29.2737 ns |     67.600 ns |
-| RobinhoodMap | 1000    |     52.873 ns |   7.6720 ns |    21.8887 ns |     44.650 ns |
-| QuadMap      | 1000    |     57.005 ns |   5.0141 ns |    14.6264 ns |     58.200 ns |
-| Dictionary   | 1000    |     69.909 ns |   8.5316 ns |    24.6156 ns |     62.700 ns |
-|              |         |               |             |               |               |
-| DenseMap     | 10000   |    267.313 ns |  14.2547 ns |    40.6694 ns |    255.950 ns |
-| RobinhoodMap | 10000   |    230.529 ns |  18.8404 ns |    53.4470 ns |    218.800 ns |
-| QuadMap      | 10000   |    148.073 ns |   9.0149 ns |    25.8654 ns |    142.700 ns |
-| Dictionary   | 10000   |    257.940 ns |  16.0387 ns |    41.4010 ns |    246.000 ns |
-|              |         |               |             |               |               |
-| DenseMap     | 100000  |  1,916.486 ns | 145.2617 ns |   407.3294 ns |  1,794.700 ns |
-| RobinhoodMap | 100000  |  1,863.903 ns | 121.3538 ns |   346.2292 ns |  1,714.050 ns |
-| QuadMap      | 100000  |  1,183.141 ns |  61.6521 ns |   178.8639 ns |  1,162.700 ns |
-| Dictionary   | 100000  |  2,156.636 ns | 145.1711 ns |   394.9488 ns |  1,975.900 ns |
-|              |         |               |             |               |               |
-| DenseMap     | 1000000 | 17,395.683 ns | 554.7733 ns | 1,591.7487 ns | 17,677.400 ns |
-| RobinhoodMap | 1000000 | 17,408.482 ns | 345.9695 ns |   855.1508 ns | 17,380.450 ns |
-| QuadMap      | 1000000 | 15,149.836 ns | 294.0958 ns |   810.0251 ns | 15,105.700 ns |
-| Dictionary   | 1000000 | 21,542.058 ns | 414.8775 ns | 1,070.9313 ns | 21,619.000 ns |
-
+| Method       | Length  | Mean         | Error      | StdDev       | Median       | Allocated |
+|--------------|---------|--------------|------------|--------------|--------------|-----------|
+| DenseMap     | 1000    |     0.04696 ms |   0.00105 ms |     0.00301 ms |     0.04580 ms |     784 B |
+| RobinhoodMap | 1000    |     0.05695 ms |   0.00139 ms |     0.00407 ms |     0.05695 ms |     448 B |
+| Dictionary   | 1000    |     0.05925 ms |   0.00302 ms |     0.00886 ms |     0.05710 ms |     448 B |
+| DenseMap     | 10000   |     0.10247 ms |   0.00204 ms |     0.00412 ms |     0.10170 ms |     784 B |
+| RobinhoodMap | 10000   |     0.11880 ms |   0.00235 ms |     0.00412 ms |     0.11740 ms |     784 B |
+| Dictionary   | 10000   |     0.28064 ms |   0.00560 ms |     0.00872 ms |     0.28010 ms |     784 B |
+| DenseMap     | 100000  |     0.74044 ms |   0.01424 ms |     0.01462 ms |     0.73490 ms |     784 B |
+| RobinhoodMap | 100000  |     1.09080 ms |   0.02139 ms |     0.03393 ms |     1.08320 ms |     448 B |
+| Dictionary   | 100000  |     2.99360 ms |   0.05919 ms |     0.07269 ms |     2.98355 ms |     784 B |
+| DenseMap     | 400000  |     5.01900 ms |   0.34001 ms |     0.99719 ms |     5.46250 ms |     784 B |
+| RobinhoodMap | 400000  |     4.83217 ms |   0.10687 ms |     0.30317 ms |     4.76510 ms |     784 B |
+| Dictionary   | 400000  |     7.67889 ms |   0.15666 ms |     0.42620 ms |     7.59280 ms |     784 B |
+| DenseMap     | 900000  |    10.63200 ms |   0.20614 ms |     0.18274 ms |    10.60900 ms |     784 B |
+| RobinhoodMap | 900000  |    14.09060 ms |   0.28137 ms |     0.78899 ms |    14.05040 ms |     784 B |
+| Dictionary   | 900000  |    24.58053 ms |   0.89271 ms |     2.61815 ms |    24.80390 ms |     784 B |
+| DenseMap     | 1000000 |    10.93189 ms |   0.21667 ms |     0.55930 ms |    10.74225 ms |     784 B |
+| RobinhoodMap | 1000000 |    17.13302 ms |   0.37145 ms |     1.05975 ms |    16.94610 ms |     784 B |
+| Dictionary   | 1000000 |    28.22181 ms |   0.84126 ms |     2.45399 ms |    27.72925 ms |     784 B |
 
 ### Updating a million keys
 
-| Method       | Length  | Mean              | Error           | StdDev          | Median            | Allocated |
-|------------- |-------- |-------------------:|---------------------:|---------------------:|----------------------:|----------:|
-| DenseMap     | 1       |          2.810 ns  |          0.0570 ns   |          0.0533 ns   |          2.787 ns     |         - |
-| RobinhoodMap | 1       |          1.744 ns  |          0.0187 ns   |          0.0175 ns   |          1.744 ns     |         - |
-| QuadMap      | 1       |          1.716 ns  |          0.0140 ns   |          0.0117 ns   |          1.713 ns     |         - |
-| Dictionary   | 1       |          3.537 ns  |          0.0274 ns   |          0.0256 ns   |          3.533 ns     |         - |
-| DenseMap     | 10      |          1.689 ns  |          0.0101 ns   |          0.0084 ns   |          1.688 ns     |         - |
-| RobinhoodMap | 10      |          1.184 ns  |          0.0105 ns   |          0.0098 ns   |          1.185 ns     |         - |
-| QuadMap      | 10      |          1.238 ns  |          0.0045 ns   |          0.0042 ns   |          1.236 ns     |         - |
-| Dictionary   | 10      |          3.091 ns  |          0.0113 ns   |          0.0105 ns   |          3.090 ns     |         - |
-| DenseMap     | 100     |          1.622 ns  |          0.0143 ns   |          0.0133 ns   |          1.624 ns     |         - |
-| RobinhoodMap | 100     |          1.357 ns  |          0.0065 ns   |          0.0060 ns   |          1.358 ns     |         - |
-| QuadMap      | 100     |          1.369 ns  |          0.0235 ns   |          0.0220 ns   |          1.360 ns     |         - |
-| Dictionary   | 100     |          3.099 ns  |          0.0128 ns   |          0.0119 ns   |          3.098 ns     |         - |
-| DenseMap     | 1000    |          1.479 ns  |          0.0053 ns   |          0.0071 ns   |          1.477 ns     |         - |
-| RobinhoodMap | 1000    |          1.385 ns  |          0.0146 ns   |          0.0136 ns   |          1.382 ns     |         - |
-| QuadMap      | 1000    |          1.465 ns  |          0.0245 ns   |          0.0229 ns   |          1.474 ns     |         - |
-| Dictionary   | 1000    |          3.161 ns  |          0.0632 ns   |          0.0592 ns   |          3.186 ns     |         - |
-| DenseMap     | 10000   |          1.718 ns  |          0.0093 ns   |          0.0087 ns   |          1.720 ns     |         - |
-| RobinhoodMap | 10000   |          2.013 ns  |          0.0085 ns   |          0.0079 ns   |          2.011 ns     |         - |
-| QuadMap      | 10000   |          1.614 ns  |          0.0137 ns   |          0.0128 ns   |          1.614 ns     |         - |
-| Dictionary   | 10000   |          5.437 ns  |          0.0303 ns   |          0.0284 ns   |          5.439 ns     |         - |
-| DenseMap     | 100000  |          2.440 ns  |          0.0081 ns   |          0.0072 ns   |          2.441 ns     |         - |
-| RobinhoodMap | 100000  |          8.727 ns  |          0.2386 ns   |          0.7034 ns   |          8.973 ns     |       1 B |
-| QuadMap      | 100000  |          9.036 ns  |          0.3137 ns   |          0.9250 ns   |          9.301 ns     |       1 B |
-| Dictionary   | 100000  |          9.780 ns  |          0.0390 ns   |          0.0346 ns   |          9.786 ns     |       1 B |
-| DenseMap     | 1000000 |         10.570 ns  |          0.1628 ns   |          0.1444 ns   |         10.566 ns     |      12 B |
-| RobinhoodMap | 1000000 |         13.121 ns  |          0.0498 ns   |          0.0441 ns   |         13.112 ns     |      12 B |
-| QuadMap      | 1000000 |         13.535 ns  |          0.0831 ns   |          0.0737 ns   |         13.553 ns     |      12 B |
-| Dictionary   | 1000000 |         18.278 ns  |          0.1861 ns   |          0.1554 ns   |         18.242 ns     |      23 B |
+| Method       | Length  | Mean          | Error       | StdDev      | Median        | Allocated |
+|--------------|---------|---------------|-------------|-------------|---------------|-----------|
+| DenseMap     | 1000    |     0.001497 ms |  0.0000095 ms |  0.0000080 ms |   0.001497 ms |         - |
+| RobinhoodMap | 1000    |     0.001886 ms |  0.0000369 ms |  0.0000563 ms |   0.001887 ms |         - |
+| Dictionary   | 1000    |     0.003374 ms |  0.0000594 ms |  0.0000660 ms |   0.003388 ms |         - |
+| DenseMap     | 10000   |     0.018904 ms |  0.0000967 ms |  0.0000807 ms |   0.018898 ms |         - |
+| RobinhoodMap | 10000   |     0.028991 ms |  0.0001625 ms |  0.0001520 ms |   0.029036 ms |         - |
+| Dictionary   | 10000   |     0.086054 ms |  0.0001592 ms |  0.0001329 ms |   0.086069 ms |         - |
+| DenseMap     | 100000  |     0.722426 ms |  0.0139707 ms |  0.0171572 ms |   0.725357 ms |       1 B |
+| RobinhoodMap | 100000  |     0.572789 ms |  0.0107215 ms |  0.0100289 ms |   0.568764 ms |       1 B |
+| Dictionary   | 100000  |     1.195203 ms |  0.0032038 ms |  0.0029968 ms |   1.196440 ms |       1 B |
+| DenseMap     | 400000  |     4.508174 ms |  0.0646880 ms |  0.0605092 ms |   4.485129 ms |       6 B |
+| RobinhoodMap | 400000  |     2.844626 ms |  0.0536748 ms |  0.0475813 ms |   2.823570 ms |       3 B |
+| Dictionary   | 400000  |     5.396909 ms |  0.0286768 ms |  0.0268243 ms |   5.405657 ms |       6 B |
+| DenseMap     | 900000  |     9.321427 ms |  0.1539810 ms |  0.1365001 ms |   9.280112 ms |      12 B |
+| RobinhoodMap | 900000  |     8.692224 ms |  0.0805071 ms |  0.0713675 ms |   8.675028 ms |      12 B |
+| Dictionary   | 900000  |    16.036116 ms |  0.1468814 ms |  0.1226526 ms |  16.054666 ms |      23 B |
+| DenseMap     | 1000000 |    10.349873 ms |  0.1659302 ms |  0.1385592 ms |  10.316205 ms |      12 B |
+| RobinhoodMap | 1000000 |    11.018986 ms |  0.2149889 ms |  0.5273715 ms |  10.852050 ms |      12 B |
+| Dictionary   | 1000000 |    18.725914 ms |  0.2099566 ms |  0.1753233 ms |  18.752681 ms |      23 B |
 
 ### Removing a million keys
 

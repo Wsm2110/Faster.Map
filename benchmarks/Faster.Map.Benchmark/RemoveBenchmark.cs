@@ -1,10 +1,11 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 using BenchmarkDotNet.Attributes;
 using Faster.Map.DenseMap;
-using Faster.Map.QuadMap;
 using Faster.Map.RobinHoodMap;
 
 namespace Faster.Map.Benchmark
@@ -16,30 +17,25 @@ namespace Faster.Map.Benchmark
     {
         #region Fields
 
-        private DenseMap<uint, uint> _denseMap = new DenseMap<uint, uint>();
-        private Dictionary<uint, uint> dic = new Dictionary<uint, uint>();
-        private RobinhoodMap<uint, uint> _robinhoodMap = new RobinhoodMap<uint, uint>();
-        private QuadMap<uint, uint> _quadMap = new QuadMap<uint, uint>();
-
+        private DenseMap<uint, uint> _denseMap;
+        private Dictionary<uint, uint> _dictionary;
+        private RobinhoodMap<uint, uint> _robinhoodMap;
+ 
         private uint[] keys;
 
         #endregion
 
         #region Properties
 
-        #region Properties
+        [Params(1000, 10000, 100000, 400000, 900000, 1000000)]
+        public uint Length { get; set; }
 
-        [Params( 1000000)]
-        public int Length { get; set; }
-
-        #endregion
-
-        #endregion
+        #endregion    
 
         /// <summary>
         /// Generate a million Keys and shuffle them afterwards
         /// </summary>
-        [IterationSetup]
+        [GlobalSetup]
         public void Setup()
         {
             var output = File.ReadAllText("Numbers.txt");
@@ -51,29 +47,31 @@ namespace Faster.Map.Benchmark
             {
                 keys[index] = uint.Parse(splittedOutput[index]);
             }
-
-            foreach (var key in keys)
-            {
-                dic.Add(key, key);
-                _denseMap.Emplace(key, key);
-                _robinhoodMap.Emplace(key, key);
-                _quadMap.Emplace(key, key);
-            }
+          
 
             // Shuffle(new Random(), keys);
         }
 
-        [IterationCleanup]
-        public void clear()
+        [IterationSetup]
+        public void IterationSetupX()
         {
-            dic.Clear();
-            _denseMap.Clear();
-            _robinhoodMap.Clear();
-            _quadMap.Clear();
+            // round of length to power of 2 prevent resizing
+            uint length = BitOperations.RoundUpToPowerOf2(Length) * 2;
+            int dicLength = HashHelpers.GetPrime((int)Length);
+
+            _denseMap = new DenseMap<uint, uint>(length);
+            _dictionary = new Dictionary<uint, uint>(dicLength);
+            _robinhoodMap = new RobinhoodMap<uint, uint>(length);
+
+            foreach (var key in keys)
+            {
+                _dictionary.Add(key, key);
+                _denseMap.Emplace(key, key);
+                _robinhoodMap.Emplace(key, key);
+            }
         }
 
         #region Benchmarks
-
 
         [Benchmark]
         public void DenseMap()
@@ -94,26 +92,13 @@ namespace Faster.Map.Benchmark
         }
 
         [Benchmark]
-        public void QuadMap()
-        {
-            foreach (var key in keys)
-            {
-                _quadMap.Remove(key);
-            }
-        }
-
-        [Benchmark]
         public void Dictionary()
         {
             foreach (var key in keys)
             {
-                dic.Remove(key, out var result);
+                _dictionary.Remove(key, out var result);
             }
         }
-
-
-
         #endregion
-
     }
 }

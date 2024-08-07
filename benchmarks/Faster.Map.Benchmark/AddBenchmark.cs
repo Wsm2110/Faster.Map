@@ -4,8 +4,6 @@ using System.IO;
 using BenchmarkDotNet.Attributes;
 using Faster.Map.DenseMap;
 using Faster.Map.RobinHoodMap;
-using Faster.Map.QuadMap;
-using System.Collections.Concurrent;
 using System.Linq;
 using System.Numerics;
 
@@ -20,18 +18,17 @@ namespace Faster.Map.Benchmark
         #region Fields
 
         //fixed size, dont want to measure resize()
-        private DenseMap<uint, uint> _dense = new DenseMap<uint, uint>(1000000);
-        private Dictionary<uint, uint> dic = new Dictionary<uint, uint>(10000000);
-        private RobinhoodMap<uint, uint> _robinhoodMap = new RobinhoodMap<uint, uint>(2000000);
-        private QuadMap<uint, uint> _quadmap = new QuadMap<uint, uint>(2000000);
-
+        private DenseMap<uint, uint> _dense;
+        private Dictionary<uint, uint> dic;
+        private RobinhoodMap<uint, uint> _robinhoodMap;
+    
         private uint[] keys;
 
         #endregion
 
         #region Properties
 
-        [Params(100000, 500000, 900000, 1000000)]
+        [Params(1000, 10000, 100000, 400000, 900000, 1000000)]
         public uint Length { get; set; }
 
         #endregion
@@ -61,8 +58,7 @@ namespace Faster.Map.Benchmark
             int dicLength = HashHelpers.GetPrime((int)Length);
 
             _dense = new DenseMap<uint, uint>(length);
-            dic = new Dictionary<uint, uint>(dicLength);
-            _quadmap = new QuadMap<uint, uint>(length);
+            dic = new Dictionary<uint, uint>(dicLength);          
             _robinhoodMap = new RobinhoodMap<uint, uint>(length);
         }
 
@@ -84,17 +80,7 @@ namespace Faster.Map.Benchmark
             {
                 _robinhoodMap.Emplace(key, key);
             }
-        }
-
-        [Benchmark]
-        public void QuadMap()
-        {
-            foreach (var key in keys.Take((int)Length))
-            {
-
-                _quadmap.Emplace(key, key);
-            }
-        }
+        }   
 
         [Benchmark]
         public void Dictionary()

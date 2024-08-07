@@ -1,10 +1,11 @@
 ﻿using BenchmarkDotNet.Attributes;
 using System.Collections.Generic;
 using System.IO;
-using Faster.Map.QuadMap;
 using Faster.Map.DenseMap;
 using Faster.Map.RobinHoodMap;
 using System;
+using System.Collections;
+using System.Numerics;
 
 namespace Faster.Map.Benchmark
 {
@@ -18,15 +19,14 @@ namespace Faster.Map.Benchmark
         private DenseMap<uint, uint> _denseMap;
         private Dictionary<uint, uint> _dictionary;
         private RobinhoodMap<uint, uint> _robinHoodMap;
-        private QuadMap<uint, uint> _quadMap;
-
+   
         private uint[] keys;
 
         #endregion
 
         #region Properties
 
-        [Params(900000)]
+        [Params(1000, 10000, 100000, 400000, 900000, 1000000)]
         public uint Length { get; set; }
 
         #endregion
@@ -36,12 +36,7 @@ namespace Faster.Map.Benchmark
         /// </summary>
         [GlobalSetup]
         public void Setup()
-        {
-            _denseMap = new DenseMap<uint, uint>(Length);
-            _dictionary = new Dictionary<uint, uint>((int)Length);
-            _robinHoodMap = new(Length);
-            _quadMap = new(Length);
-
+        {  
             var output = File.ReadAllText("Numbers.txt");
             var splittedOutput = output.Split(',');
 
@@ -52,12 +47,20 @@ namespace Faster.Map.Benchmark
                 keys[index] = uint.Parse(splittedOutput[index]);
             }
 
+
+            // round of length to power of 2 prevent resizing
+            uint length = BitOperations.RoundUpToPowerOf2(Length) * 2;
+            int dicLength = HashHelpers.GetPrime((int)Length);
+
+            _denseMap = new DenseMap<uint, uint>(length);
+            _dictionary= new Dictionary<uint, uint>(dicLength);
+            _robinHoodMap = new RobinhoodMap<uint, uint>(length);
+
             foreach (var key in keys)
             {
                 _dictionary.Add(key, key);
                 _denseMap.Emplace(key, key);
-                _robinHoodMap.Emplace(key, key);
-                _quadMap.Emplace(key, key);
+                _robinHoodMap.Emplace(key, key);               
             }
         }
 
@@ -78,16 +81,6 @@ namespace Faster.Map.Benchmark
             {
                 var key = keys[i];
                 _robinHoodMap.Get(key, out var _);           
-            }
-        }
-
-        [Benchmark]
-        public void QuadMap()
-        {
-            for (int i = 0; i < Length; ++i)
-            {
-                var key = keys[i];
-                _quadMap.Get(key, out var _);
             }
         }
 
