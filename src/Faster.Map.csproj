@@ -39,14 +39,9 @@
 
   <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="\" />
-      <Pack>True</Pack>
-      <PackagePath>\</PackagePath>
-    </None>
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="System.IO.Hashing" Version="8.0.*" />
   </ItemGroup>
-
-
 </Project>
