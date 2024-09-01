@@ -181,7 +181,6 @@ namespace Faster.Map.Concurrent
             {
                 // Retrieve the metadata for the current entry
                 ref var entry = ref Find(table.Entries, index);
-
                 // Check if the bucket is empty and try to claim it by setting a _claimed marker
                 if (_emptyBucket == entry.Meta && Interlocked.CompareExchange(ref entry.Meta, _claimed, _emptyBucket) == _emptyBucket)
                 {
@@ -190,11 +189,13 @@ namespace Faster.Map.Concurrent
                     entry.Value = value;
                     entry.Meta = h2;
 
+                    // _counter.Increment() uses a Interlocked.Increment() which provides a full memory fence, meaning they ensure all preceding memory writes are completed and visible to other threads before the Interlocked operation completes.
+                    // This means that when you perform an Interlocked operation, it guarantees that any changes made to other variables(not just the variable involved in the Interlocked operation) are also visible to other threads.
+                    // Note this also means we dont need any explicit memorybarriers.
+                    // This code, using Interlocked operations, will also work correctly on ARM architectures without needing additional explicit memory barriers.The memory ordering and visibility are managed by the Interlocked methods.
                     _counter.Increment();
-
                     return true; // Successfully inserted the entry
                 }
-
                 // Check if the bucket contains a tombstone and try to claim it
                 if (_tombstone == entry.Meta && Interlocked.CompareExchange(ref entry.Meta, _claimed, _tombstone) == _tombstone)
                 {
@@ -202,11 +203,13 @@ namespace Faster.Map.Concurrent
                     entry.Value = value;
                     entry.Meta = h2;
 
+                    // _counter.Increment() uses a Interlocked.Increment() which provides a full memory fence, meaning they ensure all preceding memory writes are completed and visible to other threads before the Interlocked operation completes.
+                    // This means that when you perform an Interlocked operation, it guarantees that any changes made to other variables(not just the variable involved in the Interlocked operation) are also visible to other threads.
+                    // Note this also means we dont need any explicit memorybarriers.
+                    // This code, using Interlocked operations, will also work correctly on ARM architectures without needing additional explicit memory barriers.The memory ordering and visibility are managed by the Interlocked methods.
                     _counter.Increment();
-
                     return true; // Successfully inserted the entry
                 }
-
                 // Check if the bucket is occupied by an entry with the same key
                 if (h2 == entry.Meta && _keyComparer.Equals(key, entry.Key))
                 {
@@ -216,12 +219,10 @@ namespace Faster.Map.Concurrent
                 jumpDistance += 1;
                 index += jumpDistance;
                 index &= table.LengthMinusOne;
-
             } while (jumpDistance <= table.MaxJumpDistance);
 
             // Trigger resize if necessary and restart insertion
             Resize(table);
-
             goto start;
         }
 
@@ -246,9 +247,11 @@ namespace Faster.Map.Concurrent
         {
             var hashcode = key.GetHashCode();
             var h2 = _table.H2(hashcode);
-            var table = _table;
-            var index = table.GetIndex(hashcode);
             byte jumpDistance = 0;
+
+            start:
+            var table = _table;
+            var index = table.GetIndex(hashcode);   
 
             do
             {
@@ -260,12 +263,18 @@ namespace Faster.Map.Concurrent
                     value = entry.Value;
                     return true;
                 }
-
+                // If the entry is an empty bucket, the key does not exist in the table
                 if (_emptyBucket == entry.Meta)
-                {
-                    // If the entry is an empty bucket, the key does not exist in the table
+                {                 
                     value = default;
                     return false;
+                }
+                // If the entry indicates a resize operation, help other threads resizing
+                if (entry.Meta == _resizeBucket)
+                {
+                    Resize(table);
+                    jumpDistance = 0;
+                    goto start;
                 }
 
                 jumpDistance += 1;
@@ -332,7 +341,7 @@ namespace Faster.Map.Concurrent
                 }
 
                 // If the entry indicates a resize operation, help other threads resizing
-                if (entry.Meta == _resizeBucket || entry.Meta == _groupResized)
+                if (entry.Meta == _resizeBucket)
                 {
                     Resize(table);
                     jumpDistance = 0;
@@ -364,11 +373,10 @@ namespace Faster.Map.Concurrent
         public bool Update(TKey key, TValue newValue, TValue comparisonValue)
         {
             var hashcode = key.GetHashCode();
-            byte jumpDistance = 0;
             var h2 = _table.H2(hashcode);
+            byte jumpDistance = 0;
 
-            start:
-
+            start:   
             var table = _table;
             var index = table.GetIndex(hashcode);
 
@@ -376,33 +384,28 @@ namespace Faster.Map.Concurrent
             {
                 // Retrieve the entry from the table at the calculated index
                 ref var entry = ref Find(table.Entries, index);
-
                 // If the entry's metadata and key match, proceed with the update
                 if (h2 == entry.Meta && _keyComparer.Equals(key, entry.Key))
                 {
                     // Guarantee that only one thread can access the critical section at a time
                     entry.Enter();
                     bool result = false;
-
                     if (EqualityComparer<TValue>.Default.Equals(entry.Value, comparisonValue))
                     {
                         // Perform the critical section: update the value
                         entry.Value = newValue;
                         result = true;
                     }
-
                     entry.Exit();
                     return result;
                 }
-
                 // If the entry indicates a resize operation, perform the resize helping other threads 
-                if (entry.Meta == _resizeBucket || entry.Meta == _groupResized)
+                if (entry.Meta == _resizeBucket)
                 {
                     Resize(table);
                     jumpDistance = 0;
                     goto start;
                 }
-
                 // If the entry indicates an empty bucket, the key does not exist in the table
                 if (_emptyBucket == entry.Meta)
                 {
@@ -432,25 +435,22 @@ namespace Faster.Map.Concurrent
         public bool Remove(TKey key)
         {
             var hashcode = key.GetHashCode();
-            byte jumpDistance = 0;
             var h2 = _table.H2(hashcode);
+            byte jumpDistance = 0;
 
             start:
-
-            var table = _table;
+            var table = _table;         
             var index = table.GetIndex(hashcode);
 
             do
             {
                 // Retrieve the entry from the table at the calculated index
                 ref var entry = ref Find(table.Entries, index);
-
                 // If the entry's metadata and key match, proceed with the update
                 if (h2 == entry.Meta && _keyComparer.Equals(key, entry.Key))
                 {
                     // Guarantee that only one thread can access the critical section at a time
                     entry.Enter();
-
                     bool result = false;
 
                     if (h2 == entry.Meta)
@@ -460,7 +460,10 @@ namespace Faster.Map.Concurrent
                         entry.Key = default;
                         entry.Value = default;
 
-                        // Decrease counter by 1
+                        // _counter.Decrement() uses a Interlocked.Decrement() which provides a full memory fence, meaning they ensure all preceding memory writes are completed and visible to other threads before the Interlocked operation completes.
+                        // This means that when you perform an Interlocked operation, it guarantees that any changes made to other variables(not just the variable involved in the Interlocked operation) are also visible to other threads.
+                        // Note this also means we dont need any explicit memorybarriers.
+                        // This code, using Interlocked operations, will also work correctly on ARM architectures without needing additional explicit memory barriers.The memory ordering and visibility are managed by the Interlocked methods.
                         _counter.Decrement();
                         result = true;
                     }
@@ -476,10 +479,8 @@ namespace Faster.Map.Concurrent
                 {
                     return false;
                 }
-
                 // If the entry indicates a resize operation, perform the resize helping other threads in the process
-
-                if (entry.Meta == _resizeBucket || entry.Meta == _groupResized)
+                if (entry.Meta == _resizeBucket)
                 {
                     Resize(table); // Resize the table
                     jumpDistance = 0; // Reset the jump distance
@@ -516,7 +517,6 @@ namespace Faster.Map.Concurrent
             var h2 = _table.H2(hashcode); // Calculate the secondary hash
 
             start:
-
             var table = _table; // Get the current state of the table
             var index = table.GetIndex(hashcode); // Calculate the initial bucket index
 
@@ -524,44 +524,41 @@ namespace Faster.Map.Concurrent
             {
                 // Retrieve the entry from the table at the calculated index
                 ref var entry = ref Find(table.Entries, index);
-
                 // If the entry's metadata and key match, proceed with the update
                 if (h2 == entry.Meta && _keyComparer.Equals(key, entry.Key))
                 {
                     // Guarantee that only one thread can access the critical section at a time
                     entry.Enter();
-
                     // Double-checked locking to prevent multiple threads from removing simultaneously
                     if (h2 == entry.Meta)
                     {
                         value = entry.Value;
-
                         // Perform the critical section
                         entry.Meta = _tombstone;
                         entry.Key = default;
                         entry.Value = default;
-
                         // Release the lock
                         entry.Exit();
+                        // _counter.Decrement() uses a Interlocked.Decrement() which provides a full memory fence, meaning they ensure all preceding memory writes are completed and visible to other threads before the Interlocked operation completes.
+                        // This means that when you perform an Interlocked operation, it guarantees that any changes made to other variables(not just the variable involved in the Interlocked operation) are also visible to other threads.
+                        // Note this also means we dont need any explicit memorybarriers.
+                        // This code, using Interlocked operations, will also work correctly on ARM architectures without needing additional explicit memory barriers.The memory ordering and visibility are managed by the Interlocked methods.
                         _counter.Decrement();
                         return true;
                     }
-
                     // Release the lock
                     entry.Exit();
                     value = default;
                     return false;
                 }
-
                 // If the entry indicates an empty bucket, the key does not exist in the table
                 if (_emptyBucket == entry.Meta)
                 {
                     value = default;
                     return false;
                 }
-
                 // If the entry indicates a resize operation, perform the resize
-                if (entry.Meta == _resizeBucket || entry.Meta == _groupResized)
+                if (entry.Meta == _resizeBucket)
                 {
                     Resize(table); // Resize the table
                     jumpDistance = 0; // Reset the jump distance
@@ -586,7 +583,7 @@ namespace Faster.Map.Concurrent
         /// Console.WriteLine("Map cleared.");
         /// </code>
         public void Clear()
-        {        
+        {
             Interlocked.Exchange(ref _table, new Table(_table.Length));
             Interlocked.Exchange(ref _counter, new Counter());
         }
@@ -630,6 +627,7 @@ namespace Faster.Map.Concurrent
 
         /// <summary>
         /// Resizes the hash table to accommodate more entries. Ensures thread safety during the resize operation.
+        /// Note. Will only allocate once while resizing.
         /// </summary>
         /// <param name="table">The current table to resize.</param>
         internal void Resize(Table table)
@@ -639,10 +637,8 @@ namespace Faster.Map.Concurrent
             {
                 return;
             }
-
             // Calculate the log base 2 of the table length to find the power of two index
             var index = BitOperations.Log2(table.Length);
-
             // Check if the resize has already been initiated for this size
             if (_powersOfTwo[index] > 0)
             {
@@ -651,7 +647,6 @@ namespace Faster.Map.Concurrent
                 {
                     // Create a new migration table with double the current table's length
                     var migrationTable = new Table(table.Length << 1);
-
                     // Atomically update the migration table reference
                     Interlocked.Exchange(ref _migrationTable, migrationTable);
 #if DEBUG            
@@ -659,19 +654,15 @@ namespace Faster.Map.Concurrent
 #endif
                 }
             }
-
             // Retrieve the current migration table reference
             var ctable = _migrationTable;
-
             // Ensure the migration table is not null and has a different length from the current table
             if (ctable == null || table.Length == ctable.Length)
             {
                 return;
             }
-
             // Migrate the entries from the current table to the migration table
             table.Migrate(ctable);
-
             // Check if the migration is complete
             if (table._depletedCounter == table._depleted)
             {
@@ -732,7 +723,6 @@ namespace Faster.Map.Concurrent
             public void Enter()
             {
                 int spinCount = 1; // Initialize spin count for exponential backoff
-
                 while (true)
                 {
                     // Attempt to acquire the lock by setting the state to 1 if it is currently 0
@@ -740,10 +730,8 @@ namespace Faster.Map.Concurrent
                     {
                         return; // Lock acquired successfully, exit the method
                     }
-
                     // Perform a spin wait to allow other threads to progress
                     Thread.SpinWait(spinCount);
-
                     // Increment the spin count exponentially, but cap it to prevent excessive delays
                     if (spinCount < 1024)
                     {
@@ -943,48 +931,39 @@ namespace Faster.Map.Concurrent
                             // Another thread has claimed this group, exit to retry another group
                             return;
                         }
-
                         // If the entry is valid having an meta > 1 migrate it to the new table
                         if (result > -1)
                         {
                             mTable.EmplaceInternal(ref entry, result);
                         }
-
                         // Move to the next entry in the group
                         ++index;
-
                         // Process all entries in the group
                         do
                         {
                             entry = ref Find(Entries, index);
                             meta = entry.Meta;
-
                             // Skip entries that are in progress
                             if (meta == _claimed)
                             {
                                 // Note we arent actually increasing the index, we just retry
                                 continue;
                             }
-
                             // Atomically mark the entry as being resized
                             result = Interlocked.CompareExchange(ref entry.Meta, _resizeBucket, meta);
-
                             // If the entry is valid and the compare-and-swap succeeded, migrate the entry
                             if (result == meta && result > -1)
                             {
                                 mTable.EmplaceInternal(ref entry, result);
                             }
-
                             // If the compare-and-swap failed, retry the current entry
                             if (result != meta)
                             {
                                 continue;
                             }
-
                             // Move to the next entry in the group
                             ++index;
                         } while (index < end);
-
                         // Increment the depleted counter once the entire group is processed
                         Interlocked.Increment(ref _depletedCounter);
                     }
@@ -1008,7 +987,6 @@ namespace Faster.Map.Concurrent
                 {
                     // Retrieve the location in the table at the calculated index
                     ref var location = ref Find(Entries, index);
-
                     // Check if the bucket is empty and try to claim it
                     if (location.Meta == _emptyBucket && _emptyBucket == Interlocked.CompareExchange(ref location.Meta, meta, _emptyBucket))
                     {
