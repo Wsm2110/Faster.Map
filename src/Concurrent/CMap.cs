@@ -175,7 +175,7 @@ namespace Faster.Map.Concurrent
             start:
             byte jumpDistance = 0; // Initialize jump distance for quadratic probing
             var table = _table; // Get the current table
-            var index = table.GetBucket(hashcode); // Calculate initial bucket index
+            var index = table.GetIndex(hashcode); // Calculate initial bucket index
 
             do
             {
@@ -247,7 +247,7 @@ namespace Faster.Map.Concurrent
             var hashcode = key.GetHashCode();
             var h2 = _table.H2(hashcode);
             var table = _table;
-            var index = table.GetBucket(hashcode);
+            var index = table.GetIndex(hashcode);
             byte jumpDistance = 0;
 
             do
@@ -297,7 +297,7 @@ namespace Faster.Map.Concurrent
 
             start:
             var table = _table;
-            var index = table.GetBucket(hashcode);
+            var index = table.GetIndex(hashcode);
 
             do
             {
@@ -370,7 +370,7 @@ namespace Faster.Map.Concurrent
             start:
 
             var table = _table;
-            var index = table.GetBucket(hashcode);
+            var index = table.GetIndex(hashcode);
 
             do
             {
@@ -438,7 +438,7 @@ namespace Faster.Map.Concurrent
             start:
 
             var table = _table;
-            var index = table.GetBucket(hashcode);
+            var index = table.GetIndex(hashcode);
 
             do
             {
@@ -518,7 +518,7 @@ namespace Faster.Map.Concurrent
             start:
 
             var table = _table; // Get the current state of the table
-            var index = table.GetBucket(hashcode); // Calculate the initial bucket index
+            var index = table.GetIndex(hashcode); // Calculate the initial bucket index
 
             do
             {
@@ -907,7 +907,7 @@ namespace Faster.Map.Concurrent
             /// <param name="hashcode">The hash code of the key.</param>
             /// <returns>The bucket index.</returns>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            internal uint GetBucket(int hashcode) => _goldenRatio * (uint)hashcode >> _shift;
+            internal uint GetIndex(int hashcode) => _goldenRatio * (uint)hashcode >> _shift;
 
             /// <summary>
             /// Migrates entries from the current table to the specified table.
@@ -1002,7 +1002,7 @@ namespace Faster.Map.Concurrent
             {
                 byte jumpDistance = 0; // Initialize jump distance for quadratic probing
                 var hashcode = entry.Key.GetHashCode(); // Calculate the hashcode of the key
-                var index = GetBucket(hashcode); // Calculate the initial bucket index using the hashcode
+                var index = GetIndex(hashcode); // Calculate the initial bucket index using the hashcode
 
                 do
                 {
