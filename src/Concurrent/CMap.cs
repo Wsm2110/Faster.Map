@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) 2024, Wiljan Ruizendaal. All rights reserved. <wruizendaal@gmail.com> 
+// Distributed under the MIT Software License, Version 1.0.
+
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Numerics;
@@ -916,11 +919,9 @@ namespace Faster.Map.Concurrent
                     uint groupIndex = Interlocked.Increment(ref _groupIndex) & _groupsMinusOne;
                     uint index = groupIndex * _groupSize;
                     uint end = index + _groupSize;
-
                     // Find the first entry in the group
                     ref var entry = ref Find(Entries, index);
                     var meta = entry.Meta;
-
                     // Check if the group has already been resized
                     if (entry.Meta != _groupResized)
                     {

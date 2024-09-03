@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) 2024, Wiljan Ruizendaal. All rights reserved. <wruizendaal@gmail.com> 
+// Distributed under the MIT Software License, Version 1.0.
+
+using System;
 using System.IO.Hashing;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;

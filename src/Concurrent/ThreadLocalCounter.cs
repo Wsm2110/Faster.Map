@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) 2024, Wiljan Ruizendaal. All rights reserved. <wruizendaal@gmail.com> 
+// Distributed under the MIT Software License, Version 1.0.
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -10,7 +13,6 @@ namespace Faster.Map.Concurrent
     internal class ThreadLocalCounter
     {
         private ThreadLocal<Cell> threadLocalCell;
-
 
         public ThreadLocalCounter()
         {
