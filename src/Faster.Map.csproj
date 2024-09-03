@@ -12,10 +12,10 @@
      Moving on to .NET 90, introducing CMAP which is a concurrent hashmap
     </PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/Wsm2110/Faster.Map</PackageProjectUrl>
-    <AssemblyVersion>6.0.1</AssemblyVersion>
-    <FileVersion>6.0.1</FileVersion>
+    <AssemblyVersion>6.0.2</AssemblyVersion>
+    <FileVersion>6.0.2</FileVersion>
     <Title>Fastest .net hashmap</Title>
-    <Version>6.0.1</Version>
+    <Version>6.0.2</Version>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Description>
       Incredibly fast (concurrent) hashmap

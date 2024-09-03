@@ -8,877 +8,817 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 
-namespace Faster.Map.DenseMap
+namespace Faster.Map;
+
+/// <summary>
+/// DenseMap is a high-performance hashmap implementation that uses open-addressing with quadratic probing and SIMD (Single Instruction, Multiple Data) for parallel searches.
+/// This map is designed for scenarios requiring efficient key-value storage with fast lookups, inserts, and deletions.
+/// 
+/// Key features:
+/// - Open addressing with quadratic probing for collision resolution.
+/// - SIMD-based parallel searches for performance optimization.
+/// - High load factor (default is 0.9) while maintaining speed.
+/// - Fibonacci hashing for better hash distribution.
+/// - Tombstones to avoid backshifts during deletions.
+///
+/// Example usage:
+/// <code>
+/// var map = new DenseMap<int, string>();
+/// map.Emplace(1, "One");
+/// map.Emplace(2, "Two");
+/// map.Emplace(3, "Three");
+///
+/// if (map.Get(2, out var value))
+/// {
+///     Console.WriteLine($"Key 2 has value: {value}");
+/// }
+///
+/// map.Update(3, "Three Updated");
+/// map.Remove(1);
+/// </code>
+/// </summary>
+/// <typeparam name="TKey">The type of keys in the map. Must be non-nullable.</typeparam>
+/// <typeparam name="TValue">The type of values in the map.</typeparam>
+public class DenseMap<TKey, TValue>
 {
+    #region Properties
+
     /// <summary>
-    /// This hashmap uses the following
-    /// - open-addressing
-    /// - Quadratic probing 
-    /// - Loadfactor by default is 0.9 while maintaining an incredible speed
-    /// - Fibonacci hashing
-    /// - Searches in parallel using SIMD
-    /// - First-come-first-serve collision resolution    
-    /// - Tombstones to avoid backshifts
+    /// Gets or sets how many elements are stored in the map.
+    /// Example:
+    /// <code>
+    /// var map = new DenseMap<int, string>();
+    /// int count = map.Count; // count should be 0 initially
+    /// </code>
     /// </summary>
-    public class DenseMap<TKey, TValue>
+    public int Count { get; private set; }
+
+    /// <summary>
+    /// Gets the size of the map.
+    /// Example:
+    /// <code>
+    /// var map = new DenseMap<int, string>();
+    /// uint size = map.Size; // size will reflect the internal array size
+    /// </code>
+    /// </summary>
+    public uint Size => (uint)_entries.Length;
+
+    /// <summary>
+    /// Returns all the entries as KeyValuePair objects.
+    /// Example:
+    /// <code>
+    /// var map = new DenseMap<int, string>();
+    /// map.Emplace(1, "One");
+    /// foreach (var entry in map.Entries)
+    /// {
+    ///     Console.WriteLine($"{entry.Key}: {entry.Value}");
+    /// }
+    /// </code>
+    /// </summary>
+    public IEnumerable<KeyValuePair<TKey, TValue>> Entries
     {
-        #region Properties
-
-        /// <summary>
-        /// Gets or sets how many elements are stored in the map
-        /// </summary>
-        /// <value>
-        /// The entry count.
-        /// </value>
-        public int Count { get; private set; }
-
-        /// <summary>
-        /// Gets the size of the map
-        /// </summary>
-        /// <value>
-        /// The size.
-        /// </value>
-        public uint Size => (uint)_entries.Length;
-
-        /// <summary>
-        /// Returns all the entries as KeyValuePair objects
-        /// </summary>
-        /// <value>
-        /// The entries.
-        /// </value>
-        public IEnumerable<KeyValuePair<TKey, TValue>> Entries
+        get
         {
-            get
+            for (int i = _metadata.Length - 1; i >= 0; --i)
             {
-                //iterate backwards so we can remove the item
-                for (int i = _metadata.Length - 1; i >= 0; --i)
+                if (_metadata[i] >= 0)
                 {
-                    if (_metadata[i] >= 0)
-                    {
-                        var entry = _entries[i];
-                        yield return new KeyValuePair<TKey, TValue>(entry.Key, entry.Value);
-                    }
+                    var entry = _entries[i];
+                    yield return new KeyValuePair<TKey, TValue>(entry.Key, entry.Value);
                 }
             }
         }
+    }
 
-        /// <summary>
-        /// Returns all keys
-        /// </summary>
-        /// <value>
-        /// The keys.
-        /// </value>
-        public IEnumerable<TKey> Keys
+    /// <summary>
+    /// Returns all keys in the map.
+    /// Example:
+    /// <code>
+    /// var map = new DenseMap<int, string>();
+    /// map.Emplace(1, "One");
+    /// foreach (var key in map.Keys)
+    /// {
+    ///     Console.WriteLine(key);
+    /// }
+    /// </code>
+    /// </summary>
+    public IEnumerable<TKey> Keys
+    {
+        get
         {
-            get
+            for (int i = _metadata.Length - 1; i >= 0; --i)
             {
-                //iterate backwards so we can remove the jumpDistanceIndex item
-                for (int i = _metadata.Length - 1; i >= 0; --i)
+                if (_metadata[i] >= 0)
                 {
-                    if (_metadata[i] >= 0)
-                    {
-                        yield return _entries[i].Key;
-                    }
+                    yield return _entries[i].Key;
                 }
             }
         }
+    }
 
-        /// <summary>
-        /// Returns all Values
-        /// </summary>
-        /// <value>
-        /// The keys.
-        /// </value>
-        public IEnumerable<TValue> Values
+    /// <summary>
+    /// Returns all values in the map.
+    /// Example:
+    /// <code>
+    /// var map = new DenseMap<int, string>();
+    /// map.Emplace(1, "One");
+    /// foreach (var value in map.Values)
+    /// {
+    ///     Console.WriteLine(value);
+    /// }
+    /// </code>
+    /// </summary>
+    public IEnumerable<TValue> Values
+    {
+        get
         {
-            get
+            for (int i = _metadata.Length - 1; i >= 0; --i)
             {
-                for (int i = _metadata.Length - 1; i >= 0; --i)
+                if (_metadata[i] >= 0)
                 {
-                    if (_metadata[i] >= 0)
-                    {
-                        yield return _entries[i].Value;
-                    }
+                    yield return _entries[i].Value;
                 }
             }
         }
+    }
 
-        #endregion
+    #endregion
 
-        #region Fields
+    #region Fields
 
-        private const sbyte _emptyBucket = -127;
-        private const sbyte _tombstone = -126;
-        private static readonly Vector128<sbyte> _emptyBucketVector = Vector128.Create(_emptyBucket);
-        private sbyte[] _metadata;
-        private Entry[] _entries;
-        private const uint _goldenRatio = 0x9E3779B9; //2654435769;
-        private uint _length;
-        private byte _shift = 32;
-        private double _maxLookupsBeforeResize;
-        private uint _lengthMinusOne;
-        private readonly double _loadFactor;
-        private readonly IEqualityComparer<TKey> _comparer;
+    private const sbyte _emptyBucket = -127;
+    private const sbyte _tombstone = -126;
+    private static readonly Vector128<sbyte> _emptyBucketVector = Vector128.Create(_emptyBucket);
+    private sbyte[] _metadata;
+    private Entry[] _entries;
+    private const uint _goldenRatio = 0x9E3779B9; // 2654435769;
+    private uint _length;
+    private byte _shift = 32;
+    private double _maxLookupsBeforeResize;
+    private uint _lengthMinusOne;
+    private readonly double _loadFactor;
+    private readonly IEqualityComparer<TKey> _comparer;
 
-        #endregion
+    #endregion
 
-        #region Constructor
+    #region Constructor
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class.
-        /// </summary>
-        public DenseMap() : this(16, 0.90, EqualityComparer<TKey>.Default) { }
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class with default parameters.
+    /// Example:
+    /// <code>
+    /// var map = new DenseMap<int, string>();
+    /// </code>
+    /// </summary>
+    public DenseMap() : this(16, 0.90, EqualityComparer<TKey>.Default) { }
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class.
-        /// </summary>
-        /// <param name="length">The length of the hashmap. Will always take the closest power of two</param>
-        /// <param name="loadFactor">The loadfactor determines when the hashmap will resize(default is 0.9d)</param>
-        public DenseMap(uint length) : this(length, 0.90, EqualityComparer<TKey>.Default) { }
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class with the specified length and default load factor.
+    /// Example:
+    /// <code>
+    /// var map = new DenseMap<int, string>(32);
+    /// </code>
+    /// </summary>
+    /// <param name="length">The length of the hashmap. Will always take the closest power of two.</param>
+    public DenseMap(uint length) : this(length, 0.90, EqualityComparer<TKey>.Default) { }
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class.
-        /// </summary>
-        /// <param name="length">The length of the hashmap. Will always take the closest power of two</param>
-        /// <param name="loadFactor">The loadfactor determines when the hashmap will resize(default is 0.9d)</param>
-        public DenseMap(uint length, double loadFactor) : this(length, loadFactor, EqualityComparer<TKey>.Default) { }
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class with the specified length and load factor.
+    /// Example:
+    /// <code>
+    /// var map = new DenseMap<int, string>(32, 0.8);
+    /// </code>
+    /// </summary>
+    /// <param name="length">The length of the hashmap. Will always take the closest power of two.</param>
+    /// <param name="loadFactor">The load factor determines when the hashmap will resize (default is 0.9).</param>
+    public DenseMap(uint length, double loadFactor) : this(length, loadFactor, EqualityComparer<TKey>.Default) { }
 
-        /// <summary>
-        /// Initializes a new instance of class.
-        /// </summary>
-        /// <param name="length">The length of the hashmap. Will always take the closest power of two</param>
-        /// <param name="loadFactor">The loadfactor determines when the hashmap will resize(default is 0.9d)</param>
-        /// <param name="keyComparer">Used to compare keys to resolve hashcollisions</param>
-        public DenseMap(uint length, double loadFactor, IEqualityComparer<TKey> keyComparer)
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class with the specified parameters.
+    /// Example:
+    /// <code>
+    /// var map = new DenseMap<int, string>(32, 0.8, EqualityComparer<int>.Default);
+    /// </code>
+    /// </summary>
+    /// <param name="length">The length of the hashmap. Will always take the closest power of two.</param>
+    /// <param name="loadFactor">The load factor determines when the hashmap will resize.</param>
+    /// <param name="keyComparer">Used to compare keys to resolve hash collisions.</param>
+    public DenseMap(uint length, double loadFactor, IEqualityComparer<TKey> keyComparer)
+    {
+        if (!Vector128.IsHardwareAccelerated)
         {
-            if (!Vector128.IsHardwareAccelerated)
-            {
-                throw new NotSupportedException("Your hardware does not support acceleration for 128 bit vectors");
-            }
+            throw new NotSupportedException("Your hardware does not support acceleration for 128-bit vectors.");
+        }
 
-            //default length is 16
+        _length = length;
+        _loadFactor = loadFactor;
+
+        if (loadFactor > 0.9)
+        {
+            _loadFactor = 0.9;
+        }
+
+        if (_length < 16)
+        {
+            _length = 16;
+        }
+        else if (BitOperations.IsPow2(_length))
+        {
             _length = length;
-            _loadFactor = loadFactor;
-
-            if (loadFactor > 0.9)
-            {
-                _loadFactor = 0.9;
-            }
-
-            if (_length < 16)
-            {
-                _length = 16;
-            }
-            else if (BitOperations.IsPow2(_length))
-            {
-                _length = length;
-            }
-            else
-            {
-                _length = BitOperations.RoundUpToPowerOf2(_length);
-            }
-
-            _maxLookupsBeforeResize = (uint)(_length * _loadFactor);
-            _comparer = keyComparer ?? EqualityComparer<TKey>.Default;
-            _shift = (byte)(_shift - BitOperations.Log2(_length));
-            _entries = new Entry[_length + 16];
-            _metadata = new sbyte[_length + 16];
-
-            //fill metadata with emptybucket info
-            Array.Fill(_metadata, _emptyBucket);
-
-            _lengthMinusOne = _length - 1;
+        }
+        else
+        {
+            _length = BitOperations.RoundUpToPowerOf2(_length);
         }
 
-        #endregion
+        _maxLookupsBeforeResize = (uint)(_length * _loadFactor);
+        _comparer = keyComparer ?? EqualityComparer<TKey>.Default;
+        _shift = (byte)(_shift - BitOperations.Log2(_length));
+        _entries = new Entry[_length + 16];
+        _metadata = new sbyte[_length + 16];
 
-        #region Public Methods
+        Array.Fill(_metadata, _emptyBucket);
+        _lengthMinusOne = _length - 1;
+    }
 
-        /// <summary>
-        /// 
-        /// Inserts a key and value in the hashmap
-        ///
-        /// </summary>
-        /// <param name="key">The key.</param>
-        /// <param name="value">The value.</param>
-        /// <returns>returns false if key already exists</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Emplace(TKey key, TValue value)
+    #endregion
+
+    #region Public Methods
+
+    /// <summary>
+    /// Inserts a key and value into the hashmap.
+    /// Example:
+    /// <code>
+    /// var map = new DenseMap<int, string>();
+    /// bool success = map.Emplace(1, "One");
+    /// </code>
+    /// </summary>
+    /// <param name="key">The key.</param>
+    /// <param name="value">The value.</param>
+    /// <returns>Returns false if the key already exists.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool Emplace(TKey key, TValue value)
+    {
+        if (Count >= _maxLookupsBeforeResize)
         {
-            //Resize if loadfactor is reached
-            if (Count >= _maxLookupsBeforeResize)
-            {
-                Resize();
-            }
-
-            // Get object identity hashcode
-            var hashcode = (uint)key.GetHashCode();
-            // GEt 7 low bits
-            var h2 = H2(hashcode);
-            //Create vector of the 7 low bits
-            var target = Vector128.Create(Unsafe.As<uint, sbyte>(ref h2));
-            // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
-            uint index = (_goldenRatio * hashcode) >> _shift;
-            //Set initial jumpdistance index
-            uint jumpDistance = 0;
-
-            while (true)
-            {
-                //Load vector @ index
-                var source = Vector128.LoadUnsafe(ref Find(_metadata, index));
-                //Get a bit sequence for matched hashcodes (h2s)
-                var mask = Vector128.Equals(source, target).ExtractMostSignificantBits();
-                //Check if key is unique
-                while (mask != 0)
-                {
-                    var bitPos = BitOperations.TrailingZeroCount(mask);
-                    var entry = Find(_entries, index + Unsafe.As<int, uint>(ref bitPos));
-
-                    if (_comparer.Equals(entry.Key, key))
-                    {
-                        //duplicate key found
-                        return false;
-                    }
-
-                    //clear bit
-                    mask = ResetLowestSetBit(mask);
-                }
-
-                mask = source.ExtractMostSignificantBits();
-                //check for tombstones and empty entries 
-                if (mask != 0)
-                {
-                    var BitPos = BitOperations.TrailingZeroCount(mask);
-                    //calculate proper index
-                    index += Unsafe.As<int, uint>(ref BitPos);
-
-                    Find(_metadata, index) = Unsafe.As<uint, sbyte>(ref h2);
-
-                    //retrieve entry
-                    ref var currentEntry = ref Find(_entries, index);
-
-                    //set key and value
-                    currentEntry.Key = key;
-                    currentEntry.Value = value;
-
-                    ++Count;
-                    return true;
-                }
-
-                //Probing is done by incrementing the currentEntry bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
-                //So first we jump by 1 group (meaning we just continue our linear scan), then 2 groups (skipping over 1 group), then 3 groups (skipping over 2 groups), and so on.
-                //Interestingly, this pattern perfectly lines up with our power-of-two size such that we will visit every single bucket exactly once without any repeats(searching is therefore guaranteed to terminate as we always have at least one EMPTY bucket).
-                //Also note that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
-                //Also note that we expect to almost never actually probe, since that’s WIDTH(16) non-EMPTY buckets we need to fail to find our key in.
-                jumpDistance += 16;
-                index += jumpDistance;
-                index = index & _length - 1;
-            }
+            Resize();
         }
 
-        /// <summary>
-        /// 
-        /// Tries to emplace a key-value pair into the map
-        ///
-        /// If the map already contains this key, update the existing KeyValuePair
-        ///
-        /// * Example *
-        ///
-        /// var map = new DenseMapSIMD<uint, uint>(16, 0.5);
-        ///
-        /// map.AddOrUpdate(1, 50);
-        /// map.AddOrUpdate(1, 60);
-        ///
-        /// var result = map.Get(1, out var result)
-        ///
-        /// Assert.AreEqual(60U, result)
-        /// 
-        /// </summary>
-        /// <param name="key">The key.</param>
-        /// <param name="value">The value.</param>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddOrUpdate(TKey key, TValue value)
+        var hashcode = (uint)key.GetHashCode();
+        var h2 = H2(hashcode);
+        var target = Vector128.Create(Unsafe.As<uint, sbyte>(ref h2));
+        uint index = (_goldenRatio * hashcode) >> _shift;
+        uint jumpDistance = 0;
+
+        while (true)
         {
-            //Resize if loadfactor is reached
-            if (Count > _maxLookupsBeforeResize)
-            {
-                Resize();
-            }
+            var source = Vector128.LoadUnsafe(ref Find(_metadata, index));
+            var mask = Vector128.Equals(source, target).ExtractMostSignificantBits();
 
-            var hashcode = (uint)key.GetHashCode();
-            // GEt 7 low bits
-            var h2 = H2(hashcode);
-            //Create vector of the 7 low bits
-            var target = Vector128.Create(Unsafe.As<uint, sbyte>(ref h2));
-            // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
-            uint index = (_goldenRatio * hashcode) >> _shift;
-            //Set initial jumpdistance index
-            uint jumpDistance = 0;
-
-            while (true)
+            while (mask != 0)
             {
-                //load vector @ index
-                var source = Vector128.LoadUnsafe(ref Find(_metadata, index));
-                //get a bit sequence for matched hashcodes (h2s)
-                var mask = Vector128.Equals(target, source).ExtractMostSignificantBits();
-                //Check if key is unique
-                while (mask != 0)
+                var bitPos = BitOperations.TrailingZeroCount(mask);
+                var entry = Find(_entries, index + Unsafe.As<int, uint>(ref bitPos));
+
+                if (_comparer.Equals(entry.Key, key))
                 {
-                    var bitPos = BitOperations.TrailingZeroCount(mask);
-                    ref var entry = ref Find(_entries, index + Unsafe.As<int, uint>(ref bitPos));
-
-                    if (_comparer.Equals(entry.Key, key))
-                    {
-                        //Key found, update existing key
-                        entry.Value = value;
-                        return;
-                    }
-
-                    //clear bit
-                    mask = ResetLowestSetBit(mask);
+                    return false;
                 }
 
-                mask = source.ExtractMostSignificantBits();
-                //check for tombstones and empty entries 
-                if (mask > 0)
+                mask = ResetLowestSetBit(mask);
+            }
+
+            mask = source.ExtractMostSignificantBits();
+
+            if (mask != 0)
+            {
+                var bitPos = BitOperations.TrailingZeroCount(mask);
+                index += Unsafe.As<int, uint>(ref bitPos);
+
+                Find(_metadata, index) = Unsafe.As<uint, sbyte>(ref h2);
+
+                ref var currentEntry = ref Find(_entries, index);
+                currentEntry.Key = key;
+                currentEntry.Value = value;
+
+                ++Count;
+                return true;
+            }
+
+            jumpDistance += 16;
+            index += jumpDistance;
+            index &= _length - 1;
+        }
+    }
+
+    /// <summary>
+    /// Tries to emplace a key-value pair into the map. If the map already contains this key, updates the existing KeyValuePair.
+    /// Example:
+    /// <code>
+    /// var map = new DenseMap<int, string>();
+    /// map.AddOrUpdate(1, "One");
+    /// map.AddOrUpdate(1, "One Updated");
+    /// </code>
+    /// </summary>
+    /// <param name="key">The key.</param>
+    /// <param name="value">The value.</param>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void AddOrUpdate(TKey key, TValue value)
+    {
+        if (Count > _maxLookupsBeforeResize)
+        {
+            Resize();
+        }
+
+        var hashcode = (uint)key.GetHashCode();
+        var h2 = H2(hashcode);
+        var target = Vector128.Create(Unsafe.As<uint, sbyte>(ref h2));
+        uint index = (_goldenRatio * hashcode) >> _shift;
+        uint jumpDistance = 0;
+
+        while (true)
+        {
+            var source = Vector128.LoadUnsafe(ref Find(_metadata, index));
+            var mask = Vector128.Equals(target, source).ExtractMostSignificantBits();
+
+            while (mask != 0)
+            {
+                var bitPos = BitOperations.TrailingZeroCount(mask);
+                ref var entry = ref Find(_entries, index + Unsafe.As<int, uint>(ref bitPos));
+
+                if (_comparer.Equals(entry.Key, key))
                 {
-                    var bitPos = BitOperations.TrailingZeroCount(mask);
-                    //calculate proper index
-                    index += Unsafe.As<int, uint>(ref bitPos);
-
-                    //retrieve entry
-                    ref var currentEntry = ref Find(_entries, index);
-
-                    //set key and value
-                    currentEntry.Key = key;
-                    currentEntry.Value = value;
-
-                    ref var metadata = ref Find(_metadata, index);
-
-                    // add h2 to metadata
-                    metadata = Unsafe.As<uint, sbyte>(ref h2);
-
-                    ++Count;
+                    entry.Value = value;
                     return;
                 }
 
-                //Probing is done by incrementing the currentEntry bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
-                //So first we jump by 1 group (meaning we just continue our linear scan), then 2 groups (skipping over 1 group), then 3 groups (skipping over 2 groups), and so on.
-                //Interestingly, this pattern perfectly lines up with our power-of-two size such that we will visit every single bucket exactly once without any repeats(searching is therefore guaranteed to terminate as we always have at least one EMPTY bucket).
-                //Also note that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
-                //Also note that we expect to almost never actually probe, since that’s WIDTH(16) non-EMPTY buckets we need to fail to find our key in.
-                jumpDistance += 16;
-                index += jumpDistance;
-                index = index & _length - 1;
-            }
-        }
-
-        /// <summary>
-        /// Tries to find the key in the map
-        /// </summary>
-        /// <param name="key">The key.</param>
-        /// <param name="value">The value.</param>
-        /// <returns>Returns false if the key is not found</returns>       
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Get(TKey key, out TValue value)
-        {
-            var hashcode = (uint)key.GetHashCode();
-            // Get 7 low bits
-            var h2 = H2(hashcode);
-            // Create vector of the 7 low bits
-            var target = Vector128.Create(Unsafe.As<uint, sbyte>(ref h2));
-            // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
-            uint index = (_goldenRatio * hashcode) >> _shift;
-            // Set initial jumpdistance index
-            uint jumpDistance = 0;
-
-            while (true)
-            {
-                //load vector @ index
-                var source = Vector128.LoadUnsafe(ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(_metadata), index));
-                //get a bit sequence for matched hashcodes (h2s)
-                var mask = Vector128.Equals(target, source).ExtractMostSignificantBits();
-                //Could be multiple bits which are set
-                while (mask > 0)
-                {
-                    //Retrieve offset 
-                    var bitPos = BitOperations.TrailingZeroCount(mask);
-                    //Get index and eq
-                    var entry = Find(_entries, index + Unsafe.As<int, byte>(ref bitPos));
-                    //Use EqualityComparer to find proper entry
-                    if (_comparer.Equals(entry.Key, key))
-                    {
-                        value = entry.Value;
-                        return true;
-                    }
-
-                    //clear bit
-                    mask = ResetLowestSetBit(mask);
-                }
-
-                //Contains empty buckets    
-                if (Vector128.Equals(source, _emptyBucketVector).ExtractMostSignificantBits() > 0)
-                {
-                    value = default;
-                    return false;
-                }
-
-                //Probing is done by incrementing the currentEntry bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
-                //So first we jump by 1 group (meaning we just continue our linear scan), then 2 groups (skipping over 1 group), then 3 groups (skipping over 2 groups), and so on.
-                //Interestingly, this pattern perfectly lines up with our power-of-two size such that we will visit every single bucket exactly once without any repeats(searching is therefore guaranteed to terminate as we always have at least one EMPTY bucket).
-                //Also note that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
-                //Also note that we expect to almost never actually probe, since that’s WIDTH(16) non-EMPTY buckets we need to fail to find our key in.
-                jumpDistance += 16;
-                index += jumpDistance;
-                index = index & _lengthMinusOne;
-            }
-        }
-
-        /// <summary>
-        /// Gets the value for the specified key, or, if the key is not present,
-        /// adds an entry and returns the value by ref. This makes it possible to
-        /// add or update a value in a single look up operation.
-        ///
-        /// Will only use one lookup instead of two
-        ///
-        /// * Example *
-        ///
-        /// var counterMap = new DenseMapSIMD<uint, uint>(16, 0.5);
-        /// ref var counter = ref counterMap.GetOrAddValueRef(1);
-        ///
-        /// ++counter;
-        /// 
-        /// </summary>
-        /// <param name="key">Key to look for</param>
-        /// <returns>Reference to the new or existing value</returns>    
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref TValue GetOrUpdate(TKey key)
-        {
-            //Resize if loadfactor is reached
-            if (Count >= _maxLookupsBeforeResize)
-            {
-                Resize();
+                mask = ResetLowestSetBit(mask);
             }
 
-            // Get object identity hashcode
-            var hashcode = (uint)key.GetHashCode();
-            // GEt 7 low bits
-            var h2 = H2(hashcode);
-            //Create vector of the 7 low bits
-            var target = Vector128.Create(Unsafe.As<uint, sbyte>(ref h2));
-            // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
-            uint index = (_goldenRatio * hashcode) >> _shift;
-            uint jumpDistance = 0;
+            mask = source.ExtractMostSignificantBits();
 
-            while (true)
+            if (mask > 0)
             {
-                //load vector @ index
-                var source = Vector128.LoadUnsafe(ref Find(_metadata, index));
-                //get a bit sequence for matched hashcodes (h2s)
-                var mask = Vector128.Equals(target, source).ExtractMostSignificantBits();
-                //Could be multiple bits which are set
-                while (mask != 0)
-                {
-                    //Retrieve offset 
-                    var bitPos = BitOperations.TrailingZeroCount(mask);
+                var bitPos = BitOperations.TrailingZeroCount(mask);
+                index += Unsafe.As<int, uint>(ref bitPos);
 
-                    //Get index and eq
-                    ref var entry = ref Find(_entries, index + Unsafe.As<int, uint>(ref bitPos));
+                ref var currentEntry = ref Find(_entries, index);
+                currentEntry.Key = key;
+                currentEntry.Value = value;
 
-                    //Use EqualityComparer to find proper entry
-                    if (_comparer.Equals(entry.Key, key))
-                    {
-                        return ref entry.Value;
-                    }
+                ref var metadata = ref Find(_metadata, index);
+                metadata = Unsafe.As<uint, sbyte>(ref h2);
 
-                    //clear bit
-                    mask = ResetLowestSetBit(mask);
-                }
-
-                mask = source.ExtractMostSignificantBits();
-                //Empty entry, add key              
-                if (mask > 0)
-                {
-                    var bitPos = BitOperations.TrailingZeroCount(mask);
-                    //calculate proper index
-                    index += Unsafe.As<int, uint>(ref bitPos);
-
-                    //retrieve entry
-                    ref var currentEntry = ref Find(_entries, index);
-
-                    //set key and value
-                    currentEntry.Key = key;
-                    currentEntry.Value = default;
-
-                    ref var metadata = ref Find(_metadata, index);
-
-                    // add h2 to metadata
-                    metadata = Unsafe.As<uint, sbyte>(ref h2);
-
-                    ++Count;
-
-                    return ref currentEntry.Value;
-                }
-
-                //Probing is done by incrementing the currentEntry bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
-                //So first we jump by 1 group (meaning we just continue our linear scan), then 2 groups (skipping over 1 group), then 3 groups (skipping over 2 groups), and so on.
-                //Interestingly, this pattern perfectly lines up with our power-of-two size such that we will visit every single bucket exactly once without any repeats(searching is therefore guaranteed to terminate as we always have at least one EMPTY bucket).
-                //Also note that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
-                //Also note that we expect to almost never actually probe, since that’s WIDTH(16) non-EMPTY buckets we need to fail to find our key in.
-                jumpDistance += 16;
-                index += jumpDistance;
-                index = index & _lengthMinusOne;
-            }
-        }
-
-        /// <summary>
-        /// Tries to find the key in the map and updates the value
-        /// </summary>
-        /// <param name="key"></param>
-        /// <param name="value"></param>
-        /// <returns> returns if update succeeded or not</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Update(TKey key, TValue value)
-        {
-            // Get object identity hashcode
-            var hashcode = (uint)key.GetHashCode();
-            // GEt 7 low bits
-            var h2 = H2(hashcode);
-            //Create vector of the 7 low bits
-            var target = Vector128.Create(Unsafe.As<uint, sbyte>(ref h2));
-            // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
-            uint index = (_goldenRatio * hashcode) >> _shift;
-            //Set initial jumpdistance index
-            uint jumpDistance = 0;
-
-            while (true)
-            {
-                //load vector @ index
-                var source = Vector128.LoadUnsafe(ref Find(_metadata, index));
-
-                //get a bit sequence for matched hashcodes (h2s)
-                var mask = Vector128.Equals(source, target).ExtractMostSignificantBits();
-
-                //Could be multiple bits which are set
-                while (mask != 0)
-                {
-                    //retrieve offset 
-                    var bitPos = BitOperations.TrailingZeroCount(mask);
-
-                    //get index and eq
-                    ref var entry = ref Find(_entries, index + Unsafe.As<int, uint>(ref bitPos));
-
-                    if (_comparer.Equals(entry.Key, key))
-                    {
-                        entry.Value = value;
-                        return true;
-                    }
-
-                    //clear bit
-                    mask = ResetLowestSetBit(mask);
-                }
-
-                //get a bit sequence for matched empty buckets                
-                if (Vector128.Equals(_emptyBucketVector, source).ExtractMostSignificantBits() > 0)
-                {
-                    //contains empty buckets - break;
-                    return false;
-                }
-
-                //Probing is done by incrementing the currentEntry bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
-                //So first we jump by 1 group (meaning we just continue our linear scan), then 2 groups (skipping over 1 group), then 3 groups (skipping over 2 groups), and so on.
-                //Interestingly, this pattern perfectly lines up with our power-of-two size such that we will visit every single bucket exactly once without any repeats(searching is therefore guaranteed to terminate as we always have at least one EMPTY bucket).
-                //Also note that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
-                //Also note that we expect to almost never actually probe, since that’s WIDTH(16) non-EMPTY buckets we need to fail to find our key in.
-
-                jumpDistance += 16;
-                index += jumpDistance;
-                index = index & _length - 1;
+                ++Count;
+                return;
             }
 
+            jumpDistance += 16;
+            index += jumpDistance;
+            index &= _length - 1;
         }
+    }
 
-        /// <summary>
-        /// Removes a key and value from the map
-        /// </summary>
-        /// <param name="key"></param>
-        /// <returns> returns if the removal succeeded </returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Remove(TKey key)
+    /// <summary>
+    /// Tries to find the key in the map and returns the associated value.
+    /// Example:
+    /// <code>
+    /// var map = new DenseMap<int, string>();
+    /// map.Emplace(1, "One");
+    /// if (map.Get(1, out var value))
+    /// {
+    ///     Console.WriteLine(value); // Output: "One"
+    /// }
+    /// </code>
+    /// </summary>
+    /// <param name="key">The key.</param>
+    /// <param name="value">The value.</param>
+    /// <returns>Returns false if the key is not found.</returns>       
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool Get(TKey key, out TValue value)
+    {
+        var hashcode = (uint)key.GetHashCode();
+        var h2 = H2(hashcode);
+        var target = Vector128.Create(Unsafe.As<uint, sbyte>(ref h2));
+        uint index = (_goldenRatio * hashcode) >> _shift;
+        uint jumpDistance = 0;
+
+        while (true)
         {
-            // Get object identity hashcode
-            var hashcode = (uint)key.GetHashCode();
-            // GEt 7 low bits
-            var h2 = H2(hashcode);
-            //Create vector of the 7 low bits
-            var target = Vector128.Create(Unsafe.As<uint, sbyte>(ref h2));
-            // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
-            uint index = (_goldenRatio * hashcode) >> _shift;
-            //Set initial jumpdistance index
-            uint jumpDistance = 0;
+            var source = Vector128.LoadUnsafe(ref Find(_metadata, index));
+            var mask = Vector128.Equals(target, source).ExtractMostSignificantBits();
 
-            while (true)
+            while (mask != 0)
             {
-                //load vector @ index
-                var source = Vector128.LoadUnsafe(ref Find(_metadata, index));
-                //get a bit sequence for matched hashcodes (h2s)
-                var mask = Vector128.Equals(target, source).ExtractMostSignificantBits();
-                //Could be multiple bits which are set
-                while (mask != 0)
+                var bitPos = BitOperations.TrailingZeroCount(mask);
+                var entry = Find(_entries, index + Unsafe.As<int, byte>(ref bitPos));
+
+                if (_comparer.Equals(entry.Key, key))
                 {
-                    //retrieve offset 
-                    var bitPos = BitOperations.TrailingZeroCount(mask);
-
-                    if (_comparer.Equals(Find(_entries, index + Unsafe.As<int, uint>(ref bitPos)).Key, key))
-                    {
-                        Find(_metadata, index + Unsafe.As<int, uint>(ref bitPos)) = _tombstone;
-                        --Count;
-                        return true;
-                    }
-
-                    //clear bit
-                    mask = ResetLowestSetBit(mask);
+                    value = entry.Value;
+                    return true;
                 }
 
-                //find an empty spot, which means the key is not found             
-                if (Vector128.Equals(_emptyBucketVector, source).ExtractMostSignificantBits() != 0)
-                {
-                    //contains empty buckets - break;
-                    return false;
-                }
-
-                //Probing is done by incrementing the currentEntry bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
-                //So first we jump by 1 group (meaning we just continue our linear scan), then 2 groups (skipping over 1 group), then 3 groups (skipping over 2 groups), and so on.
-                //Interestingly, this pattern perfectly lines up with our power-of-two size such that we will visit every single bucket exactly once without any repeats(searching is therefore guaranteed to terminate as we always have at least one EMPTY bucket).
-                //Also note that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
-                //Also note that we expect to almost never actually probe, since that’s WIDTH(16) non-EMPTY buckets we need to fail to find our key in.
-                jumpDistance += 16;
-                index += jumpDistance;
-                index = index & _lengthMinusOne;
+                mask = ResetLowestSetBit(mask);
             }
-        }
 
-        /// <summary>
-        /// determines if hashmap contains key x
-        /// </summary>
-        /// <param name="key">The key.</param>
-        /// <returns> returns if a key is found </returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Contains(TKey key)
-        {
-            // Get object identity hashcode
-            var hashcode = (uint)key.GetHashCode();
-            // GEt 7 low bits
-            var h2 = H2(hashcode);
-            //Create vector of the 7 low bits
-            var target = Vector128.Create(Unsafe.As<uint, sbyte>(ref h2));
-            // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
-            uint index = (_goldenRatio * hashcode) >> _shift;
-            //Set initial jumpdistance index
-            uint jumpDistance = 0;
-
-            while (true)
+            if (Vector128.Equals(source, _emptyBucketVector).ExtractMostSignificantBits() > 0)
             {
-                //load vector @ index
-                var source = Vector128.LoadUnsafe(ref Find(_metadata, index));
-                //get a bit sequence for matched hashcodes (h2s)
-                var mask = Vector128.Equals(target, source).ExtractMostSignificantBits();
-                //Could be multiple bits which are set
-                while (mask != 0)
-                {
-                    //retrieve offset 
-                    var bitPos = BitOperations.TrailingZeroCount(mask);
-                    if (_comparer.Equals(Find(_entries, index + Unsafe.As<int, uint>(ref bitPos)).Key, key))
-                    {
-                        return true;
-                    }
-
-                    //clear bit
-                    mask = ResetLowestSetBit(mask);
-                }
-
-                if (Vector128.Equals(_emptyBucketVector, source).ExtractMostSignificantBits() != 0)
-                {
-                    //contains empty buckets - break;  
-                    return false;
-                }
-
-                //Probing is done by incrementing the currentEntry bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
-                //So first we jump by 1 group (meaning we just continue our linear scan), then 2 groups (skipping over 1 group), then 3 groups (skipping over 2 groups), and so on.
-                //Interestingly, this pattern perfectly lines up with our power-of-two size such that we will visit every single bucket exactly once without any repeats(searching is therefore guaranteed to terminate as we always have at least one EMPTY bucket).
-                //Also note that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
-                //Also note that we expect to almost never actually probe, since that’s WIDTH(16) non-EMPTY buckets we need to fail to find our key in.
-                jumpDistance += 16;
-                index += jumpDistance;
-                index = index & _lengthMinusOne;
+                value = default;
+                return false;
             }
+
+            jumpDistance += 16;
+            index += jumpDistance;
+            index &= _lengthMinusOne;
+        }
+    }
+
+    /// <summary>
+    /// Gets the value for the specified key, or, if the key is not present, adds an entry and returns the value by reference.
+    /// This allows you to add or update a value in a single lookup operation.
+    /// Example:
+    /// <code>
+    /// var map = new DenseMap<int, int>();
+    /// ref var value = ref map.GetOrUpdate(1);
+    /// value++;
+    /// Console.WriteLine(value); // Output: 1
+    /// </code>
+    /// </summary>
+    /// <param name="key">The key to look for.</param>
+    /// <returns>Reference to the new or existing value.</returns>    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public ref TValue GetOrUpdate(TKey key)
+    {
+        if (Count >= _maxLookupsBeforeResize)
+        {
+            Resize();
         }
 
-        /// <summary>
-        /// Copies entries from one map to another
-        /// </summary>
-        /// <param name="denseMap">The map.</param>
-        public void Copy(DenseMap<TKey, TValue> denseMap)
+        var hashcode = (uint)key.GetHashCode();
+        var h2 = H2(hashcode);
+        var target = Vector128.Create(Unsafe.As<uint, sbyte>(ref h2));
+        uint index = (_goldenRatio * hashcode) >> _shift;
+        uint jumpDistance = 0;
+
+        while (true)
         {
-            for (var i = 0; i < denseMap._entries.Length; ++i)
+            var source = Vector128.LoadUnsafe(ref Find(_metadata, index));
+            var mask = Vector128.Equals(target, source).ExtractMostSignificantBits();
+
+            while (mask != 0)
             {
-                if (denseMap._metadata[i] < 0)
+                var bitPos = BitOperations.TrailingZeroCount(mask);
+                ref var entry = ref Find(_entries, index + Unsafe.As<int, uint>(ref bitPos));
+
+                if (_comparer.Equals(entry.Key, key))
                 {
-                    continue;
+                    return ref entry.Value;
                 }
 
-                var entry = denseMap._entries[i];
-                Emplace(entry.Key, entry.Value);
+                mask = ResetLowestSetBit(mask);
             }
-        }
 
-        /// <summary>
-        /// Removes all entries from this map and sets the count to 0
-        /// </summary>
-        public void Clear()
-        {
-            Array.Clear(_entries);
-            Array.Fill(_metadata, _emptyBucket);
+            mask = source.ExtractMostSignificantBits();
 
-            Count = 0;
-        }
-
-        /// <summary>
-        /// Gets or sets the value by using a Tkey
-        /// </summary>
-        /// <value>
-        /// The 
-        /// </value>
-        /// <param name="key">The key.</param>
-        /// <returns></returns>
-        /// <exception cref="KeyNotFoundException">
-        /// Unable to find entry - {key.GetType().FullName} key - {key.GetHashCode()}
-        /// or
-        /// Unable to find entry - {key.GetType().FullName} key - {key.GetHashCode()}
-        /// </exception>
-        public TValue this[TKey key]
-        {
-            get
+            if (mask > 0)
             {
-                if (Get(key, out var result))
+                var bitPos = BitOperations.TrailingZeroCount(mask);
+                index += Unsafe.As<int, uint>(ref bitPos);
+
+                ref var currentEntry = ref Find(_entries, index);
+                currentEntry.Key = key;
+                currentEntry.Value = default;
+
+                ref var metadata = ref Find(_metadata, index);
+                metadata = Unsafe.As<uint, sbyte>(ref h2);
+
+                ++Count;
+                return ref currentEntry.Value;
+            }
+
+            jumpDistance += 16;
+            index += jumpDistance;
+            index &= _lengthMinusOne;
+        }
+    }
+
+    /// <summary>
+    /// Tries to find the key in the map and updates the associated value.
+    /// Example:
+    /// <code>
+    /// var map = new DenseMap<int, string>();
+    /// map.Emplace(1, "One");
+    /// bool updated = map.Update(1, "One Updated");
+    /// </code>
+    /// </summary>
+    /// <param name="key">The key.</param>
+    /// <param name="value">The new value.</param>
+    /// <returns>Returns true if the update succeeded, otherwise false.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool Update(TKey key, TValue value)
+    {
+        var hashcode = (uint)key.GetHashCode();
+        var h2 = H2(hashcode);
+        var target = Vector128.Create(Unsafe.As<uint, sbyte>(ref h2));
+        uint index = (_goldenRatio * hashcode) >> _shift;
+        uint jumpDistance = 0;
+
+        while (true)
+        {
+            var source = Vector128.LoadUnsafe(ref Find(_metadata, index));
+            var mask = Vector128.Equals(source, target).ExtractMostSignificantBits();
+
+            while (mask != 0)
+            {
+                var bitPos = BitOperations.TrailingZeroCount(mask);
+                ref var entry = ref Find(_entries, index + Unsafe.As<int, uint>(ref bitPos));
+
+                if (_comparer.Equals(entry.Key, key))
                 {
-                    return result;
+                    entry.Value = value;
+                    return true;
                 }
 
+                mask = ResetLowestSetBit(mask);
+            }
+
+            if (Vector128.Equals(_emptyBucketVector, source).ExtractMostSignificantBits() > 0)
+            {
+                return false;
+            }
+
+            jumpDistance += 16;
+            index += jumpDistance;
+            index &= _length - 1;
+        }
+    }
+
+    /// <summary>
+    /// Removes a key and value from the map.
+    /// Example:
+    /// <code>
+    /// var map = new DenseMap<int, string>();
+    /// map.Emplace(1, "One");
+    /// bool removed = map.Remove(1);
+    /// </code>
+    /// </summary>
+    /// <param name="key">The key.</param>
+    /// <returns>Returns true if the removal succeeded, otherwise false.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool Remove(TKey key)
+    {
+        var hashcode = (uint)key.GetHashCode();
+        var h2 = H2(hashcode);
+        var target = Vector128.Create(Unsafe.As<uint, sbyte>(ref h2));
+        uint index = (_goldenRatio * hashcode) >> _shift;
+        uint jumpDistance = 0;
+
+        while (true)
+        {
+            var source = Vector128.LoadUnsafe(ref Find(_metadata, index));
+            var mask = Vector128.Equals(target, source).ExtractMostSignificantBits();
+
+            while (mask != 0)
+            {
+                var bitPos = BitOperations.TrailingZeroCount(mask);
+
+                if (_comparer.Equals(Find(_entries, index + Unsafe.As<int, uint>(ref bitPos)).Key, key))
+                {
+                    Find(_metadata, index + Unsafe.As<int, uint>(ref bitPos)) = _tombstone;
+                    --Count;
+                    return true;
+                }
+
+                mask = ResetLowestSetBit(mask);
+            }
+
+            if (Vector128.Equals(_emptyBucketVector, source).ExtractMostSignificantBits() != 0)
+            {
+                return false;
+            }
+
+            jumpDistance += 16;
+            index += jumpDistance;
+            index &= _lengthMinusOne;
+        }
+    }
+
+    /// <summary>
+    /// Determines if the hashmap contains the specified key.
+    /// Example:
+    /// <code>
+    /// var map = new DenseMap<int, string>();
+    /// map.Emplace(1, "One");
+    /// bool contains = map.Contains(1); // true
+    /// </code>
+    /// </summary>
+    /// <param name="key">The key.</param>
+    /// <returns>Returns true if the key is found, otherwise false.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool Contains(TKey key)
+    {
+        var hashcode = (uint)key.GetHashCode();
+        var h2 = H2(hashcode);
+        var target = Vector128.Create(Unsafe.As<uint, sbyte>(ref h2));
+        uint index = (_goldenRatio * hashcode) >> _shift;
+        uint jumpDistance = 0;
+
+        while (true)
+        {
+            var source = Vector128.LoadUnsafe(ref Find(_metadata, index));
+            var mask = Vector128.Equals(target, source).ExtractMostSignificantBits();
+
+            while (mask != 0)
+            {
+                var bitPos = BitOperations.TrailingZeroCount(mask);
+                if (_comparer.Equals(Find(_entries, index + Unsafe.As<int, uint>(ref bitPos)).Key, key))
+                {
+                    return true;
+                }
+
+                mask = ResetLowestSetBit(mask);
+            }
+
+            if (Vector128.Equals(_emptyBucketVector, source).ExtractMostSignificantBits() != 0)
+            {
+                return false;
+            }
+
+            jumpDistance += 16;
+            index += jumpDistance;
+            index &= _lengthMinusOne;
+        }
+    }
+
+    /// <summary>
+    /// Copies entries from one map to another.
+    /// Example:
+    /// <code>
+    /// var sourceMap = new DenseMap<int, string>();
+    /// sourceMap.Emplace(1, "One");
+    /// var destMap = new DenseMap<int, string>();
+    /// destMap.Copy(sourceMap);
+    /// </code>
+    /// </summary>
+    /// <param name="denseMap">The map to copy from.</param>
+    public void Copy(DenseMap<TKey, TValue> denseMap)
+    {
+        for (var i = 0; i < denseMap._entries.Length; ++i)
+        {
+            if (denseMap._metadata[i] < 0)
+            {
+                continue;
+            }
+
+            var entry = denseMap._entries[i];
+            Emplace(entry.Key, entry.Value);
+        }
+    }
+
+    /// <summary>
+    /// Removes all entries from the map and sets the count to 0.
+    /// Example:
+    /// <code>
+    /// var map = new DenseMap<int, string>();
+    /// map.Clear();
+    /// </code>
+    /// </summary>
+    public void Clear()
+    {
+        Array.Clear(_entries);
+        Array.Fill(_metadata, _emptyBucket);
+        Count = 0;
+    }
+
+    /// <summary>
+    /// Gets or sets the value associated with the specified key.
+    /// Example:
+    /// <code>
+    /// var map = new DenseMap<int, string>();
+    /// map.Emplace(1, "One");
+    /// string value = map[1]; // "One"
+    /// map[1] = "One Updated";
+    /// </code>
+    /// </summary>
+    /// <param name="key">The key.</param>
+    /// <returns>The value associated with the key.</returns>
+    /// <exception cref="KeyNotFoundException">Thrown when the key is not found in the map.</exception>
+    public TValue this[TKey key]
+    {
+        get
+        {
+            if (Get(key, out var result))
+            {
+                return result;
+            }
+
+            throw new KeyNotFoundException($"Unable to find entry - {key.GetType().FullName} key - {key.GetHashCode()}");
+        }
+        set
+        {
+            if (!Update(key, value))
+            {
                 throw new KeyNotFoundException($"Unable to find entry - {key.GetType().FullName} key - {key.GetHashCode()}");
             }
-            set
-            {
-                if (!Update(key, value))
-                {
-                    throw new KeyNotFoundException($"Unable to find entry - {key.GetType().FullName} key - {key.GetHashCode()}");
-                }
-            }
         }
-
-        #endregion
-
-        #region Private Methods
-
-        /// <summary>
-        /// Resizes this instance.
-        /// </summary>     
-        private void Resize()
-        {
-            //next power of 2
-            --_shift;
-            _length = _length << 1;
-            _lengthMinusOne = _length - 1;
-            _maxLookupsBeforeResize = _length * _loadFactor;
-
-            var oldEntries = _entries;
-            var oldMetadata = _metadata;
-
-            var size = Unsafe.As<uint, int>(ref _length) + 16;
-
-            _metadata = GC.AllocateArray<sbyte>(size);
-            _entries = GC.AllocateArray<Entry>(size);
-
-            _metadata.AsSpan().Fill(_emptyBucket);
-
-            for (uint i = 0; i < oldEntries.Length; ++i)
-            {
-                var h2 = Find(oldMetadata, i);
-                if (h2 < 0)
-                {
-                    continue;
-                }
-
-                var entry = Find(oldEntries, i);
-
-                // Get object identity hashcode
-                var hashcode = (uint)entry.Key.GetHashCode();
-                // Objectidentity hashcode * golden ratio (fibonnachi hashing) followed by a shift
-                uint index = (_goldenRatio * hashcode) >> _shift;
-                //Set initial jumpdistance index
-                uint jumpDistance = 0;
-
-                while (true)
-                {
-                    //check for empty entries
-                    var mask = Vector128.LoadUnsafe(ref Find(_metadata, index)).ExtractMostSignificantBits();
-                    if (mask != 0)
-                    {
-                        var BitPos = BitOperations.TrailingZeroCount(mask);
-
-                        index += Unsafe.As<int, uint>(ref BitPos);
-
-                        Find(_metadata, index) = h2;
-                        Find(_entries, index) = entry;
-                        break;
-                    }
-
-                    jumpDistance += 16;
-                    index += jumpDistance;
-                    index = index & _lengthMinusOne;
-                }
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ref T Find<T>(T[] array, uint index)
-        {
-            ref var arr0 = ref MemoryMarshal.GetArrayDataReference(array);
-            return ref Unsafe.Add(ref arr0, index);
-        }
-
-        /// <summary>
-        /// Retrieve 7 low bits from hashcode
-        /// </summary>
-        /// <param name="hashcode"></param>
-        /// <returns></returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static uint H2(uint hashcode) => hashcode & 0b01111111;
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ref sbyte Find(sbyte[] array, uint index)
-        {
-            ref var arr0 = ref MemoryMarshal.GetArrayDataReference(array);
-            return ref Unsafe.Add(ref arr0, index);
-        }
-
-        /// <summary>
-        /// Reset the lowest significant bit in the given value
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static uint ResetLowestSetBit(uint value)
-        {
-            // It's lowered to BLSR on x86
-            return value & value - 1;
-        }
-
-        #endregion
-
-        [StructLayout(LayoutKind.Sequential)]
-        public struct Entry
-        {
-            public TKey Key;
-            public TValue Value;
-        };
     }
+
+    #endregion
+
+    #region Private Methods
+
+    /// <summary>
+    /// Resizes the map by doubling its size and rehashing all entries.
+    /// </summary>     
+    private void Resize()
+    {
+        _shift--;
+        _length <<= 1;
+        _lengthMinusOne = _length - 1;
+        _maxLookupsBeforeResize = _length * _loadFactor;
+
+        var oldEntries = _entries;
+        var oldMetadata = _metadata;
+
+        var size = Unsafe.As<uint, int>(ref _length) + 16;
+
+        _metadata = GC.AllocateArray<sbyte>(size);
+        _entries = GC.AllocateArray<Entry>(size);
+
+        _metadata.AsSpan().Fill(_emptyBucket);
+
+        for (uint i = 0; i < oldEntries.Length; ++i)
+        {
+            var h2 = Find(oldMetadata, i);
+            if (h2 < 0)
+            {
+                continue;
+            }
+
+            var entry = Find(oldEntries, i);
+
+            var hashcode = (uint)entry.Key.GetHashCode();
+            uint index = (_goldenRatio * hashcode) >> _shift;
+            uint jumpDistance = 0;
+
+            while (true)
+            {
+                var mask = Vector128.LoadUnsafe(ref Find(_metadata, index)).ExtractMostSignificantBits();
+                if (mask != 0)
+                {
+                    var bitPos = BitOperations.TrailingZeroCount(mask);
+                    index += Unsafe.As<int, uint>(ref bitPos);
+
+                    Find(_metadata, index) = h2;
+                    Find(_entries, index) = entry;
+                    break;
+                }
+
+                jumpDistance += 16;
+                index += jumpDistance;
+                index &= _lengthMinusOne;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Finds the element in the array at the specified index.
+    /// </summary>
+    /// <typeparam name="T">The type of elements in the array.</typeparam>
+    /// <param name="array">The array to search.</param>
+    /// <param name="index">The index to look up.</param>
+    /// <returns>A reference to the found element.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ref T Find<T>(T[] array, uint index)
+    {
+        ref var arr0 = ref MemoryMarshal.GetArrayDataReference(array);
+        return ref Unsafe.Add(ref arr0, index);
+    }
+
+    /// <summary>
+    /// Retrieves the 7 lowest bits from a hashcode.
+    /// </summary>
+    /// <param name="hashcode">The hashcode.</param>
+    /// <returns>The 7 lowest bits of the hashcode.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static uint H2(uint hashcode) => hashcode & 0b01111111;
+
+    /// <summary>
+    /// Resets the lowest significant bit in the given value.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static uint ResetLowestSetBit(uint value)
+    {
+        return value & (value - 1);
+    }
+
+    #endregion
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct Entry
+    {
+        public TKey Key;
+        public TValue Value;
+    };
 }
