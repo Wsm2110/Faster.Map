@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using BenchmarkDotNet.Attributes;
-using Faster.Map.DenseMap;
-using Faster.Map.RobinHoodMap;
 using System.Linq;
 using System.Numerics;
 

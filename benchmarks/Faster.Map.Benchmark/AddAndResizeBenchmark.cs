@@ -1,6 +1,5 @@
 ﻿using BenchmarkDotNet.Attributes;
-using Faster.Map.DenseMap;
-using Faster.Map.RobinHoodMap;
+using Faster.Map;
 using System;
 using System.Collections.Generic;
 using System.IO;

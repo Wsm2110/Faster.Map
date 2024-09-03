@@ -5,8 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using BenchmarkDotNet.Attributes;
-using Faster.Map.DenseMap;
-using Faster.Map.RobinHoodMap;
 
 namespace Faster.Map.Benchmark
 {
