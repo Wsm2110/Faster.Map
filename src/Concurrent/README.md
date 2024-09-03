@@ -22,23 +22,23 @@ BenchmarkDotNet v0.13.12, Windows 11 (10.0.22631.3880/23H2/2023Update/SunValley3
 ```
 ### Retrieving a million pre-generated keys
 
-| Method               | Length  | NumberOfThreads | Mean      | Error     | StdDev    | Median    | Allocated |
-|--------------------- |-------- |---------------- |----------:|----------:|----------:|----------:|----------:|
-| ConcurrentDictionary | 1000000 | 1               | 27.052 ms | 0.2012 ms | 0.1882 ms | 27.031 ms |   1.75 KB |
-| NonBlocking          | 1000000 | 1               | 20.919 ms | 0.2913 ms | 0.2583 ms | 20.880 ms |   1.75 KB |
-| CMap                 | 1000000 | 1               | 16.103 ms | 0.2116 ms | 0.1875 ms | 16.077 ms |   1.75 KB |
-| ConcurrentDictionary | 1000000 | 2               | 17.704 ms | 0.1393 ms | 0.1303 ms | 17.730 ms |   1.96 KB |
-| NonBlocking          | 1000000 | 2               | 11.472 ms | 0.1091 ms | 0.0852 ms | 11.491 ms |   2.01 KB |
-| CMap                 | 1000000 | 2               | 10.137 ms | 0.1000 ms | 0.0886 ms | 10.122 ms |   2.01 KB |
-| ConcurrentDictionary | 1000000 | 4               |  9.063 ms | 0.1703 ms | 0.1593 ms |  9.136 ms |   2.41 KB |
-| NonBlocking          | 1000000 | 4               |  6.629 ms | 0.0864 ms | 0.0808 ms |  6.614 ms |   2.53 KB |
-| CMap                 | 1000000 | 4               |  5.946 ms | 0.1135 ms | 0.1062 ms |  5.972 ms |   2.54 KB |
-| ConcurrentDictionary | 1000000 | 8               |  7.115 ms | 0.0789 ms | 0.0738 ms |  7.104 ms |   3.37 KB |
-| NonBlocking          | 1000000 | 8               |  5.394 ms | 0.0941 ms | 0.0834 ms |  5.357 ms |   3.49 KB |
-| CMap                 | 1000000 | 8               |  4.487 ms | 0.0652 ms | 0.0609 ms |  4.473 ms |    3.6 KB |
-| ConcurrentDictionary | 1000000 | 16              |  5.349 ms | 0.0535 ms | 0.0474 ms |  5.359 ms |   4.95 KB |
-| NonBlocking          | 1000000 | 16              |  4.007 ms | 0.0782 ms | 0.0653 ms |  3.996 ms |   5.12 KB |
-| CMap                 | 1000000 | 16              |  2.768 ms | 0.0540 ms | 0.1041 ms |  2.726 ms |   4.93 KB |
+| Method               | Length  | NumberOfThreads | Mean      | Error     | StdDev    | Allocated |
+|--------------------- |-------- |---------------- |----------:|----------:|----------:|----------:|
+| ConcurrentDictionary | 1000000 | 1               | 26.658 ms | 0.2631 ms | 0.2333 ms |   1.75 KB |
+| NonBlocking          | 1000000 | 1               | 20.674 ms | 0.2542 ms | 0.2123 ms |   1.75 KB |
+| CMap                 | 1000000 | 1               | 16.019 ms | 0.2072 ms | 0.1938 ms |   1.75 KB |
+| ConcurrentDictionary | 1000000 | 2               | 16.412 ms | 0.2622 ms | 0.2453 ms |   1.96 KB |
+| NonBlocking          | 1000000 | 2               | 11.383 ms | 0.1851 ms | 0.1641 ms |   2.01 KB |
+| CMap                 | 1000000 | 2               | 10.319 ms | 0.0858 ms | 0.0716 ms |   2.01 KB |
+| ConcurrentDictionary | 1000000 | 4               | 17.133 ms | 0.3297 ms | 0.3084 ms |   2.37 KB |
+| NonBlocking          | 1000000 | 4               |  6.779 ms | 0.1311 ms | 0.1510 ms |   2.51 KB |
+| CMap                 | 1000000 | 4               |  6.364 ms | 0.0873 ms | 0.0774 ms |   2.54 KB |
+| ConcurrentDictionary | 1000000 | 8               |  6.967 ms | 0.0616 ms | 0.0515 ms |   3.35 KB |
+| NonBlocking          | 1000000 | 8               |  5.198 ms | 0.0708 ms | 0.0628 ms |   3.48 KB |
+| CMap                 | 1000000 | 8               |  4.470 ms | 0.0523 ms | 0.0490 ms |   3.59 KB |
+| ConcurrentDictionary | 1000000 | 16              |  5.359 ms | 0.1043 ms | 0.1318 ms |   4.95 KB |
+| NonBlocking          | 1000000 | 16              |  4.003 ms | 0.0782 ms | 0.0653 ms |   5.16 KB |
+| CMap                 | 1000000 | 16              |  2.674 ms | 0.0509 ms | 0.0747 ms |   5.17 KB |
 
 
 ### Adding a million keys
@@ -86,23 +86,23 @@ BenchmarkDotNet v0.13.12, Windows 11 (10.0.22631.3880/23H2/2023Update/SunValley3
 
 ### Removing a million keys
 
-| Method               | Length  | NumberOfThreads | Mean      | Error     | StdDev    | Allocated |
-|--------------------- |-------- |---------------- |----------:|----------:|----------:|----------:|
-| ConcurrentDictionary | 1000000 | 1               |  5.594 ms | 0.0988 ms | 0.1319 ms |   1.73 KB |
-| NonBlocking          | 1000000 | 1               | 21.099 ms | 0.1544 ms | 0.1444 ms |   1.75 KB |
-| CMap                 | 1000000 | 1               | 36.303 ms | 0.5778 ms | 0.5405 ms |   1.79 KB |
-| ConcurrentDictionary | 1000000 | 2               |  2.587 ms | 0.0511 ms | 0.0588 ms |   1.95 KB |
-| NonBlocking          | 1000000 | 2               | 12.340 ms | 0.0987 ms | 0.0875 ms |   2.01 KB |
-| CMap                 | 1000000 | 2               | 18.938 ms | 0.3257 ms | 0.3046 ms |   2.04 KB |
-| ConcurrentDictionary | 1000000 | 4               |  1.354 ms | 0.0253 ms | 0.0249 ms |   2.43 KB |
-| NonBlocking          | 1000000 | 4               |  6.945 ms | 0.0739 ms | 0.0691 ms |   2.52 KB |
-| CMap                 | 1000000 | 4               | 10.878 ms | 0.2120 ms | 0.2442 ms |    2.5 KB |
-| ConcurrentDictionary | 1000000 | 8               |  1.265 ms | 0.0251 ms | 0.0279 ms |   3.36 KB |
-| NonBlocking          | 1000000 | 8               |  5.499 ms | 0.0965 ms | 0.0902 ms |   3.49 KB |
-| CMap                 | 1000000 | 8               |  8.702 ms | 0.1719 ms | 0.4312 ms |    3.4 KB |
-| ConcurrentDictionary | 1000000 | 16              |  1.014 ms | 0.0170 ms | 0.0142 ms |   4.71 KB |
-| NonBlocking          | 1000000 | 16              |  5.129 ms | 0.0960 ms | 0.0898 ms |   4.84 KB |
-| CMap                 | 1000000 | 16              |  5.670 ms | 0.1088 ms | 0.1336 ms |    4.9 KB |
+| Method               | Length  | NumberOfThreads | Mean      | Error     | StdDev    | Median    | Allocated |
+|--------------------- |-------- |---------------- |----------:|----------:|----------:|----------:|----------:|
+| ConcurrentDictionary | 1000000 | 1               | 81.100 ms | 1.4729 ms | 1.3057 ms | 81.128 ms |    2.2 KB |
+| NonBlocking          | 1000000 | 1               | 72.727 ms | 1.4092 ms | 1.7306 ms | 72.605 ms |    2.2 KB |
+| CMap                 | 1000000 | 1               | 38.879 ms | 0.7483 ms | 0.7685 ms | 38.688 ms |    2.2 KB |
+| ConcurrentDictionary | 1000000 | 2               | 97.203 ms | 2.8311 ms | 8.3032 ms | 97.641 ms |   2.63 KB |
+| NonBlocking          | 1000000 | 2               | 38.481 ms | 0.7013 ms | 1.0709 ms | 38.518 ms |   3.19 KB |
+| CMap                 | 1000000 | 2               | 23.204 ms | 0.5885 ms | 1.5708 ms | 23.209 ms |   2.63 KB |
+| ConcurrentDictionary | 1000000 | 4               | 91.633 ms | 2.1806 ms | 6.3952 ms | 91.293 ms |   3.05 KB |
+| NonBlocking          | 1000000 | 4               | 21.225 ms | 0.2979 ms | 0.2326 ms | 21.293 ms |   4.41 KB |
+| CMap                 | 1000000 | 4               | 12.889 ms | 0.2237 ms | 0.3417 ms | 12.880 ms |   3.05 KB |
+| ConcurrentDictionary | 1000000 | 8               | 75.948 ms | 1.6868 ms | 4.9205 ms | 75.359 ms |    3.9 KB |
+| NonBlocking          | 1000000 | 8               | 16.144 ms | 0.3227 ms | 0.3842 ms | 16.162 ms |   6.45 KB |
+| CMap                 | 1000000 | 8               |  9.249 ms | 0.2001 ms | 0.5836 ms |  9.242 ms |    3.9 KB |
+| ConcurrentDictionary | 1000000 | 16              | 57.463 ms | 1.1482 ms | 1.9183 ms | 56.532 ms |   5.59 KB |
+| NonBlocking          | 1000000 | 16              | 12.441 ms | 0.2391 ms | 0.3273 ms | 12.520 ms |   8.13 KB |
+| CMap                 | 1000000 | 16              |  6.901 ms | 0.1377 ms | 0.3219 ms |  6.914 ms |   5.59 KB |
  
 ### Add and resize
 
