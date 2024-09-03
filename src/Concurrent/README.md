@@ -1,6 +1,7 @@
-# Faster.Map
- 
-CMap  is a high-performance, thread-safe, lockfree concurrent hash map that uses open addressing, quadratic probing, and Fibonacci hashing to manage key-value pairs. The default load factor is set to 0.5, meaning the hash map will resize when it is half full.
+# CMap
+
+  Is a high-performance, thread-safe concurrent hashmap implemented using open addressing, quadratic probing, and Fibonacci hashing.
+  It efficiently handles concurrent access and minimizes contention between threads.
 
  ## Tested on platforms:
 * x86
