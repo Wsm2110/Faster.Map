@@ -1,6 +1,8 @@
 ﻿// Copyright (c) 2024, Wiljan Ruizendaal. All rights reserved. <wruizendaal@gmail.com> 
 // Distributed under the MIT Software License, Version 1.0.
 
+#if NET9_0_OR_GREATER
+
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -1017,3 +1019,5 @@ namespace Faster.Map.Concurrent
         }
     }
 }
+
+#endif
