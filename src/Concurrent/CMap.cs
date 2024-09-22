@@ -96,11 +96,29 @@ namespace Faster.Map.Concurrent
 
         internal Table _migrationTable;
         internal Table _table;
-        private const sbyte _emptyBucket = -127;
+
+        /// <summary>
+        /// Default state of an entry
+        /// </summary>
+        private const sbyte _empty = -127;
+        /// <summary>
+        /// While removing an entry from the array we set a tombstone marker
+        /// </summary>
         private const sbyte _tombstone = -126;
-        private const sbyte _resizeBucket = -125;
-        private const sbyte _groupResized = -123;
-        private const sbyte _claimed = -124;
+        /// <summary>
+        /// Entry has been moved to a new table
+        /// </summary>
+        private const sbyte _resized = -125;
+        /// <summary>
+        /// Adding entries to a hashmap is a two-step process.
+        /// First, we use an "in-progress" marker to indicate that the entry is claimed and worked on. 
+        /// Once the entry is fully prepared and finalized, we then update the metadata to mark the entry as complete.
+        /// This final step signals to the hashmap that the entry is now ready and can be fully integrated as part of the hashmap.
+        /// Setting the Metadata directly using a compare-and-swap would lead to incorrect behaviour while resizing. 
+        /// It would move an entry to the new table without having a key or value, hence the two-step process
+        /// </summary>
+        private const sbyte _inProgress = -124;
+
         private readonly IEqualityComparer<TKey> _keyComparer;
         private readonly uint[] _powersOfTwo = {
             0x1, 0x2, 0x4, 0x8, 0x10, 0x20, 0x40, 0x80,
@@ -187,11 +205,12 @@ namespace Faster.Map.Concurrent
                 // Retrieve the metadata for the current entry
                 ref var entry = ref Find(table.Entries, index);
                 // Check if the bucket is empty and try to claim it by setting a _claimed marker
-                if (_emptyBucket == entry.Meta && Interlocked.CompareExchange(ref entry.Meta, _claimed, _emptyBucket) == _emptyBucket)
+                if (_empty == entry.Meta && Interlocked.CompareExchange(ref entry.Meta, _inProgress, _empty) == _empty)
                 {
                     // Place the key and value in the entry
                     entry.Key = key;
                     entry.Value = value;
+                    // Store 6 bits of information 
                     entry.Meta = h2;
 
                     // _counter.Increment() uses a Interlocked.Increment() which provides a full memory fence, meaning they ensure all preceding memory writes are completed and visible to other threads before the Interlocked operation completes.
@@ -202,10 +221,11 @@ namespace Faster.Map.Concurrent
                     return true; // Successfully inserted the entry
                 }
                 // Check if the bucket contains a tombstone and try to claim it
-                if (_tombstone == entry.Meta && Interlocked.CompareExchange(ref entry.Meta, _claimed, _tombstone) == _tombstone)
+                if (_tombstone == entry.Meta && Interlocked.CompareExchange(ref entry.Meta, _inProgress, _tombstone) == _tombstone)
                 {
                     entry.Key = key;
                     entry.Value = value;
+                    // Store 6 bits of information 
                     entry.Meta = h2;
 
                     // _counter.Increment() uses a Interlocked.Increment() which provides a full memory fence, meaning they ensure all preceding memory writes are completed and visible to other threads before the Interlocked operation completes.
@@ -216,7 +236,8 @@ namespace Faster.Map.Concurrent
                     return true; // Successfully inserted the entry
                 }
                 // Check if the bucket is occupied by an entry with the same key
-                if (h2 == entry.Meta && _keyComparer.Equals(key, entry.Key))
+                // Note that we compare the h2 with the metadata which are th first 6 bits of the Meta property
+                if (h2 == entry.Metadata && _keyComparer.Equals(key, entry.Key))
                 {
                     return false;
                 }
@@ -256,26 +277,29 @@ namespace Faster.Map.Concurrent
 
             start:
             var table = _table;
-            var index = table.GetIndex(hashcode);   
+            var index = table.GetIndex(hashcode);
 
             do
             {
                 // Retrieve the entry from the table at the calculated index
                 var entry = Find(table.Entries, index);
-                if (h2 == entry.Meta && _keyComparer.Equals(key, entry.Key))
+                if (h2 == entry.Metadata && _keyComparer.Equals(key, entry.Key))
                 {
                     // If the entry's metadata and key match, return the value
                     value = entry.Value;
                     return true;
                 }
-                // If the entry is an empty bucket, the key does not exist in the table
-                if (_emptyBucket == entry.Meta)
-                {                 
+
+                // If the entry corresponds to an empty bucket, the key is not present in the table.
+                // State information (_empty, _resized, _tombstone) is stored using 8 bits. Utilize the Meta property.
+                if (entry.Meta == _empty)
+                {
                     value = default;
                     return false;
                 }
+
                 // If the entry indicates a resize operation, help other threads resizing
-                if (entry.Meta == _resizeBucket)
+                if (entry.Meta == _resized)
                 {
                     Resize(table);
                     jumpDistance = 0;
@@ -318,35 +342,30 @@ namespace Faster.Map.Concurrent
                 // Retrieve the entry from the table at the calculated index
                 ref var entry = ref Find(table.Entries, index);
                 // If the entry's metadata and key match, proceed with the update
-                if (h2 == entry.Meta && _keyComparer.Equals(key, entry.Key))
+                if (h2 == entry.Metadata && _keyComparer.Equals(key, entry.Key))
                 {
                     // Guarantee that only one thread can access the critical section at a time
                     entry.Enter();
-
-                    var result = false;
-
-                    // There is a possibility meta has changed while locking this entry
-                    if (h2 == entry.Meta)
+                    // There is a possibility that between validating the hashcode and locking, a thread racing has changed the metadata
+                    if (entry.Metadata == h2)
                     {
-                        // Perform the critical section: update the value
                         entry.Value = newValue;
-                        result = true;
+                        entry.Exit();
+                        return true;
                     }
 
-                    // Release lock 
+                    // At this point, Meta can indicate one of two states: either resized or tombstone.
+                    // Instead of handling each state individually, we allow the algorithm to proceed as intended.
                     entry.Exit();
-
-                    return result;
                 }
 
                 // If the entry indicates an empty bucket, the key does not exist in the table
-                if (_emptyBucket == entry.Meta)
+                if (entry.Meta == _empty)
                 {
                     return false;
                 }
-
                 // If the entry indicates a resize operation, help other threads resizing
-                if (entry.Meta == _resizeBucket)
+                if (entry.Meta == _resized)
                 {
                     Resize(table);
                     jumpDistance = 0;
@@ -381,7 +400,7 @@ namespace Faster.Map.Concurrent
             var h2 = _table.H2(hashcode);
             byte jumpDistance = 0;
 
-            start:   
+            start:
             var table = _table;
             var index = table.GetIndex(hashcode);
 
@@ -390,29 +409,34 @@ namespace Faster.Map.Concurrent
                 // Retrieve the entry from the table at the calculated index
                 ref var entry = ref Find(table.Entries, index);
                 // If the entry's metadata and key match, proceed with the update
-                if (h2 == entry.Meta && _keyComparer.Equals(key, entry.Key))
+                if (h2 == entry.Metadata && _keyComparer.Equals(key, entry.Key))
                 {
                     // Guarantee that only one thread can access the critical section at a time
                     entry.Enter();
-                    bool result = false;
-                    if (EqualityComparer<TValue>.Default.Equals(entry.Value, comparisonValue))
+
+                    if (h2 == entry.Metadata && EqualityComparer<TValue>.Default.Equals(entry.Value, comparisonValue))
                     {
                         // Perform the critical section: update the value
                         entry.Value = newValue;
-                        result = true;
+                        entry.Exit();
+                        return true;
                     }
+
+                    // To this point Meta can have two different states (resized or tombstone), or the comparisonValue does not equal the entry.value
+                    // Note instead of processing each state, we simply let the algorithm do its job. 
                     entry.Exit();
-                    return result;
                 }
+
                 // If the entry indicates a resize operation, perform the resize helping other threads 
-                if (entry.Meta == _resizeBucket)
+                if (entry.Meta == _resized)
                 {
                     Resize(table);
                     jumpDistance = 0;
                     goto start;
                 }
+
                 // If the entry indicates an empty bucket, the key does not exist in the table
-                if (_emptyBucket == entry.Meta)
+                if (entry.Meta == _empty)
                 {
                     return false;
                 }
@@ -444,7 +468,7 @@ namespace Faster.Map.Concurrent
             byte jumpDistance = 0;
 
             start:
-            var table = _table;         
+            var table = _table;
             var index = table.GetIndex(hashcode);
 
             do
@@ -452,40 +476,42 @@ namespace Faster.Map.Concurrent
                 // Retrieve the entry from the table at the calculated index
                 ref var entry = ref Find(table.Entries, index);
                 // If the entry's metadata and key match, proceed with the update
-                if (h2 == entry.Meta && _keyComparer.Equals(key, entry.Key))
+                if (entry.Metadata == h2 && _keyComparer.Equals(key, entry.Key))
                 {
                     // Guarantee that only one thread can access the critical section at a time
                     entry.Enter();
-                    bool result = false;
 
-                    if (h2 == entry.Meta)
+                    // Release the lock. Entry has already been removed
+                    if (entry.Metadata == h2)
                     {
-                        // reset current entry
+                        // Reset current entry and set tombstone marker
                         entry.Meta = _tombstone;
                         entry.Key = default;
                         entry.Value = default;
-
                         // _counter.Decrement() uses a Interlocked.Decrement() which provides a full memory fence, meaning they ensure all preceding memory writes are completed and visible to other threads before the Interlocked operation completes.
                         // This means that when you perform an Interlocked operation, it guarantees that any changes made to other variables(not just the variable involved in the Interlocked operation) are also visible to other threads.
                         // Note this also means we dont need any explicit memorybarriers.
                         // This code, using Interlocked operations, will also work correctly on ARM architectures without needing additional explicit memory barriers.The memory ordering and visibility are managed by the Interlocked methods.
                         _counter.Decrement();
-                        result = true;
+                        // Release lock
+                        entry.Exit();
+                        // Remove operation succeeded
+                        return true;
                     }
 
-                    // Release lock
+                    // At this point, Meta can indicate one of two states: either resized or tombstone.
+                    // Instead of handling each state individually, we allow the algorithm to proceed as intended.
                     entry.Exit();
-
-                    return result;
                 }
 
                 // If the entry indicates an empty bucket, the key does not exist in the table
-                if (_emptyBucket == entry.Meta)
+                if (entry.Meta == _empty)
                 {
                     return false;
                 }
+
                 // If the entry indicates a resize operation, perform the resize helping other threads in the process
-                if (entry.Meta == _resizeBucket)
+                if (entry.Meta == _resized)
                 {
                     Resize(table); // Resize the table
                     jumpDistance = 0; // Reset the jump distance
@@ -530,40 +556,41 @@ namespace Faster.Map.Concurrent
                 // Retrieve the entry from the table at the calculated index
                 ref var entry = ref Find(table.Entries, index);
                 // If the entry's metadata and key match, proceed with the update
-                if (h2 == entry.Meta && _keyComparer.Equals(key, entry.Key))
+                if (h2 == entry.Metadata && _keyComparer.Equals(key, entry.Key))
                 {
                     // Guarantee that only one thread can access the critical section at a time
                     entry.Enter();
-                    // Double-checked locking to prevent multiple threads from removing simultaneously
-                    if (h2 == entry.Meta)
+
+                    if (entry.Metadata == h2)
                     {
+                        // return old value
                         value = entry.Value;
-                        // Perform the critical section
-                        entry.Meta = _tombstone;
+                        // Reset current entry and set tombstone marker                  
                         entry.Key = default;
                         entry.Value = default;
+                        entry.Metadata = _tombstone;
                         // Release the lock
                         entry.Exit();
+
                         // _counter.Decrement() uses a Interlocked.Decrement() which provides a full memory fence, meaning they ensure all preceding memory writes are completed and visible to other threads before the Interlocked operation completes.
                         // This means that when you perform an Interlocked operation, it guarantees that any changes made to other variables(not just the variable involved in the Interlocked operation) are also visible to other threads.
                         // Note this also means we dont need any explicit memorybarriers.
                         // This code, using Interlocked operations, will also work correctly on ARM architectures without needing additional explicit memory barriers.The memory ordering and visibility are managed by the Interlocked methods.
+
                         _counter.Decrement();
                         return true;
                     }
                     // Release the lock
                     entry.Exit();
-                    value = default;
-                    return false;
                 }
                 // If the entry indicates an empty bucket, the key does not exist in the table
-                if (_emptyBucket == entry.Meta)
+                if (entry.Meta == _empty)
                 {
                     value = default;
                     return false;
                 }
                 // If the entry indicates a resize operation, perform the resize
-                if (entry.Meta == _resizeBucket)
+                if (entry.Meta == _resized)
                 {
                     Resize(table); // Resize the table
                     jumpDistance = 0; // Reset the jump distance
@@ -669,7 +696,7 @@ namespace Faster.Map.Concurrent
             // Migrate the entries from the current table to the migration table
             table.Migrate(ctable);
             // Check if the migration is complete
-            if (table._depletedCounter == table._depleted)
+            if (table._depletedGroupsCounter == table._maxDepletedGroups)
             {
                 // Atomically update the main table reference to the new migrated table
                 Interlocked.CompareExchange(ref _table, ctable, table);
@@ -696,19 +723,32 @@ namespace Faster.Map.Concurrent
         /// Represents an entry in the hash table.
         /// </summary>
         [StructLayout(LayoutKind.Sequential)]
-        [DebuggerDisplay("key = {Key}; value = {Value}; meta = {Meta};")]
+        [DebuggerDisplay("key = {Key}; value = {Value}; Meta = {Meta} metadata = {Metadata};")]
         internal struct Entry
         {
             /// <summary>
-            /// The state of the entry, used for locking. 0 indicates unlocked, 1 indicates locked.
-            /// </summary>
-            internal byte state;
-
-            /// <summary>
             /// Metadata associated with the entry. This is used to indicate the state of the entry,
-            /// such as whether it is empty, a tombstone, in-progress, or not empty (H2 hash)
+            /// such as whether it is empty, a tombstone, in-progress, the 7th bit is used to lock this entry
+            /// 0-5 (h2 hash) 6 (lock) 7 sign bit
             /// </summary>
             internal sbyte Meta;
+
+            /// <summary>
+            /// Gets or sets the Meta property, ensuring only the lower 6 bits are used.
+            /// </summary>
+            public sbyte Metadata
+            {
+                get
+                {
+
+                    return (sbyte)(Meta & 0x3F); // 0x3F is 00111111 in binary // Mask out the upper 2 bits to get only the lower 6 bits
+                }
+                set
+                {
+                    // Set only the lower 6 bits, preserving the upper 2 bits
+                    Meta = value;
+                }
+            }
 
             /// <summary>
             /// The key of the entry.
@@ -723,20 +763,36 @@ namespace Faster.Map.Concurrent
             /// <summary>
             /// Enters a critical section by acquiring a lock. Ensures thread safety.
             /// This method uses a spin lock with exponential backoff to reduce contention.
+            /// Set the 7th bit, indicating that it is locked.
             /// </summary>
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Enter()
             {
-                int spinCount = 1; // Initialize spin count for exponential backoff
+                int spinCount = 1;
+                sbyte originalValue;
+
                 while (true)
                 {
-                    // Attempt to acquire the lock by setting the state to 1 if it is currently 0
-                    if (Interlocked.CompareExchange(ref state, 1, 0) == 0)
+                    originalValue = Metadata;
+                    // Set the 7th bit to lock the entry
+                    sbyte newValue = (sbyte)(originalValue ^ 0b01000000);
+
+                    var result = Interlocked.CompareExchange(ref Meta, newValue, originalValue);
+
+                    if (result == originalValue)
                     {
-                        return; // Lock acquired successfully, exit the method
+                        return; // Lock acquired
                     }
+
+                    // There is a possibility that competing threads have already set the Metadata.
+                    // To avoid a potential deadlock, we return immediately.
+                    if (result is _resized or _tombstone)
+                    {
+                        return;
+                    }
+
                     // Perform a spin wait to allow other threads to progress
                     Thread.SpinWait(spinCount);
+
                     // Increment the spin count exponentially, but cap it to prevent excessive delays
                     if (spinCount < 1024)
                     {
@@ -747,9 +803,12 @@ namespace Faster.Map.Concurrent
 
             /// <summary>
             /// Exits the critical section by releasing the lock.
-            /// </summary>
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void Exit() => Interlocked.Exchange(ref state, 0);
+            /// </summary>     
+            public void Exit()
+            {
+                // Clear the 7th bit to unlock the entry      
+                Interlocked.Exchange(ref Meta, (sbyte)(Meta & ~0x40));
+            }
         }
 
         internal class Table
@@ -764,7 +823,7 @@ namespace Faster.Map.Concurrent
             /// <summary>
             /// The bitmask value used for secondary hash calculation.
             /// </summary>
-            private const sbyte _bitmask = (1 << 7) - 1;
+            private const sbyte _bitmask = (1 << 6) - 1;
 
             /// <summary>
             /// A constant value based on the golden ratio, used for hash calculation.
@@ -779,12 +838,12 @@ namespace Faster.Map.Concurrent
             /// <summary>
             /// The total number of groups in the table.
             /// </summary>
-            internal int _depleted;
+            internal int _maxDepletedGroups;
 
             /// <summary>
             /// The current index of the group being processed during migration.
             /// </summary>
-            private uint _groupIndex;
+            private uint _group;
 
             #endregion
 
@@ -813,7 +872,7 @@ namespace Faster.Map.Concurrent
             /// <summary>
             /// Counter for the number of depleted groups during migration.
             /// </summary>
-            internal int _depletedCounter;
+            internal int _depletedGroupsCounter;
 
             /// <summary>
             /// The maximum distance to jump during quadratic probing.
@@ -844,11 +903,11 @@ namespace Faster.Map.Concurrent
                 _shift = (byte)(_shift - BitOperations.Log2(length));
 
                 Entries = GC.AllocateUninitializedArray<Entry>((int)length);
-                Entries.AsSpan().Fill(new Entry { Meta = _emptyBucket });
+                Entries.AsSpan().Fill(new Entry { Meta = _empty });
 
                 _groupSize = DetermineChunkSize((uint)BitOperations.Log2(length), Environment.ProcessorCount);
                 _groupsMinusOne = (length / _groupSize) - 1;
-                _depleted = (int)(length / _groupSize);
+                _maxDepletedGroups = (int)(length / _groupSize);
                 MaxJumpDistance = (byte)(BitOperations.Log2(length) + 1);
             }
 
@@ -915,60 +974,65 @@ namespace Faster.Map.Concurrent
             internal void Migrate(Table mTable)
             {
                 // Continue migrating until all groups are depleted of resources
-                while (_depletedCounter < _depleted)
+                while (_depletedGroupsCounter < _maxDepletedGroups)
                 {
                     // Atomically increment the group index and wrap around if necessary
-                    uint groupIndex = Interlocked.Increment(ref _groupIndex) & _groupsMinusOne;
-                    uint index = groupIndex * _groupSize;
+                    uint group = Interlocked.Increment(ref _group) & _groupsMinusOne;
+                    uint index = group * _groupSize;
                     uint end = index + _groupSize;
-                    // Find the first entry in the group
-                    ref var entry = ref Find(Entries, index);
-                    var meta = entry.Meta;
-                    // Check if the group has already been resized
-                    if (entry.Meta != _groupResized)
+
+                    while (index < end)
                     {
-                        // Atomically mark the group as being resized
-                        var result = Interlocked.CompareExchange(ref entry.Meta, _groupResized, meta);
-                        if (result != meta)
+                        ref var entry = ref Find(Entries, index);
+                        var metadata = entry.Metadata;
+
+                        // If this entry is marked as resized, it means this group has already been claimed. Move on to the next group.
+                        if (entry.Meta == _resized)
                         {
-                            // Another thread has claimed this group, exit to retry another group
                             return;
                         }
-                        // If the entry is valid having an meta > 1 migrate it to the new table
-                        if (result > -1)
+
+                        if (entry.Meta == _inProgress)
+                        {
+                            // Note: We aren't actually incrementing the index; we simply retry until the Meta state changes.
+                            continue;
+                        }
+
+                        if (entry.Meta is _tombstone)
+                        {
+                            // Dirty - metadata should only be 6 bits
+                            // The compare-and-swap operation will always fail unless the metadata is set to tombstone, causing an infinite loop.
+                            metadata = _tombstone;
+                        }
+
+                        if (entry.Meta is _empty)
+                        {
+                            // The compare-and-swap operation will always fail unless the metadata is set to empty, causing an infinite loop.
+                            metadata = _empty;
+                        }
+
+                        // Atomically mark the entry as being resized.
+                        // Note: We don't need to lock an entry while moving it to a new table.
+                        // The compare-and-swap operation will handle this by failing and retrying if necessary.
+                        // Meta is 8 bits, while metadata is only 6. If the 7th bit is set, the values will differ, causing the compare-and-swap to fail and retry.
+                        var result = Interlocked.CompareExchange(ref entry.Meta, _resized, metadata);
+                        // If the entry is valid and the compare-and-swap operation succeeds, proceed to migrate the entry.
+                        if (result == metadata && result > -1)
                         {
                             mTable.EmplaceInternal(ref entry, result);
                         }
+                        // If the compare-and-swap failed, retry the current entry
+                        if (result != metadata)
+                        {
+                            continue;
+                        }
                         // Move to the next entry in the group
                         ++index;
-                        // Process all entries in the group
-                        do
-                        {
-                            entry = ref Find(Entries, index);
-                            meta = entry.Meta;
-                            // Skip entries that are in progress
-                            if (meta == _claimed)
-                            {
-                                // Note we arent actually increasing the index, we just retry
-                                continue;
-                            }
-                            // Atomically mark the entry as being resized
-                            result = Interlocked.CompareExchange(ref entry.Meta, _resizeBucket, meta);
-                            // If the entry is valid and the compare-and-swap succeeded, migrate the entry
-                            if (result == meta && result > -1)
-                            {
-                                mTable.EmplaceInternal(ref entry, result);
-                            }
-                            // If the compare-and-swap failed, retry the current entry
-                            if (result != meta)
-                            {
-                                continue;
-                            }
-                            // Move to the next entry in the group
-                            ++index;
-                        } while (index < end);
-                        // Increment the depleted counter once the entire group is processed
-                        Interlocked.Increment(ref _depletedCounter);
+                    }
+
+                    if (index == end)
+                    {
+                        Interlocked.Increment(ref _depletedGroupsCounter);
                     }
                 }
             }
@@ -991,7 +1055,7 @@ namespace Faster.Map.Concurrent
                     // Retrieve the location in the table at the calculated index
                     ref var location = ref Find(Entries, index);
                     // Check if the bucket is empty and try to claim it
-                    if (location.Meta == _emptyBucket && _emptyBucket == Interlocked.CompareExchange(ref location.Meta, meta, _emptyBucket))
+                    if (location.Meta == _empty && _empty == Interlocked.CompareExchange(ref location.Meta, meta, _empty))
                     {
                         // Place the entry in the bucket
                         location = entry;

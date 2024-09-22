@@ -185,6 +185,11 @@ namespace Faster.Map.CMap.Tests
                 }
             }
 
+            if (numberSucceeded != tasks.Length) 
+            {
+            
+            }
+
             Assert.True(numberSucceeded == tasks.Length, "One or more threads failed!");
             Assert.True(totalKeysUpdated == map.Count, string.Format("TestTryUpdate:  FAILED.  The updated keys count doesn't match the dictionary count, expected {0}, actual {1}", map.Count, totalKeysUpdated));
 

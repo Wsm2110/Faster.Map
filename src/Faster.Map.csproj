@@ -44,4 +44,11 @@
   <ItemGroup>
     <PackageReference Include="System.IO.Hashing" Version="8.0.*" />
   </ItemGroup>
+
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Faster.Map.CMap.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
 </Project>
