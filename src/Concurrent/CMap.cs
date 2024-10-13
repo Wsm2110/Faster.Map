@@ -481,20 +481,17 @@ namespace Faster.Map.Concurrent
                     // Guarantee that only one thread can access the critical section at a time
                     entry.Enter();
 
-                    // Release the lock. Entry has already been removed
-                    if (entry.Metadata == h2)
+                    if (entry.Meta > -1)
                     {
-                        // Reset current entry and set tombstone marker
-                        entry.Meta = _tombstone;
+                        // Reset current entry and set tombstone marker                      
                         entry.Key = default;
                         entry.Value = default;
+                        entry.Meta = _tombstone;
                         // _counter.Decrement() uses a Interlocked.Decrement() which provides a full memory fence, meaning they ensure all preceding memory writes are completed and visible to other threads before the Interlocked operation completes.
                         // This means that when you perform an Interlocked operation, it guarantees that any changes made to other variables(not just the variable involved in the Interlocked operation) are also visible to other threads.
                         // Note this also means we dont need any explicit memorybarriers.
                         // This code, using Interlocked operations, will also work correctly on ARM architectures without needing additional explicit memory barriers.The memory ordering and visibility are managed by the Interlocked methods.
-                        _counter.Decrement();
-                        // Release lock
-                        entry.Exit();
+                        _counter.Decrement();                    
                         // Remove operation succeeded
                         return true;
                     }
@@ -561,17 +558,17 @@ namespace Faster.Map.Concurrent
                     // Guarantee that only one thread can access the critical section at a time
                     entry.Enter();
 
-                    if (entry.Metadata == h2)
+                    // Racing threads, only continue while tombstones, resizing is not set
+                    if (entry.Meta > -1)
                     {
                         // return old value
                         value = entry.Value;
                         // Reset current entry and set tombstone marker                  
                         entry.Key = default;
                         entry.Value = default;
+                        // Setting tombstone will release the lock
                         entry.Metadata = _tombstone;
-                        // Release the lock
-                        entry.Exit();
-
+          
                         // _counter.Decrement() uses a Interlocked.Decrement() which provides a full memory fence, meaning they ensure all preceding memory writes are completed and visible to other threads before the Interlocked operation completes.
                         // This means that when you perform an Interlocked operation, it guarantees that any changes made to other variables(not just the variable involved in the Interlocked operation) are also visible to other threads.
                         // Note this also means we dont need any explicit memorybarriers.
@@ -777,7 +774,6 @@ namespace Faster.Map.Concurrent
                     sbyte newValue = (sbyte)(originalValue ^ 0b01000000);
 
                     var result = Interlocked.CompareExchange(ref Meta, newValue, originalValue);
-
                     if (result == originalValue)
                     {
                         return; // Lock acquired
