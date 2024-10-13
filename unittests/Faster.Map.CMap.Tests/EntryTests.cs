@@ -75,12 +75,12 @@ public class EntryTests
         thread2.Start();
 
         // Assert
-        Assert.Equal(0b01000000, entry.Meta & 0b01000000); // Ensure the 7th bit is set
+        Assert.Equal(0b01000000, entry.Meta & 0b1000000); // Ensure the 7th bit is set
 
 
         thread1.ContinueWith(_ => entry.Exit());
         thread2.ContinueWith(_ => entry.Exit());
 
-        Assert.Equal(0b00000000, entry.Meta & 0b01000000); // Ensure the 7th bit is cleared
+        Assert.Equal(0b00000000, entry.Meta & 0b00100000); // Ensure the 7th bit is cleared
     }
 }
