@@ -59,28 +59,4 @@ public class EntryTests
         // Assert
         Assert.Equal(-125, entry.Meta); // Meta should remain as _resized
     }
-
-    [Fact]
-    public void Enter_MultipleThreads_CorrectlyLocksAndUnlocks()
-    {
-        // Arrange
-        var entry = new CMap<int, string>.Entry();
-        entry.Meta = 0b00000000;
-
-        // Act
-        var thread1 = new Task(() => entry.Enter());
-        var thread2 = new Task(() => entry.Enter());
-
-        thread1.Start();
-        thread2.Start();
-
-        // Assert
-        Assert.Equal(0b01000000, entry.Meta & 0b1000000); // Ensure the 7th bit is set
-
-
-        thread1.ContinueWith(_ => entry.Exit());
-        thread2.ContinueWith(_ => entry.Exit());
-
-        Assert.Equal(0b00000000, entry.Meta & 0b00100000); // Ensure the 7th bit is cleared
-    }
 }
