@@ -11,7 +11,7 @@ These standard collections are widely used for key-value pair storage in .NET ap
 * RobinHoodMap with Linear Probing:
         Employs linear probing to resolve hash collisions, reducing the likelihood of clustering and improving access speed.
         Suitable for applications where a balance between performance and simplicity is required. 
-* CMap  is a high-performance, thread-safe, lockfree concurrent hashmap that uses open addressing, quadratic probing, and Fibonacci hashing to manage key-value pairs. The default load factor is set to 0.5, meaning the hash map will resize when it is half full.
+* CMap  is a high-performance, thread-safe, lockfree concurrent hashmap that uses open addressing, quadratic probing, and Fibonacci hashing to manage key-value pairs. The default load factor is set to 0.5, meaning the hash map will resize when it is half full. Note: this hashmap will only allocate once while resizing.
 
 * Installation:
 
