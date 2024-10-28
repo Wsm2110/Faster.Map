@@ -1,5 +1,4 @@
 ﻿using Faster.Map.Core;
-using Faster.Map.DenseMap;
 using Xunit;
 
 namespace Faster.Map.DenseMap.Tests

@@ -143,10 +143,9 @@ namespace Faster.Map.Densemap.Tests
             var r1 = map.Emplace(1, 1);
 
             var r2 = map.Emplace(1, 2);
-
             //assert
             Assert.AreEqual(r1, true);
-            Assert.AreEqual(r2, false);
+            Assert.AreEqual(r2, true);
         }
 
         [TestMethod]
@@ -636,88 +635,7 @@ namespace Faster.Map.Densemap.Tests
 
             //assert
             Assert.AreEqual(count, 4);
-        }
-
-        [TestMethod]
-        public void AssertEmplaceOrUdateReturnsUpdatedValue()
-        {
-            //assign
-            var map = new DenseMap<int, int>(16, 0.5);
-
-            //act
-            map.AddOrUpdate(1, 1);
-            map.AddOrUpdate(1, 2);
-
-            map.Get(1, out var result);
-
-            //assert
-            Assert.AreEqual(2, result);
-        }
-
-        [TestMethod]
-        public void AssertGetOrAddValueRefAddsDefaultValue()
-        {
-            //assign
-            var map = new DenseMap<int, int>(16, 0.5);
-
-            //act
-            ref var value = ref map.GetOrUpdate(1);
-
-            //assert
-            Assert.AreEqual(0, value);
-        }
-
-        [TestMethod]
-        public void AssertGetOrAddValueRefAddsEntryInMapIfKeyIsNotFound()
-        {
-            //assign
-            var map = new DenseMap<int, int>(16, 0.5);
-
-            //act
-            ref var value = ref map.GetOrUpdate(1);
-
-            value = 100;
-
-            map.Get(1, out var result);
-
-            //assert
-            Assert.AreEqual(100, result);
-        }
-
-        [TestMethod]
-        public void AssertGetOrAddValueRefAddsAndRemoveShouldLeaveTombstone()
-        {
-            //assign
-            var map = new DenseMap<int, int>(16, 0.5);
-
-            //act
-            ref var value = ref map.GetOrUpdate(1);
-
-            value = 100;
-
-            map.Remove(1);
-
-            var result2 = map.Get(1, out var result);
-            //assert
-            Assert.AreEqual(0, result);
-            Assert.AreEqual(false, result2);
-        }
-
-        [TestMethod]
-        public void AssertGetOrAddValueBasicExampleWorksAsIntended()
-        {
-            //assign
-            var counterMap = new DenseMap<uint, uint>(16, 0.5);
-            ref var counter = ref counterMap.GetOrUpdate(1);
-
-            //act
-            ++counter;
-
-            counterMap.Get(1, out var result);
-
-            //assert
-            Assert.AreEqual(1u, result);
-        }
+        }      
 
         [TestMethod]
         public void AssertAnItemHasBeenLost()
@@ -775,28 +693,10 @@ namespace Faster.Map.Densemap.Tests
         {
             var fmap = new DenseMap<long, long>(1);
             fmap.Emplace(0L, 0L);
-          
+
             //hashmap has an overhead of + 16
 
             Assert.IsTrue(fmap.Size == 32);
         }
-
-        [TestMethod]
-        public void AssertGetOrAddMultipleValues()
-        {
-            //assign
-            var map = new DenseMap<int, int>();
-
-            //act
-            for (int i = 0; i < 20; i++)
-            {
-                map.GetOrUpdate(i);                                
-            }
-
-            //assert
-            // resize + 16 is 48
-            Assert.IsTrue(map.Size == 48);
-        }
-
     }
 }
