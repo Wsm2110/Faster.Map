@@ -420,7 +420,7 @@ namespace Faster.Map.DenseMap.Tests
         public void Remove_ShouldHandleSparseRemovalsAfterResize()
         {
             // Insert keys to force a resize
-            for (int i = 0; i < 30; i++)
+            for (int i = 0; i <= 28; i++)
             {
                 _map.Emplace(i, $"value{i}");
             }
@@ -428,13 +428,13 @@ namespace Faster.Map.DenseMap.Tests
             int initialSize = (int)_map.Size;
 
             // Remove every other entry after resize
-            for (int i = 0; i < 30; i += 2)
+            for (int i = 0; i <= 28; i += 2)
             {
                 _map.Remove(i);
             }
 
             Assert.Equal(initialSize, (int)_map.Size); // Verify no additional resize occurred
-            for (int i = 1; i < 30; i += 2)
+            for (int i = 1; i <= 28; i += 2)
             {
                 Assert.True(_map.Contains(i));
             }

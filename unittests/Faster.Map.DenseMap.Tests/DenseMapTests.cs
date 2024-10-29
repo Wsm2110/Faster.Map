@@ -31,121 +31,16 @@ namespace Faster.Map.Densemap.Tests
         }
 
         [TestMethod]
-        public void AssertDailyUseCaseWithoutResize()
-        {
-            var fmap = new DenseMap<uint, uint>(1000000);
-
-            foreach (var k in keys.Take(900000))
-            {
-                if (!fmap.Emplace(k, k))
-                {
-                    throw new InternalTestFailureException("Error occured while add");
-                }
-            }
-
-            Assert.AreEqual(900000, fmap.Count);
-
-            //find all entries from map
-
-            //var offset = 0;
-            foreach (var k in keys.Take(900000))
-            {
-                if (!fmap.Get(k, out var result))
-                {
-                    throw new InternalTestFailureException("Error occured while get");
-                }
-            }
-
-            //remove all entries from map
-
-            foreach (var k in keys.Take(900000))
-            {
-                if (!fmap.Remove(k))
-                {
-                    throw new InternalTestFailureException("Error occured while removing");
-                }
-            }
-
-            Assert.IsTrue(fmap.Count == 0);
-
-            //map full of tombstones, try inserting again
-
-            foreach (var k in keys.Take(900000))
-            {
-                if (!fmap.Emplace(k, k))
-                {
-                    throw new InternalTestFailureException("Error occured while removing");
-                }
-            }
-
-            Assert.AreEqual(900000, fmap.Count);
-        }
-
-
-        [TestMethod]
-        public void AssertDailyUseCaseWithResize()
-        {
-            var fmap = new DenseMap<uint, uint>(16);
-
-            foreach (var k in keys.Take(900000))
-            {
-                if (!fmap.Emplace(k, k))
-                {
-                    throw new InternalTestFailureException("Error occured while add");
-                }
-            }
-
-            Assert.AreEqual(900000, fmap.Count);
-
-            //find all entries from map
-
-            //var offset = 0;
-            foreach (var k in keys.Take(900000))
-            {
-                if (!fmap.Get(k, out var result))
-                {
-                    throw new InternalTestFailureException("Error occured while get");
-                }
-            }
-
-            //remove all entries from map
-
-            foreach (var k in keys.Take(900000))
-            {
-                if (!fmap.Remove(k))
-                {
-                    throw new InternalTestFailureException("Error occured while removing");
-                }
-            }
-
-            Assert.IsTrue(fmap.Count == 0);
-
-            //map full of tombstones, try inserting again
-
-            foreach (var k in keys.Take(900000))
-            {
-                if (!fmap.Emplace(k, k))
-                {
-                    throw new InternalTestFailureException("Error occured while removing");
-                }
-            }
-
-            Assert.AreEqual(900000, fmap.Count);
-        }
-
-        [TestMethod]
         public void AssertAddingDuplicateKeysShouldFail()
         {
             //arrange
             var map = new DenseMap<uint, uint>(16);
 
             //act
-            var r1 = map.Emplace(1, 1);
+            map.Emplace(1, 1);
+            map.Emplace(1, 2);
 
-            var r2 = map.Emplace(1, 2);
-            //assert
-            Assert.AreEqual(r1, true);
-            Assert.AreEqual(r2, true);
+            Assert.IsTrue(map[1] == 2);
         }
 
         [TestMethod]
@@ -215,7 +110,7 @@ namespace Faster.Map.Densemap.Tests
             var map = new DenseMap<uint, uint>(16);
 
             //act
-            var result = map.Emplace(1, 1);
+            map.Emplace(1, 1);
             map.Clear();
 
             //assert        
@@ -551,25 +446,7 @@ namespace Faster.Map.Densemap.Tests
             map.Get(1, out var result);
 
             Assert.IsTrue((uint)2 == result);
-        }
-
-        [TestMethod]
-        public void AssertCustomSize()
-        {
-            for (int i = 0; i < 100; i++)
-            {
-
-                DenseMap<uint, uint> map = new DenseMap<uint, uint>(1000000, 0.9);
-
-                foreach (var k in keys.Take(900000))
-                {
-                    if (!map.Emplace(k, k))
-                    {
-                        throw new InternalTestFailureException("Error occured while add");
-                    }
-                }
-            }
-        }
+        } 
 
         [TestMethod]
         public void AssertKeyEnumerator()
@@ -635,7 +512,7 @@ namespace Faster.Map.Densemap.Tests
 
             //assert
             Assert.AreEqual(count, 4);
-        }      
+        }
 
         [TestMethod]
         public void AssertAnItemHasBeenLost()

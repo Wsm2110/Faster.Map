@@ -19,8 +19,7 @@ namespace Faster.Map;
 /// Key features:
 /// - Open addressing with quadratic probing for collision resolution.
 /// - SIMD-based parallel searches for performance optimization.
-/// - High load factor (default is 0.9) while maintaining speed.
-/// - Fibonacci hashing for better hash distribution.
+/// - High load factor (default is 0.875) while maintaining speed.
 /// - Tombstones to avoid backshifts during deletions.
 ///
 /// Example usage:
@@ -163,8 +162,8 @@ public class DenseMap<TKey, TValue>
     private uint _lengthMinusOne;
     private readonly double _loadFactor;
     private readonly IEqualityComparer<TKey> _comparer;
-    private const double baseThreshold = 0.125; // 12.5% of entries as tombstones
- 
+    private const double _baseThreshold = 0.125; // 12.5% of entries as tombstones
+
     #endregion
 
     #region Constructor
@@ -176,7 +175,7 @@ public class DenseMap<TKey, TValue>
     /// var map = new DenseMap<int, string>();
     /// </code>
     /// </summary>
-    public DenseMap() : this(16, 0.90) { }
+    public DenseMap() : this(16, 0.875) { }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class with the specified length and default load factor.
@@ -186,7 +185,7 @@ public class DenseMap<TKey, TValue>
     /// </code>
     /// </summary>
     /// <param name="length">The length of the hashmap. Will always take the closest power of two.</param>
-    public DenseMap(uint length) : this(length, 0.90) { }
+    public DenseMap(uint length) : this(length, 0.875) { }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class with the specified parameters.
@@ -208,9 +207,9 @@ public class DenseMap<TKey, TValue>
         _length = length;
         _loadFactor = loadFactor;
 
-        if (loadFactor > 0.9)
+        if (loadFactor > 0.875)
         {
-            _loadFactor = 0.9;
+            _loadFactor = 0.875;
         }
 
         if (_length < 16)
@@ -232,11 +231,8 @@ public class DenseMap<TKey, TValue>
         _entries = new Entry[_length + 16];
         _controlBytes = new sbyte[_length + 16];
 
-        // Calculate the weight factor based on the table size
-        double weightFactor = CalculateWeightFactor(_length);
-
         // Calculate max tombstones before rehash based on the dynamic weight factor
-        _maxTombstoneBeforeRehash = (uint)(baseThreshold * _length * weightFactor * (1 - (loadFactor / _length)));
+        _maxTombstoneBeforeRehash = _length * _baseThreshold;
 
         Array.Fill(_controlBytes, _emptyBucket);
         _lengthMinusOne = _length - 1;
@@ -269,7 +265,7 @@ public class DenseMap<TKey, TValue>
     /// <param name="value">The value.</param>
     /// <returns>Returns the old value</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool Emplace(TKey key, TValue value)
+    public void Emplace(TKey key, TValue value)
     {
         // Check if the table is full based on the maximum lookups before needing to resize.
         // Resize if the count exceeds the threshold.
@@ -284,86 +280,65 @@ public class DenseMap<TKey, TValue>
         var h2 = H2(hashcode);
         // Create a SIMD vector with the value of 'h2' for quick equality checks.
         var target = Vector128.Create(h2);
-        // Calculate the initial index by hashing the hashcode with a multiplicative hash function.
-        uint index = _goldenRatio * hashcode >> _shift;
+        // This operation ensures that `index` is in the range [0, capacity - 1] by using only the lower bits of `hashcode`,
+        // which helps in efficient and quick indexing.
+        uint index = hashcode & _lengthMinusOne;
         // Initialize the probing jump distance to zero, which will increase with each probe iteration.
         uint jumpDistance = 0;
-
-        // Fast path: if the control byte at 'index' indicates an empty bucket, insert directly.
-        // Note: No need to use an expensive equalitycomparer
-        ref var controlbyte = ref Find(_controlBytes, index);
-        if (controlbyte == _emptyBucket)
-        {
-            // Claim the bucket by setting its control byte to 'h2'.
-            controlbyte = h2;
-            // Get a reference to the entry at 'index' and assign the key-value pair.
-            ref var entry = ref Find(_entries, index);
-            entry.Value = value;
-            entry.Key = key;
-
-            // Increment the count and return the newly inserted value.
-            Count++;
-            return true;
-        }
-
-        // `indexSimd` is used to track a potential position to place the new entry.
-        int indexSimd = -1;
 
         while (true)
         {
             // Load a 128-bit vector from `_controlBytes` at 'index' to check for matching control bytes.
             var source = Vector128.LoadUnsafe(ref Find(_controlBytes, index));
             // Compare `source` and `target` vectors to find any positions with a matching control byte.
-            var mask = Vector128.Equals(source, target).ExtractMostSignificantBits();
+            var resultMask = Vector128.Equals(source, target).ExtractMostSignificantBits();
+
             // Loop over each set bit in `mask` (indicating matching positions).
-            while (mask != 0)
+            while (resultMask != 0)
             {
                 // Find the lowest set bit in `mask` (first matching position).
-                var bitPos = BitOperations.TrailingZeroCount(mask);
+                var bitPos = BitOperations.TrailingZeroCount(resultMask);
                 // Use `bitPos` to access the corresponding entry in `_entries`.
                 ref var entry = ref Find(_entries, index + Unsafe.As<int, uint>(ref bitPos));
                 // If a matching key is found, update the entry's value and return the old value.
                 if (_comparer.Equals(entry.Key, key))
                 {
                     entry.Value = value;
-                    return true;
+                    return;
                 }
 
                 // Clear the lowest set bit in `mask` to continue with the next matching bit.
-                mask = ResetLowestSetBit(mask);
+                resultMask = ResetLowestSetBit(resultMask);
             }
 
-            // If `entrySimd` is still null, check for tombstone markers in `source`.
-            if (indexSimd == -1)
-            {
-                // Check for tombstones (deleted entries) in the vector.
-                mask = Vector128.Equals(source, _tombstoneVector).ExtractMostSignificantBits();
-                if (mask != 0)
-                {
-                    indexSimd = (int)index + BitOperations.TrailingZeroCount(mask);
-                }
-            }
+            // Note: we arent using tombstones, we just leave them for dead.
+            // This means we are increasing the probe chain, but then again we dont expect there to be alot of tombstones
+            // Probe sequences terminate at the first empty slot they encounter, having an empty slot in the group means that "removing" the current entry without placing a tombstone won’t disrupt probe chains.
+            // More information at "Remove()"
 
+            var emptyMask = Vector128.Equals(source, _emptyBucketVector).ExtractMostSignificantBits();
             // Check for empty buckets in the current vector.
-            mask = Vector128.Equals(source, _emptyBucketVector).ExtractMostSignificantBits();
-            if (mask != 0)
+            if (emptyMask != 0)
             {
-                // If an empty bucket is found and `entrySimd` is not set, use this as the insertion point.
-                // The empty bucket marks the end of a probeChain.
-                if (indexSimd == -1)
-                {
-                    indexSimd = (int)index + BitOperations.TrailingZeroCount(mask);
-                }
-
-                ref var entrySimd = ref Find(_entries, indexSimd);
-
-                entrySimd.Key = key;
-                entrySimd.Value = value;
-
-                Find(_controlBytes, indexSimd) = h2;
-
-                ++Count;
-                return true;
+                // Find the lowest set bit in `mask`, which represents the first matching position in the current probe group.
+                // This identifies the first available slot or match within the group.
+                var bitPos = BitOperations.TrailingZeroCount(emptyMask);
+                // Convert `bitPos` to an unsigned integer and add it to `index` to calculate the absolute position `i`.
+                // This gives the exact position of the slot in `_entries` relative to the table's base index.
+                var i = index + Unsafe.As<int, uint>(ref bitPos);
+                // Access the entry in `_entries` at position `i` for insertion or update.
+                ref var entry = ref Find(_entries, i);
+                // Assign the specified `key` to the `Key` field of the located entry.
+                entry.Key = key;
+                // Assign the specified `value` to the `Value` field of the located entry.
+                entry.Value = value;
+                // Update the control byte at position `i` in `_controlBytes` to `h2`, marking it as occupied.
+                // The control byte typically indicates the status of the slot (occupied, empty, or tombstone).
+                Find(_controlBytes, i) = h2;
+                // Increment the total count of entries in the hash table, reflecting the new insertion.
+                Count++;
+                // Return immediately to indicate the insertion is complete.
+                return;
             }
 
             // Probing is done by incrementing the currentEntry bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
@@ -402,9 +377,9 @@ public class DenseMap<TKey, TValue>
         var h2 = H2(hashcode);
         // Create a 128-bit vector that holds the transformed hash code, which is used for comparisons.
         var target = Vector128.Create(h2);
-        // Calculate the initial index position in the map based on a multiplication with a constant (_goldenRatio)
-        // and a bitwise right shift. This helps spread the entries across the map's range.
-        uint index = _goldenRatio * hashcode >> _shift;
+        // This operation ensures that `index` is in the range [0, capacity - 1] by using only the lower bits of `hashcode`,
+        // which helps in efficient and quick indexing.
+        uint index = hashcode & _lengthMinusOne; 
         // Initialize a variable to keep track of the distance to jump when probing the map.
         uint jumpDistance = 0;
 
@@ -476,6 +451,8 @@ public class DenseMap<TKey, TValue>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ref TValue GetValueRefOrAddDefault(TKey key)
     {
+        // Note: GetValueRefOrAddDefault is mirrored from Emplace
+
         // Check if the table is full based on the maximum lookups before needing to resize.
         // Resize if the count exceeds the threshold.
         if (Count >= _maxLookupsBeforeResize)
@@ -489,29 +466,11 @@ public class DenseMap<TKey, TValue>
         var h2 = H2(hashcode);
         // Create a SIMD vector with the value of 'h2' for quick equality checks.
         var target = Vector128.Create(h2);
-        // Calculate the initial index by hashing the hashcode with a multiplicative hash function.
-        uint index = _goldenRatio * hashcode >> _shift;
+        // This operation ensures that `index` is in the range [0, capacity - 1] by using only the lower bits of `hashcode`,
+        // which helps in efficient and quick indexing.
+        uint index = hashcode & _lengthMinusOne;
         // Initialize the probing jump distance to zero, which will increase with each probe iteration.
         uint jumpDistance = 0;
-
-        // Fast path: if the control byte at 'index' indicates an empty bucket, insert directly.
-        // Note: No need to use an expensive equalitycomparer
-        ref var controlbyte = ref Find(_controlBytes, index);
-        if (controlbyte == _emptyBucket)
-        {
-            // Claim the bucket by setting its control byte to 'h2'.
-            controlbyte = h2;
-            // Get a reference to the entry at 'index' and assign the key-value pair.
-            ref var entry = ref Find(_entries, index);
-            entry.Key = key;
-
-            // Increment the count and return the newly inserted value.
-            Count++;
-            return ref entry.Value;
-        }
-
-        // `indexSimd` is used to track a potential position to place the new entry.
-        int indexSimd = -1;
 
         while (true)
         {
@@ -536,37 +495,31 @@ public class DenseMap<TKey, TValue>
                 mask = ResetLowestSetBit(mask);
             }
 
-            // If `entrySimd` is still null, check for tombstone markers in `source`.
-            if (indexSimd == -1)
-            {
-                // Check for tombstones (deleted entries) in the vector.
-                mask = Vector128.Equals(source, _tombstoneVector).ExtractMostSignificantBits();
-                if (mask != 0)
-                {
-                    indexSimd = (int)index + BitOperations.TrailingZeroCount(mask);
-                }
-            }
+            // Note: we arent using tombstones, we just leave them for dead.
+            // This means we are increasing the probe chain, but then again we dont expect there to be alot of tombstones
+            // Probe sequences terminate at the first empty slot they encounter, having an empty slot in the group means that "removing" the current entry without placing a tombstone won’t disrupt probe chains.
+            // More information at "Remove()"
 
             // Check for empty buckets in the current vector.
             mask = Vector128.Equals(source, _emptyBucketVector).ExtractMostSignificantBits();
             if (mask != 0)
             {
-                // If an empty bucket is found and `entrySimd` is not set, use this as the insertion point.
-                // The empty bucket marks the end of a probeChain.
-                if (indexSimd == -1)
-                {
-                    indexSimd = (int)index + BitOperations.TrailingZeroCount(mask);
-                }
+                // Find the lowest set bit in `mask`, which represents the first matching position.
+                var bitPos = BitOperations.TrailingZeroCount(mask);
+                // Convert `bitPos` to an unsigned integer and add it to `index` to get the absolute position `i`.
+                // This calculates the offset within the group where the match or available slot is located.
+                var i = index + Unsafe.As<int, uint>(ref bitPos);
+                // Access the entry in `_entries` at the calculated position `i`.
+                ref var entry = ref Find(_entries, i);
+                // Set the key for the located entry to the specified `key`.
+                entry.Key = key;
+                // Set the control byte for the entry at position `i` to `h2` to mark it as occupied.
+                Find(_controlBytes, i) = h2;
+                // Increment the total count of entries in the hash table.
+                Count++;
 
-                ref var entrySimd = ref Find(_entries, indexSimd);
-
-                entrySimd.Key = key;
-
-                Find(_controlBytes, indexSimd) = h2;
-
-                ++Count;
-
-                return ref entrySimd.Value;
+                // Return a reference to the `Value` field of the entry, allowing for direct access or assignment.
+                return ref entry.Value;
             }
 
             // Probing is done by incrementing the currentEntry bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
@@ -602,8 +555,9 @@ public class DenseMap<TKey, TValue>
         var h2 = H2(hashcode);
         // Create a 128-bit vector from the transformed hash code to use as the target for comparison.
         var target = Vector128.Create(h2);
-        // Calculate the initial index position in the hash map, using `_goldenRatio` and a right shift.
-        uint index = (_goldenRatio * hashcode) >> _shift;
+        // This operation ensures that `index` is in the range [0, capacity - 1] by using only the lower bits of `hashcode`,
+        // which helps in efficient and quick indexing.
+        uint index = hashcode & _lengthMinusOne;
         // Initialize `jumpDistance` to control the distance between probes, starting at zero.
         uint jumpDistance = 0;
 
@@ -674,9 +628,10 @@ public class DenseMap<TKey, TValue>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Remove(TKey key)
     {
+        // We dont expect to trigger this. Use a resize sinds this will only happen when the table is nearly full
         if (_tombstoneCounter >= _maxTombstoneBeforeRehash)
         {
-            Rehash();
+            Resize();
         }
         // Compute the hash code for the given key and cast it to an unsigned integer for bitwise operations.
         var hashcode = (uint)key.GetHashCode();
@@ -684,8 +639,9 @@ public class DenseMap<TKey, TValue>
         var h2 = H2(hashcode);
         // Create a 128-bit vector from the transformed hash code to use as the target for comparison.
         var target = Vector128.Create(h2);
-        // Calculate the initial index position in the hash map, based on `_goldenRatio` and bit-shifting.
-        uint index = (_goldenRatio * hashcode) >> _shift;
+        // This operation ensures that `index` is in the range [0, capacity - 1] by using only the lower bits of `hashcode`,
+        // which helps in efficient and quick indexing.
+        uint index = hashcode & _lengthMinusOne;
         // Initialize `jumpDistance` to control the distance between probes, starting at zero.
         uint jumpDistance = 0;
 
@@ -698,40 +654,59 @@ public class DenseMap<TKey, TValue>
 
             // Compare `source` with `target`. `ExtractMostSignificantBits` returns a bitmask
             // where each set bit represents a potential match with `target`.
-            var mask = Vector128.Equals(source, target).ExtractMostSignificantBits();
+            var resultMask = Vector128.Equals(source, target).ExtractMostSignificantBits();
+            var emptyMask = Vector128.Equals(_emptyBucketVector, source).ExtractMostSignificantBits();
 
             // Process each matching bit in `mask`.
-            while (mask != 0)
+            while (resultMask != 0)
             {
                 // Get the position of the first set bit in `mask`, indicating a potential key match.
-                var bitPos = BitOperations.TrailingZeroCount(mask);
+                var bitPos = BitOperations.TrailingZeroCount(resultMask);
+
+                var i = index + Unsafe.As<int, uint>(ref bitPos);
 
                 // Check if the entry at the matched position has a key that equals the specified key.
-                // Use `_comparer` to ensure accurate key comparison.
-                if (_comparer.Equals(Find(_entries, index + Unsafe.As<int, uint>(ref bitPos)).Key, key))
+                // Use `_comparer` to ensure accurate key comparison.              
+                if (_comparer.Equals(Find(_entries, i).Key, key))
                 {
-                    // If a match is found, mark the control byte as a tombstone to indicate a deleted entry.
-                    Find(_controlBytes, index + Unsafe.As<int, uint>(ref bitPos)) = _tombstone;
+                    // If the group that contains the entry to be removed has an empty slot (an unoccupied slot that is marked empty rather than as a tombstone), this indicates that any probe sequence for a key would terminate upon reaching that empty slot.
+                    // Since probe sequences terminate at the first empty slot they encounter, having an empty slot in the group means that removing the current entry without placing a tombstone won’t disrupt probe chains.
+                    // Any probe sequence for another key that reaches this group would terminate on the existing empty slot before it could reach the removed slot.Therefore, there is no need to place a tombstone to preserve probe chain integrity.
+
+                    // By skipping tombstone placement in this case, densemap reduces the need for tombstone management and avoids increasing the tombstone count, which would otherwise contribute to the rehash threshold.
+                    // This keeps the table cleaner and minimizes the chance of triggering rehashes due to tombstone accumulation.
+
+                    // Example:
+                    // Imagine a group of 16 slots where a slot in the group is already empty. When removing an entry from this group, Densemap can remove the key without marking it as a tombstone because:
+                    // 1. Any probe sequence from a different key that reaches this group would stop at the empty slot before hitting the removed slot.
+                    // 2. This effectively preserves probe chain termination without needing the removed slot to act as a tombstone.
+
+                    if (emptyMask > 0)
+                    {
+                        Find(_controlBytes, i) = _emptyBucket;
+                    }
+                    else
+                    {
+                        Find(_controlBytes, i) = _tombstone;
+                        _tombstoneCounter++;
+                    }
 
                     // Reset to default
-                    Find(_entries, index + Unsafe.As<int, uint>(ref bitPos)) = default;
-
+                    Find(_entries, i) = default;
                     // Decrement the `Count` to reflect the removal of an entry.
                     --Count;
-
-                    _tombstoneCounter++;
 
                     // Return `true` to indicate that the key was successfully removed.
                     return true;
                 }
 
                 // Clear the lowest set bit in `mask` to continue checking any remaining matches in the vector.
-                mask = ResetLowestSetBit(mask);
+                resultMask = ResetLowestSetBit(resultMask);
             }
 
             // Check if `source` contains any empty buckets, which would indicate the end of the probe chain.
             // If an empty bucket is found, the key is not in the map.
-            if (Vector128.Equals(_emptyBucketVector, source).ExtractMostSignificantBits() != 0)
+            if (emptyMask != 0)
             {
                 // Return `false` since the key was not found and no removal was performed.
                 return false;
@@ -768,8 +743,9 @@ public class DenseMap<TKey, TValue>
         var h2 = H2(hashcode);
         // Create a 128-bit vector from the transformed hash code to use as the target for comparison.
         var target = Vector128.Create(h2);
-        // Calculate the initial index position in the hash map, using `_goldenRatio` and a right shift.
-        uint index = _goldenRatio * hashcode >> _shift;
+        // This operation ensures that `index` is in the range [0, capacity - 1] by using only the lower bits of `hashcode`,
+        // which helps in efficient and quick indexing.
+        uint index = hashcode & _lengthMinusOne;    
         // Initialize `jumpDistance` to control the distance between probes, starting at zero.
         uint jumpDistance = 0;
 
@@ -822,7 +798,6 @@ public class DenseMap<TKey, TValue>
             index &= _lengthMinusOne; // Ensures the index remains within the valid range of the map.
         }
     }
-
 
     /// <summary>
     /// Copies entries from one map to another.
@@ -902,75 +877,6 @@ public class DenseMap<TKey, TValue>
     #region Private Methods
 
     /// <summary>
-    /// Calculates a weight factor based on the table size.
-    /// The weight factor decreases as the table size grows.
-    /// </summary>
-    /// <param name="tableSize">The current size of the table.</param>
-    /// <returns>The weight factor to apply to the tombstone limit.</returns>
-    private double CalculateWeightFactor(uint tableSize)
-    {
-        // Start with a higher weight factor for small tables and reduce gradually
-        if (tableSize <= 16) return 3;
-        if (tableSize <= 32) return 2.75;
-        if (tableSize <= 64) return 2.5;
-        if (tableSize <= 128) return 2.25;
-        if (tableSize <= 256) return 2;
-        if (tableSize <= 512) return 1.75;
-        if (tableSize <= 1024) return 1.5;
-        if (tableSize <= 2048) return 1.25;
-
-        // For larger tables, return the base threshold weight factor
-        return 1.0;
-    }
-
-    private void Rehash()
-    {
-        var oldEntries = _entries;
-        var oldMetadata = _controlBytes;
-        _tombstoneCounter = 0;
-
-        var size = Unsafe.As<uint, int>(ref _length) + 16;
-
-        _controlBytes = GC.AllocateArray<sbyte>(size);
-        _entries = GC.AllocateArray<Entry>(size);
-
-        _controlBytes.AsSpan().Fill(_emptyBucket);
-
-        for (uint i = 0; i < oldEntries.Length; ++i)
-        {
-            var h2 = Find(oldMetadata, i);
-            if (h2 < 0)
-            {
-                continue;
-            }
-
-            var entry = Find(oldEntries, i);
-
-            var hashcode = (uint)entry.Key.GetHashCode();
-            uint index = (_goldenRatio * hashcode) >> _shift;
-            uint jumpDistance = 0;
-
-            while (true)
-            {
-                var mask = Vector128.LoadUnsafe(ref Find(_controlBytes, index)).ExtractMostSignificantBits();
-                if (mask != 0)
-                {
-                    var bitPos = BitOperations.TrailingZeroCount(mask);
-                    index += Unsafe.As<int, uint>(ref bitPos);
-
-                    Find(_controlBytes, index) = h2;
-                    Find(_entries, index) = entry;
-                    break;
-                }
-
-                jumpDistance += 16;
-                index += jumpDistance;
-                index &= _lengthMinusOne;
-            }
-        }
-    }
-
-    /// <summary>
     /// Resizes the map by doubling its size and rehashing all entries.
     /// </summary>     
     private void Resize()
@@ -981,12 +887,7 @@ public class DenseMap<TKey, TValue>
         _maxLookupsBeforeResize = _length * _loadFactor;
 
         _tombstoneCounter = 0;
-
-        // Calculate the weight factor based on the table size
-        double weightFactor = CalculateWeightFactor(_length);
-
-        // Calculate max tombstones before rehash based on the dynamic weight factor
-        _maxTombstoneBeforeRehash = (uint)(baseThreshold * _length * weightFactor * (1 - (_loadFactor / _length)));
+        _maxTombstoneBeforeRehash = _length * _baseThreshold;
 
         var oldEntries = _entries;
         var oldMetadata = _controlBytes;
@@ -1009,7 +910,7 @@ public class DenseMap<TKey, TValue>
             var entry = Find(oldEntries, i);
 
             var hashcode = (uint)entry.Key.GetHashCode();
-            uint index = (_goldenRatio * hashcode) >> _shift;
+            uint index = hashcode & _lengthMinusOne;
             uint jumpDistance = 0;
 
             while (true)
@@ -1059,7 +960,7 @@ public class DenseMap<TKey, TValue>
     /// <param name="hashcode">The hashcode.</param>
     /// <returns>The 7 lowest bits of the hashcode.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static sbyte H2(uint hashcode) => (sbyte)(hashcode & 0b01111111);
+    private static sbyte H2(uint hashcode) => (sbyte)(hashcode >> 25);
 
     /// <summary>
     /// Resets the lowest significant bit in the given value.

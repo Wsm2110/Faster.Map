@@ -17,8 +17,7 @@ namespace Faster.Map.DenseMap.Tests
         [Fact]
         public void Emplace_ShouldInsertNewKeyValuePair_WhenKeyDoesNotExist()
         {
-            var result = _map.Emplace(1, "value1");
-            Assert.True(result);
+            _map.Emplace(1, "value1");           
             Assert.True(_map.Contains(1));
             Assert.Equal("value1", _map[1]);
         }
@@ -27,9 +26,8 @@ namespace Faster.Map.DenseMap.Tests
         public void Emplace_ShouldUpdateExistingKeyValuePair_WhenKeyAlreadyExists()
         {
             _map.Emplace(1, "initialValue");
-            var result = _map.Emplace(1, "updatedValue");
-
-            Assert.True(result);
+            _map.Emplace(1, "updatedValue");
+           
             Assert.True(_map.Contains(1));
             Assert.Equal("updatedValue", _map[1]);
         }
@@ -99,9 +97,9 @@ namespace Faster.Map.DenseMap.Tests
         [Fact]
         public void Emplace_ShouldReturnDefault_WhenInsertingNewKey()
         {
-            var result = _map.Emplace(1, "newValue");
+            _map.Emplace(1, "newValue");
 
-            Assert.True(result);
+         
             Assert.True(_map.Contains(1));
             Assert.Equal("newValue", _map[1]);
         }
@@ -110,9 +108,8 @@ namespace Faster.Map.DenseMap.Tests
         public void Emplace_ShouldReturnOldValue_WhenUpdatingExistingKey()
         {
             _map.Emplace(1, "initialValue");
-            var result = _map.Emplace(1, "updatedValue");
-
-            Assert.True(result);
+            _map.Emplace(1, "updatedValue");
+        
             Assert.Equal("updatedValue", _map[1]);
         }
 
@@ -120,9 +117,8 @@ namespace Faster.Map.DenseMap.Tests
         public void Emplace_ShouldUpdateValue_WhenDuplicateKeyIsInsertedConsecutively()
         {
             _map.Emplace(1, "initialValue");
-            var result = _map.Emplace(1, "duplicateValue");
-
-            Assert.True(result);
+            _map.Emplace(1, "duplicateValue");
+       
             Assert.True(_map.Contains(1));
             Assert.Equal("duplicateValue", _map[1]);
         }
@@ -132,9 +128,8 @@ namespace Faster.Map.DenseMap.Tests
         {
             _map.Emplace(1, "value1");
             _map.Emplace(1, "value2");
-            var result = _map.Emplace(1, "finalValue");
-
-            Assert.True(result);
+            _map.Emplace(1, "finalValue");
+          
             Assert.True(_map.Contains(1));
             Assert.Equal("finalValue", _map[1]);
         }
@@ -236,9 +231,8 @@ namespace Faster.Map.DenseMap.Tests
             _map.Emplace(2, "value2");
             _map.Remove(1);
 
-            var result = _map.Emplace(1, "newValue");
-
-            Assert.True(result);
+           _map.Emplace(1, "newValue");
+       
             Assert.Equal("newValue", _map[1]);
             Assert.Equal("value2", _map[2]);
         }
@@ -299,9 +293,8 @@ namespace Faster.Map.DenseMap.Tests
             _map.Emplace(1, "value1");
             _map.Remove(1);
 
-            var result = _map.Emplace(1, "newValue");
-
-            Assert.True(result);
+           _map.Emplace(1, "newValue");
+      
             Assert.Equal("newValue", _map[1]);
         }
 
@@ -384,16 +377,16 @@ namespace Faster.Map.DenseMap.Tests
         public void Emplace_ShouldResizeCorrectlyAtHighLoadFactor()
         {
             // Insert entries to reach the resizing threshold
-            for (int i = 0; i < 15; i++) // Close to initial capacity of 16 with load factor 0.9
+            for (int i = 0; i <= 28; i++) // Close to initial capacity of 32 with load factor 0.9
             {
                 _map.Emplace(i, $"value{i}");
             }
 
             // The map should have resized to accommodate the entries
-            Assert.True(_map.Size > 16); // Initial capacity exceeded due to resizing
+            Assert.True(_map.Size > 32); // Initial capacity exceeded due to resizing
 
             // Ensure no data is lost after resizing
-            for (int i = 0; i < 15; i++)
+            for (int i = 0; i <= 28; i++)
             {
                 Assert.Equal($"value{i}", _map[i]);
             }
@@ -504,10 +497,9 @@ namespace Faster.Map.DenseMap.Tests
             _map.Remove(2);
 
             // Step 4: Re-add an existing entry (should update, not duplicate)
-            var oldValue = _map.Emplace(1, "newValue1");
+             _map.Emplace(1, "newValue1");
 
-            // Step 5: Assertions
-            Assert.True(oldValue); // Ensure old value is returned
+            // Step 5: Assertions   
             Assert.Equal("newValue1", _map[1]); // Verify updated value for key 1
             Assert.False(_map.Contains(2)); // Key 2 should be removed
             Assert.Equal("value3", _map[3]); // Key 3 should remain unchanged
@@ -539,9 +531,8 @@ namespace Faster.Map.DenseMap.Tests
             _map.Remove(13);
 
             // Try to add a duplicate which is in the second group of 16
-            var value = _map.Emplace(767, "UpdatedValue");
-
-            Assert.True(value);
+           _map.Emplace(767, "UpdatedValue");
+            
             Assert.True(_map[767] == "UpdatedValue");
         }
 
@@ -570,9 +561,8 @@ namespace Faster.Map.DenseMap.Tests
             _map.Remove(13);
 
             // Try to add _map duplicate which is in the second group of 16
-            var value = _map.Emplace(coll.ElementAt(100), "newValue");
-
-            Assert.True(value);
+            _map.Emplace(coll.ElementAt(100), "newValue");
+         
             Assert.True(_map[coll.ElementAt(100)] == "newValue");
         }
     }
