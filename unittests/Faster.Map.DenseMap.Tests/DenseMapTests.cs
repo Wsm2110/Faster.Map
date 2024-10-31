@@ -7,7 +7,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
 
-namespace Faster.Map.Densemap.Tests
+namespace Faster.Map.DenseMap.Tests
 {
     [TestClass]
     public class DenseMapTests

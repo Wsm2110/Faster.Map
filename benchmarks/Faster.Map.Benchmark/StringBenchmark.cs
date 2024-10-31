@@ -1,4 +1,6 @@
 ﻿using BenchmarkDotNet.Attributes;
+using Faster.Map.Core;
+using Faster.Map.Hasher;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -49,7 +51,7 @@ namespace Faster.Map.Benchmark
             uint length = BitOperations.RoundUpToPowerOf2(Length) * 2;
             int dicLength = HashHelpers.GetPrime((int)Length);
 
-            _denseMap = new DenseMap<string, string>(length);
+            _denseMap = new DenseMap<string, string>(length, 0875, new StringHasher());
             _dictionary = new Dictionary<string, string>(dicLength);
             _robinhoodMap = new RobinhoodMap<string, string>(length);
 
@@ -70,23 +72,23 @@ namespace Faster.Map.Benchmark
             }
         }
 
-        [Benchmark]
-        public void RobinhoodMap()
-        {
-            foreach (var key in keys)
-            {
-                _robinhoodMap.Get(key, out var result);
-            }
-        }
+        //[Benchmark]
+        //public void RobinhoodMap()
+        //{
+        //    foreach (var key in keys)
+        //    {
+        //        _robinhoodMap.Get(key, out var result);
+        //    }
+        //}
 
-        [Benchmark]
-        public void Dictionary()
-        {
-            foreach (var key in keys)
-            {
-                _dictionary.TryGetValue(key, out var result);
-            }
-        }
+        //[Benchmark]
+        //public void Dictionary()
+        //{
+        //    foreach (var key in keys)
+        //    {
+        //        _dictionary.TryGetValue(key, out var result);
+        //    }
+        //}
 
     }
 }

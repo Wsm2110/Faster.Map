@@ -20,10 +20,10 @@
       Smart Tombstone Management: Introduced an optimized approach to manage and avoid tombstones, enhancing data integrity and reducing unnecessary overhead.
     </PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/Wsm2110/Faster.Map</PackageProjectUrl>
-    <AssemblyVersion>6.1.0</AssemblyVersion>
-    <FileVersion>6.1.0</FileVersion>
+    <AssemblyVersion>6.1.1</AssemblyVersion>
+    <FileVersion>6.1.1</FileVersion>
     <Title>Fastest .net hashmap</Title>
-    <Version>6.1.0</Version>
+    <Version>6.1.1</Version>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Description>
       Incredibly fast (concurrent) hashmap

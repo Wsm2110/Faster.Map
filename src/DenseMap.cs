@@ -3,6 +3,9 @@
 
 #if NET7_0_OR_GREATER
 
+using Faster.Map.Contracts;
+using Faster.Map.Core;
+using Faster.Map.Hasher;
 using System;
 using System.Collections.Generic;
 using System.Numerics;
@@ -163,6 +166,7 @@ public class DenseMap<TKey, TValue>
     private double _maxLookupsBeforeResize;
     private uint _lengthMinusOne;
     private readonly double _loadFactor;
+    private readonly IHasher<TKey> _hasher;    
     private readonly IEqualityComparer<TKey> _comparer;
     private const double _baseThreshold = 0.125; // 12.5% of entries as tombstones
 
@@ -177,7 +181,16 @@ public class DenseMap<TKey, TValue>
     /// var map = new DenseMap<int, string>();
     /// </code>
     /// </summary>
-    public DenseMap() : this(16, 0.875) { }
+    public DenseMap(IHasher<TKey> hasher) : this(16, 0.875, hasher) { }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class with default parameters.
+    /// Example:
+    /// <code>
+    /// var map = new DenseMap<int, string>();
+    /// </code>
+    /// </summary>
+    public DenseMap() : this(16, 0.875, new DefaultHasher<TKey>()) { }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class with the specified length and default load factor.
@@ -187,7 +200,7 @@ public class DenseMap<TKey, TValue>
     /// </code>
     /// </summary>
     /// <param name="length">The length of the hashmap. Will always take the closest power of two.</param>
-    public DenseMap(uint length) : this(length, 0.875) { }
+    public DenseMap(uint length) : this(length, 0.875, new DefaultHasher<TKey>()) { }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class with the specified parameters.
@@ -199,7 +212,7 @@ public class DenseMap<TKey, TValue>
     /// <param name="length">The length of the hashmap. Will always take the closest power of two.</param>
     /// <param name="loadFactor">The load factor determines when the hashmap will resize.</param>
     /// <param name="keyComparer">Used to compare keys to resolve hash collisions.</param>
-    public DenseMap(uint length, double loadFactor)
+    public DenseMap(uint length, double loadFactor, IHasher<TKey> hasher = null)
     {
         if (!Vector128.IsHardwareAccelerated)
         {
@@ -208,6 +221,7 @@ public class DenseMap<TKey, TValue>
 
         _length = length;
         _loadFactor = loadFactor;
+        _hasher = hasher ?? new DefaultHasher<TKey>();
 
         if (loadFactor > 0.875)
         {
@@ -232,7 +246,7 @@ public class DenseMap<TKey, TValue>
         _shift = (byte)(_shift - BitOperations.Log2(_length));
 
         _controlBytes = new sbyte[_length + 16];
-        _entries = new Entry[_length];
+        _entries = new Entry[_length + 16];
 
         _maxTombstoneBeforeRehash = _length * _baseThreshold;
 
@@ -277,7 +291,7 @@ public class DenseMap<TKey, TValue>
         }
 
         // Calculate the hash code for the key and cast it to uint for non-negative indexing.
-        var hashcode = (uint)key.GetHashCode();
+        var hashcode = _hasher.ComputeHash(key);
         // Generate a secondary hash value 'h2' for probing, used to avoid clustering.
         var h2 = H2(hashcode);
         // Create a SIMD vector with the value of 'h2' for quick equality checks.
@@ -336,7 +350,7 @@ public class DenseMap<TKey, TValue>
                 entry.Value = value;
                 // Update the control byte at position `i` in `_controlBytes` to `h2`, marking it as occupied.
                 // The control byte typically indicates the status of the slot (occupied, empty, or tombstone).
-                SetCtrl(i, h2);
+                Find(_controlBytes, i) = h2;
                 // Increment the total count of entries in the hash table, reflecting the new insertion.
                 Count++;
                 // Return immediately to indicate the insertion is complete.
@@ -374,7 +388,7 @@ public class DenseMap<TKey, TValue>
     public bool Get(TKey key, out TValue value)
     {
         // Compute the hash code for the given key and cast it to an unsigned integer for bitwise operations.
-        var hashcode = (uint)key.GetHashCode();
+        var hashcode = _hasher.ComputeHash(key);
         // Apply a secondary hash function to further spread the bits of the hashcode to reduce clustering.
         var h2 = H2(hashcode);
         // Create a 128-bit vector that holds the transformed hash code, which is used for comparisons.
@@ -460,7 +474,7 @@ public class DenseMap<TKey, TValue>
         }
 
         // Calculate the hash code for the key and cast it to uint for non-negative indexing.
-        var hashcode = (uint)key.GetHashCode();
+        var hashcode = _hasher.ComputeHash(key);
         // Generate a secondary hash value 'h2' for probing, used to avoid clustering.
         var h2 = H2(hashcode);
         // Create a SIMD vector with the value of 'h2' for quick equality checks.
@@ -513,7 +527,7 @@ public class DenseMap<TKey, TValue>
                 // Set the key for the located entry to the specified `key`.
                 entry.Key = key;
                 // Set the control byte for the entry at position `i` to `h2` to mark it as occupied.
-                SetCtrl(i, h2);
+                Find(_controlBytes, i) = h2;
                 // Increment the total count of entries in the hash table.
                 Count++;
 
@@ -549,7 +563,7 @@ public class DenseMap<TKey, TValue>
     public bool Update(TKey key, TValue value)
     {
         // Compute the hash code for the given key and cast to an unsigned integer for bitwise operations.
-        var hashcode = (uint)key.GetHashCode();
+        var hashcode = _hasher.ComputeHash(key);
         // Apply a secondary hash function to further spread out hashcode bits.
         var h2 = H2(hashcode);
         // Create a 128-bit vector from the transformed hash code to use as the target for comparison.
@@ -632,7 +646,7 @@ public class DenseMap<TKey, TValue>
             Resize();
         }
         // Compute the hash code for the given key and cast it to an unsigned integer for bitwise operations.
-        var hashcode = (uint)key.GetHashCode();
+        var hashcode = _hasher.ComputeHash(key);
         // Apply a secondary hash function to further spread the hash bits.
         var h2 = H2(hashcode);
         // Create a 128-bit vector from the transformed hash code to use as the target for comparison.
@@ -681,11 +695,11 @@ public class DenseMap<TKey, TValue>
 
                     if (emptyMask > 0)
                     {
-                        SetCtrl(i, _emptyBucket);
+                        Find(_controlBytes, i) = _emptyBucket;
                     }
                     else
                     {
-                        SetCtrl(i, _tombstone);
+                        Find(_controlBytes, i) = _tombstone;
                         _tombstoneCounter++;
                     }
 
@@ -736,7 +750,7 @@ public class DenseMap<TKey, TValue>
     public bool Contains(TKey key)
     {
         // Compute the hash code for the given key and cast it to an unsigned integer for bitwise operations.
-        var hashcode = (uint)key.GetHashCode();
+        var hashcode = _hasher.ComputeHash(key);
         // Apply a secondary hash function to further spread the bits of the hashcode.
         var h2 = H2(hashcode);
         // Create a 128-bit vector from the transformed hash code to use as the target for comparison.
@@ -890,7 +904,7 @@ public class DenseMap<TKey, TValue>
         var size = Unsafe.As<uint, int>(ref _length);
 
         _controlBytes = GC.AllocateUninitializedArray<sbyte>(size + 16);
-        _entries = GC.AllocateArray<Entry>(size);
+        _entries = GC.AllocateArray<Entry>(size + 16);
 
         _controlBytes.AsSpan().Fill(_emptyBucket);
 
@@ -904,7 +918,7 @@ public class DenseMap<TKey, TValue>
 
             var entry = Find(oldEntries, i);
 
-            var hashcode = (uint)entry.Key.GetHashCode();
+            var hashcode = _hasher.ComputeHash(entry.Key);
             uint index = hashcode & _lengthMinusOne;
             uint jumpDistance = 0;
 
@@ -916,7 +930,7 @@ public class DenseMap<TKey, TValue>
                     var bitPos = BitOperations.TrailingZeroCount(mask);
                     index += Unsafe.As<int, uint>(ref bitPos);
 
-                    SetCtrl(i, h2);
+                    Find(_controlBytes, index) = h2;
                     Find(_entries, index) = entry;
                     break;
                 }
@@ -980,6 +994,14 @@ public class DenseMap<TKey, TValue>
 
         // If probing starts at index 60, a SIMD load from 60–75 will read indices 60–63 in the main array and wrap into the mirrored control bytes(64–75), which mirror indices 0–11.
         // This allows the probe to seamlessly continue from the end of the array to the start, simulating a circular array without needing additional checks or modular arithmetic.
+
+        // Warning: This approach may lead to unintended behavior in some edge cases.
+        // For example, suppose we hash a key to slot 3 with a control byte (h2) of 68, 
+        // and slots 12–15 in the control array are occupied. If another key hashes to 
+        // slot 14 with an h2 of 68, the mirrored control bytes could cause it to appear 
+        // as a "match" at the beginning of the table when probed. This false match could 
+        // lead to unintended lookups or modifications and potentially out-of-bounds issues 
+        // during probing if not properly checked against the actual key data in the entries array.
 
         var index2 = ((index - _groupWidth) & _lengthMinusOne) + _groupWidth;
         Find(_controlBytes, index) = ctrl;
