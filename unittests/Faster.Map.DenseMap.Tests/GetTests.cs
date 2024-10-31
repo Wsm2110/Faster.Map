@@ -275,5 +275,20 @@ namespace Faster.Map.DenseMap.Tests
             Assert.True(map.Get(8, out var value));
             Assert.Equal("newEight", value);
         }
+
+        [Fact]
+        public void Get_ShouldReturn_WhileMapIsEmpty()
+        {
+            var dense = new DenseMap<int, int>();
+            for (int i = 1; i <= 16; ++i)
+            {
+                dense.Emplace(i, 0);
+                dense.Remove(i);
+            }
+
+            var result = dense.Get(0, out int value);
+
+            Assert.False(result);
+        }
     }
 }
