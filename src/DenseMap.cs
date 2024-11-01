@@ -4,7 +4,6 @@
 #if NET7_0_OR_GREATER
 
 using Faster.Map.Contracts;
-using Faster.Map.Core;
 using Faster.Map.Hasher;
 using System;
 using System.Collections.Generic;

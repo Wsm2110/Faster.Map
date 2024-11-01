@@ -25,7 +25,7 @@ namespace Faster.Map.Benchmark
 
         #region Properties
 
-        [Params(1000, 10000, 100000, 400000, 900000, 1000000)]
+        [Params(/*1000, 10000, 100000, 400000, 900000,*/ 1000000)]
         public uint Length { get; set; }
 
         #endregion
@@ -71,23 +71,23 @@ namespace Faster.Map.Benchmark
             }
         }
 
-        [Benchmark]
-        public void RobinhoodMap()
-        {
-            foreach (var key in keys)
-            {
-                _robinhoodMap.Get(key, out var result);
-            }
-        }
+        //[Benchmark]
+        //public void RobinhoodMap()
+        //{
+        //    foreach (var key in keys)
+        //    {
+        //        _robinhoodMap.Get(key, out var result);
+        //    }
+        //}
 
-        [Benchmark]
-        public void Dictionary()
-        {
-            foreach (var key in keys)
-            {
-                _dictionary.TryGetValue(key, out var result);
-            }
-        }
+        //[Benchmark]
+        //public void Dictionary()
+        //{
+        //    foreach (var key in keys)
+        //    {
+        //        _dictionary.TryGetValue(key, out var result);
+        //    }
+        //}
 
     }
 }

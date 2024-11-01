@@ -26,7 +26,7 @@ namespace Faster.Map.Benchmark
 
         #region Properties
 
-        [Params(1000, 10000, 100000, 400000, 900000, 1000000)]
+        [Params(/*1000, 10000, 100000, 400000, 900000,*/ 1000000)]
         public uint Length { get; set; }
 
         #endregion
@@ -51,7 +51,7 @@ namespace Faster.Map.Benchmark
             uint length = BitOperations.RoundUpToPowerOf2(Length) * 2;
             int dicLength = HashHelpers.GetPrime((int)Length);
 
-            _denseMap = new DenseMap<string, string>(length, 0875, new StringHasher());
+            _denseMap = new DenseMap<string, string>(length, 0.875, new XxHash3StringHasher());
             _dictionary = new Dictionary<string, string>(dicLength);
             _robinhoodMap = new RobinhoodMap<string, string>(length);
 

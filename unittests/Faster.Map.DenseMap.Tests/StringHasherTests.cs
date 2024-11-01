@@ -13,7 +13,7 @@ namespace Faster.Map.DenseMap.Tests
 
         public StringHasherTests()
         {
-            _map = new DenseMap<string, string>(16, 0.875, new StringHasher());
+            _map = new DenseMap<string, string>(16, 0.875, new XxHash3StringHasher());
         }
 
         [Fact]
@@ -170,7 +170,7 @@ namespace Faster.Map.DenseMap.Tests
         [Fact]
         public void LoadFactorLimit_DoesNotExceedForStringKeys()
         {
-            var result = new DenseMap<string, string>(4, 0.75, new StringHasher());
+            var result = new DenseMap<string, string>(4, 0.75, new XxHash3StringHasher());
 
             result.Emplace("key1", "value1");
             result.Emplace("key2", "value2");

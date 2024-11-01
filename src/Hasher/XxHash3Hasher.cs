@@ -11,8 +11,8 @@ namespace Faster.Map.Hasher
         public uint ComputeHash(T key)
         {
             var span = MemoryMarshal.AsBytes(MemoryMarshal.CreateReadOnlySpan(ref Unsafe.AsRef(key), 1));
-            var result = XxHash3.Hash(MemoryMarshal.AsBytes(span));
-            return Unsafe.ReadUnaligned<uint>(ref result[0]);
+            var result = XxHash3.HashToUInt64(MemoryMarshal.AsBytes(span)) >> 32;
+            return Unsafe.As<ulong, uint>(ref result);         
         }
     }
 }

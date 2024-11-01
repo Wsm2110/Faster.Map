@@ -6,14 +6,13 @@ using Faster.Map.Contracts;
 
 namespace Faster.Map.Hasher
 {
-    public class StringHasher : IHasher<string>
+    public class XxHash3StringHasher : IHasher<string>
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public uint ComputeHash(string key)
         {
-            var span = key.AsSpan();
-            var result = XxHash3.Hash(MemoryMarshal.AsBytes(span));
-            return Unsafe.ReadUnaligned<uint>(ref result[0]);
+            var result = XxHash3.HashToUInt64(MemoryMarshal.AsBytes(key.AsSpan())) >> 32;
+            return Unsafe.As<ulong, uint>(ref result);
         }
     }
 }
