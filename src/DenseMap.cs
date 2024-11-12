@@ -297,7 +297,7 @@ public class DenseMap<TKey, TValue>
         var target = Vector128.Create(h2);
         // This operation ensures that `index` is in the range [0, capacity - 1] by using only the lower bits of `hashcode`,
         // which helps in efficient and quick indexing.
-        uint index = hashcode & _lengthMinusOne;
+        var index = hashcode & _lengthMinusOne;
         // Initialize the probing jump distance to zero, which will increase with each probe iteration.
         uint jumpDistance = 0;
 
@@ -394,7 +394,7 @@ public class DenseMap<TKey, TValue>
         var target = Vector128.Create(h2);
         // This operation ensures that `index` is in the range [0, capacity - 1] by using only the lower bits of `hashcode`,
         // which helps in efficient and quick indexing.
-        uint index = hashcode & _lengthMinusOne;
+        var index = hashcode & _lengthMinusOne;
         // Initialize a variable to keep track of the distance to jump when probing the map.
         uint jumpDistance = 0;
 
@@ -480,7 +480,7 @@ public class DenseMap<TKey, TValue>
         var target = Vector128.Create(h2);
         // This operation ensures that `index` is in the range [0, capacity - 1] by using only the lower bits of `hashcode`,
         // which helps in efficient and quick indexing.
-        uint index = hashcode & _lengthMinusOne;
+        var index = hashcode & _lengthMinusOne;
         // Initialize the probing jump distance to zero, which will increase with each probe iteration.
         uint jumpDistance = 0;
 
@@ -569,7 +569,7 @@ public class DenseMap<TKey, TValue>
         var target = Vector128.Create(h2);
         // This operation ensures that `index` is in the range [0, capacity - 1] by using only the lower bits of `hashcode`,
         // which helps in efficient and quick indexing.
-        uint index = hashcode & _lengthMinusOne;
+        var index = hashcode & _lengthMinusOne;
         // Initialize `jumpDistance` to control the distance between probes, starting at zero.
         uint jumpDistance = 0;
 
@@ -652,7 +652,7 @@ public class DenseMap<TKey, TValue>
         var target = Vector128.Create(h2);
         // This operation ensures that `index` is in the range [0, capacity - 1] by using only the lower bits of `hashcode`,
         // which helps in efficient and quick indexing.
-        uint index = hashcode & _lengthMinusOne;
+        var index = hashcode & _lengthMinusOne;
         // Initialize `jumpDistance` to control the distance between probes, starting at zero.
         uint jumpDistance = 0;
 
@@ -756,7 +756,7 @@ public class DenseMap<TKey, TValue>
         var target = Vector128.Create(h2);
         // This operation ensures that `index` is in the range [0, capacity - 1] by using only the lower bits of `hashcode`,
         // which helps in efficient and quick indexing.
-        uint index = hashcode & _lengthMinusOne;
+        var index = hashcode & _lengthMinusOne;
         // Initialize `jumpDistance` to control the distance between probes, starting at zero.
         uint jumpDistance = 0;
 
@@ -918,7 +918,7 @@ public class DenseMap<TKey, TValue>
             var entry = Find(oldEntries, i);
 
             var hashcode = _hasher.ComputeHash(entry.Key);
-            uint index = hashcode & _lengthMinusOne;
+            var index = hashcode & _lengthMinusOne;
             uint jumpDistance = 0;
 
             while (true)
@@ -949,10 +949,10 @@ public class DenseMap<TKey, TValue>
     /// <param name="index">The index to look up.</param>
     /// <returns>A reference to the found element.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ref T Find<T>(T[] array, uint index)
+    private static ref T Find<T>(T[] array, ulong index)
     {
         ref var arr0 = ref MemoryMarshal.GetArrayDataReference(array);
-        return ref Unsafe.Add(ref arr0, index);
+        return ref Unsafe.Add(ref arr0, Unsafe.As<ulong, nuint>(ref index));
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -968,7 +968,7 @@ public class DenseMap<TKey, TValue>
     /// <param name="hashcode">The hashcode.</param>
     /// <returns>The 7 lowest bits of the hashcode.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static sbyte H2(uint hashcode) => (sbyte)(hashcode >> 25);
+    private static sbyte H2(ulong hashcode) => (sbyte)(hashcode >> 57);
 
     /// <summary>
     /// Resets the lowest significant bit in the given value.

@@ -228,26 +228,25 @@ BenchmarkDotNet v0.13.12, Windows 11 (10.0.22631.3880/23H2/2023Update/SunValley3
 | RobinhoodMap | 1000000 |    84.237352 ms |  1.6354160 ms |  2.2926251 ms |     123 B |
 | Dictionary   | 1000000 |    45.689701 ms |  0.9896159 ms |  2.8867563 ms |      67 B |
 
-### Create StringWrapperBenchmark (cached hashcode)
+### Get string benchmark using XXHash3StringHasher
 
-| Method       | Length  | Mean           | Error         | StdDev        | Allocated |
-|--------------|---------|----------------|---------------|---------------|-----------|
-| DenseMap     | 1000    |     0.005590 ms |   0.0000622 ms |   0.0000582 ms |         - |
-| RobinhoodMap | 1000    |     0.004822 ms |   0.0000862 ms |   0.0000807 ms |         - |
-| Dictionary   | 1000    |     0.006721 ms |   0.0001277 ms |   0.0001311 ms |         - |
-| DenseMap     | 10000   |     0.072046 ms |   0.0005074 ms |   0.0004237 ms |         - |
-| RobinhoodMap | 10000   |     0.071678 ms |   0.0010047 ms |   0.0008390 ms |         - |
-| Dictionary   | 10000   |     0.134088 ms |   0.0004288 ms |   0.0004011 ms |         - |
-| DenseMap     | 100000  |     1.111280 ms |   0.0174223 ms |   0.0154444 ms |       1 B |
-| RobinhoodMap | 100000  |     1.359501 ms |   0.0153216 ms |   0.0143318 ms |       1 B |
-| Dictionary   | 100000  |     1.866555 ms |   0.0053967 ms |   0.0045064 ms |       1 B |
-| DenseMap     | 400000  |    13.668025 ms |   0.0525273 ms |   0.0465641 ms |      12 B |
-| RobinhoodMap | 400000  |    13.020727 ms |   0.0614468 ms |   0.0479736 ms |      12 B |
-| Dictionary   | 400000  |    10.846306 ms |   0.0903438 ms |   0.0800874 ms |      12 B |
-| DenseMap     | 900000  |    34.296921 ms |   0.1181645 ms |   0.0986727 ms |      49 B |
-| RobinhoodMap | 900000  |    33.615793 ms |   0.4644336 ms |   0.4344315 ms |      49 B |
-| Dictionary   | 900000  |    41.753783 ms |   0.8050352 ms |   0.7906522 ms |       4 B |
-| DenseMap     | 1000000 |    40.145635 ms |   0.7456945 ms |   0.6975231 ms |      57 B |
-| RobinhoodMap | 1000000 |    41.060782 ms |   0.5800290 ms |   0.5141806 ms |       5 B |
-| Dictionary   | 1000000 |    40.949160 ms |   0.3808110 ms |   0.3179945 ms |       5 B |
-
+| Method       | Length  | Mean         | Error        | StdDev       | Allocated |
+|------------- |-------- |-------------:|-------------:|-------------:|----------:|
+| DenseMap     | 1000    |    0.0061 ms |   0.000052 ms |   0.000044 ms |         - |
+| RobinhoodMap | 1000    |    0.0082 ms |   0.000113 ms |   0.000106 ms |         - |
+| Dictionary   | 1000    |    0.0075 ms |   0.000057 ms |   0.000047 ms |         - |
+| DenseMap     | 10000   |    0.0655 ms |   0.000178 ms |   0.000158 ms |         - |
+| RobinhoodMap | 10000   |    0.1136 ms |   0.001130 ms |   0.001057 ms |         - |
+| Dictionary   | 10000   |    0.1455 ms |   0.000811 ms |   0.000677 ms |         - |
+| DenseMap     | 100000  |    0.9943 ms |   0.0176 ms |   0.0165 ms |       1 B |
+| RobinhoodMap | 100000  |    1.8320 ms |   0.0049 ms |   0.0046 ms |       1 B |
+| Dictionary   | 100000  |    1.8777 ms |   0.0034 ms |   0.0032 ms |       3 B |
+| DenseMap     | 400000  |   10.3705 ms |   0.0636 ms |   0.0563 ms |      12 B |
+| RobinhoodMap | 400000  |   17.7692 ms |   0.1609 ms |   0.1426 ms |      23 B |
+| Dictionary   | 400000  |    9.3516 ms |   0.1836 ms |   0.1964 ms |      12 B |
+| DenseMap     | 900000  |   32.7895 ms |   0.5783 ms |   0.5410 ms |      46 B |
+| RobinhoodMap | 900000  |   56.5273 ms |   0.6319 ms |   0.5602 ms |      82 B |
+| Dictionary   | 900000  |   42.8022 ms |   1.2363 ms |   3.5670 ms |      49 B |
+| DenseMap     | 1000000 |   35.2224 ms |   0.5863 ms |   0.5484 ms |      57 B |
+| RobinhoodMap | 1000000 |   68.3534 ms |   1.1398 ms |   1.0661 ms |      92 B |
+| Dictionary   | 1000000 |   42.9991 ms |   0.4173 ms |   0.3699 ms |       5 B |

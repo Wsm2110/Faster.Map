@@ -1,7 +1,5 @@
 ﻿using System;
 using Xunit;
-using Faster.Map;
-using Faster.Map.Core;
 using System.Collections.Generic;
 using Faster.Map.Hasher;
 

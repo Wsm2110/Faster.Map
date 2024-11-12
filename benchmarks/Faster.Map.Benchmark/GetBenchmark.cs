@@ -72,24 +72,24 @@ namespace Faster.Map.Benchmark
             }
         }
 
-        [Benchmark]
-        public void RobinhoodMap()
-        {
-            for (int i = 0; i < Length; ++i)
-            {
-                var key = keys[i];
-                _robinHoodMap.Get(key, out var _);           
-            }
-        }
+        //[Benchmark]
+        //public void RobinhoodMap()
+        //{
+        //    for (int i = 0; i < Length; ++i)
+        //    {
+        //        var key = keys[i];
+        //        _robinHoodMap.Get(key, out var _);           
+        //    }
+        //}
 
-        [Benchmark(Baseline = true)]
-        public void Dictionary()
-        {
-            for (int i = 0; i < Length; ++i)
-            {
-                var key = keys[i];
-                _dictionary.TryGetValue(key, out var _);
-            }
-        }
+        //[Benchmark(Baseline = true)]
+        //public void Dictionary()
+        //{
+        //    for (int i = 0; i < Length; ++i)
+        //    {
+        //        var key = keys[i];
+        //        _dictionary.TryGetValue(key, out var _);
+        //    }
+        //}
     }
 }

@@ -1,31 +1,30 @@
 ﻿using BenchmarkDotNet.Attributes;
-using Faster.Map.Core;
+using Faster.Map.Hasher;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Numerics;
 
 namespace Faster.Map.Benchmark
 {
     [MarkdownExporterAttribute.GitHub]
     [MemoryDiagnoser]
-    public class StringWrapperBenchmark
+    public class IntBenchmark
     {
         #region Fields
 
-        private DenseMap<StringWrapper, StringWrapper> _denseMap;
-        private Dictionary<StringWrapper, StringWrapper> _dictionary;
-        private RobinhoodMap<StringWrapper, StringWrapper> _robinhoodMap;
+        private DenseMap<uint, uint> _denseMap;
+        private Dictionary<uint, uint> _dictionary;
+        private RobinhoodMap<uint, uint> _robinhoodMap;
 
-        private string[] keys;
+        private uint[] keys;
 
         #endregion
 
         #region Properties
 
-        [Params(/*1000, 10000, 100000, 400000, 900000,*/ 1000000)]
+        [Params(/*10000, 100000, 400000, 900000,*/ 1000000)]
         public uint Length { get; set; }
 
         #endregion
@@ -39,20 +38,20 @@ namespace Faster.Map.Benchmark
             var output = File.ReadAllText("Numbers.txt");
             var splittedOutput = output.Split(',');
 
-            keys = new string[Length];
+            keys = new uint[Length];
 
             for (var index = 0; index < Length; index++)
             {
-                keys[index] = splittedOutput[index];
+                keys[index] = Convert.ToUInt32(splittedOutput[index]);
             }
 
             // round of length to power of 2 prevent resizing
-            uint length = BitOperations.RoundUpToPowerOf2(Length) * 2;
+            uint length = BitOperations.RoundUpToPowerOf2(Length);
             int dicLength = HashHelpers.GetPrime((int)Length);
 
-            _denseMap = new DenseMap<StringWrapper, StringWrapper>(length);
-            _dictionary = new Dictionary<StringWrapper, StringWrapper>(dicLength);
-            _robinhoodMap = new RobinhoodMap<StringWrapper, StringWrapper>(length);
+            _denseMap = new DenseMap<uint, uint>(length, 0.875, new DefaultHasher<uint>());
+            _dictionary = new Dictionary<uint, uint>(dicLength);
+            _robinhoodMap = new RobinhoodMap<uint, uint>(length);
 
             foreach (var key in keys)
             {
@@ -80,14 +79,14 @@ namespace Faster.Map.Benchmark
         //    }
         //}
 
-        //[Benchmark]
-        //public void Dictionary()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        _dictionary.TryGetValue(key, out var result);
-        //    }
-        //}
+        [Benchmark]
+        public void Dictionary()
+        {
+            foreach (var key in keys)
+            {
+                _dictionary.TryGetValue(key, out var result);
+            }
+        }
 
     }
 }

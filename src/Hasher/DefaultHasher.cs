@@ -5,7 +5,9 @@ namespace Faster.Map.Hasher
 {
     public class DefaultHasher<TKey> : IHasher<TKey>
     {
+        ulong _goldenRatio = 11400714819323198485;
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public uint ComputeHash(TKey key) => (uint)key.GetHashCode();
+        public ulong ComputeHash(TKey key) => (uint)key.GetHashCode() * _goldenRatio;
     }
 }

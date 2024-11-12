@@ -1,5 +1,4 @@
 ﻿using BenchmarkDotNet.Attributes;
-using Faster.Map.Core;
 using Faster.Map.Hasher;
 using System;
 using System.Collections;
@@ -26,7 +25,7 @@ namespace Faster.Map.Benchmark
 
         #region Properties
 
-        [Params(/*1000, 10000, 100000, 400000, 900000,*/ 1000000)]
+        [Params(10000, 100000, 400000, 900000, 1000000)]
         public uint Length { get; set; }
 
         #endregion
@@ -48,7 +47,7 @@ namespace Faster.Map.Benchmark
             }
 
             // round of length to power of 2 prevent resizing
-            uint length = BitOperations.RoundUpToPowerOf2(Length) * 2;
+            uint length = BitOperations.RoundUpToPowerOf2(Length);
             int dicLength = HashHelpers.GetPrime((int)Length);
 
             _denseMap = new DenseMap<string, string>(length, 0.875, new XxHash3StringHasher());

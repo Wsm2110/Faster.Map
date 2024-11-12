@@ -2,6 +2,6 @@
 {
     public interface IHasher<in TKey>
     {
-        uint ComputeHash(TKey key);
+        ulong ComputeHash(TKey key);      
     }
 }

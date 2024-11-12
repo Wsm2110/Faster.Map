@@ -8,11 +8,10 @@ namespace Faster.Map.Hasher
     public class XxHash3Hasher<T> : IHasher<T> where T : unmanaged
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public uint ComputeHash(T key)
+        public ulong ComputeHash(T key)
         {
-            var span = MemoryMarshal.AsBytes(MemoryMarshal.CreateReadOnlySpan(ref Unsafe.AsRef(key), 1));
-            var result = XxHash3.HashToUInt64(MemoryMarshal.AsBytes(span)) >> 32;
-            return Unsafe.As<ulong, uint>(ref result);         
+            var span = MemoryMarshal.AsBytes(MemoryMarshal.CreateReadOnlySpan(ref Unsafe.AsRef(in key), 1));
+            return XxHash3.HashToUInt64(span);
         }
     }
 }
