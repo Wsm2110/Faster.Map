@@ -25,7 +25,7 @@ namespace Faster.Map.Benchmark
 
         #region Properties
 
-        [Params(1000, 10000, 100000, 400000, 900000, 1000000)]
+        [Params(100, 10000, 100000, 400000, 900000, 1000000)]
         public uint Length { get; set; }
 
         #endregion    
@@ -54,12 +54,12 @@ namespace Faster.Map.Benchmark
         public void IterationSetupX()
         {
             // round of length to power of 2 prevent resizing
-            uint length = BitOperations.RoundUpToPowerOf2(Length) * 2;
+            uint length = BitOperations.RoundUpToPowerOf2(Length);
             int dicLength = HashHelpers.GetPrime((int)Length);
 
             _denseMap = new DenseMap<uint, uint>(length);
             _dictionary = new Dictionary<uint, uint>(dicLength);
-            _robinhoodMap = new RobinhoodMap<uint, uint>(length);
+            _robinhoodMap = new RobinhoodMap<uint, uint>(length * 2);
 
             foreach (var key in keys)
             {

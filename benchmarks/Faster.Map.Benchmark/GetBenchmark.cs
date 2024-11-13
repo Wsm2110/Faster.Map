@@ -47,12 +47,12 @@ namespace Faster.Map.Benchmark
 
 
             // round of length to power of 2 prevent resizing
-            uint length = BitOperations.RoundUpToPowerOf2(Length) * 2;
+            uint length = BitOperations.RoundUpToPowerOf2(Length);
             int dicLength = HashHelpers.GetPrime((int)Length);
 
             _denseMap = new DenseMap<uint, uint>(length);
             _dictionary= new Dictionary<uint, uint>(dicLength);
-            _robinHoodMap = new RobinhoodMap<uint, uint>(length);
+            _robinHoodMap = new RobinhoodMap<uint, uint>(length * 2);
 
             foreach (var key in keys)
             {
@@ -72,24 +72,24 @@ namespace Faster.Map.Benchmark
             }
         }
 
-        //[Benchmark]
-        //public void RobinhoodMap()
-        //{
-        //    for (int i = 0; i < Length; ++i)
-        //    {
-        //        var key = keys[i];
-        //        _robinHoodMap.Get(key, out var _);           
-        //    }
-        //}
+        [Benchmark]
+        public void RobinhoodMap()
+        {
+            for (int i = 0; i < Length; ++i)
+            {
+                var key = keys[i];
+                _robinHoodMap.Get(key, out var _);
+            }
+        }
 
-        //[Benchmark(Baseline = true)]
-        //public void Dictionary()
-        //{
-        //    for (int i = 0; i < Length; ++i)
-        //    {
-        //        var key = keys[i];
-        //        _dictionary.TryGetValue(key, out var _);
-        //    }
-        //}
+        [Benchmark(Baseline = true)]
+        public void Dictionary()
+        {
+            for (int i = 0; i < Length; ++i)
+            {
+                var key = keys[i];
+                _dictionary.TryGetValue(key, out var _);
+            }
+        }
     }
 }

@@ -57,7 +57,7 @@ namespace Faster.Map.Benchmark
 
             _dense = new DenseMap<uint, uint>(length);
             dic = new Dictionary<uint, uint>(dicLength);          
-            _robinhoodMap = new RobinhoodMap<uint, uint>(length);
+            _robinhoodMap = new RobinhoodMap<uint, uint>(length * 2);
         }
 
         #region Benchmarks
