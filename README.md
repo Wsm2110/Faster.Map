@@ -57,6 +57,8 @@ BenchmarkDotNet v0.13.12, Windows 11 (10.0.22631.3880/23H2/2023Update/SunValley3
 ```
 ### Get Benchmark
 
+| Method       | Length   | Mean         | Error       | StdDev       | Median       | Allocated |
+|--------------|----------|-------------:|------------:|-------------:|-------------:|----------:|
 | **DenseMap**     | **1000**    |      **0.00183 ms** |   **0.00001 ms** |  **0.00001 ms** |  **0.70** |     **341 B** |         **-** |          **NA** |
 | RobinhoodMap | 1000    |      0.00137 ms |   0.00000 ms |  0.00000 ms |  0.53 |     175 B |         - |          NA |
 | Dictionary   | 1000    |      0.00260 ms |   0.00001 ms |  0.00001 ms |  1.00 |     412 B |         - |          NA |
