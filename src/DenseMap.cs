@@ -299,7 +299,7 @@ public class DenseMap<TKey, TValue>
         // which helps in efficient and quick indexing.
         var index = hashcode & _lengthMinusOne;
         // Initialize the probing jump distance to zero, which will increase with each probe iteration.
-        uint jumpDistance = 0;
+        byte jumpDistance = 0;
 
         while (true)
         {
@@ -396,7 +396,21 @@ public class DenseMap<TKey, TValue>
         // which helps in efficient and quick indexing.
         var index = hashcode & _lengthMinusOne;
         // Initialize a variable to keep track of the distance to jump when probing the map.
-        uint jumpDistance = 0;
+
+        //Fast path: 
+        if (Find(_controlBytes, index) == h2)
+        {
+            var e = Find(_entries, index);
+            // Check if the entry's key matches the specified key using the equality comparer.
+            if (_comparer.Equals(e.Key, key))
+            {
+                // If a match is found, set the output value and return true.
+                value = e.Value;
+                return true;
+            }
+        }
+
+        byte jumpDistance = 0;
 
         // Loop until we find either a match or an empty slot.
         while (true)
@@ -413,7 +427,7 @@ public class DenseMap<TKey, TValue>
                 // Get the position of the first set bit in the mask (indicating a match).
                 var bitPos = BitOperations.TrailingZeroCount(mask);
                 // Retrieve the entry corresponding to the matched bit position within the map's entries.
-                var entry = Find(_entries, index + Unsafe.As<int, byte>(ref bitPos));
+                var entry = Find(_entries, index + Unsafe.As<int, uint>(ref bitPos));
                 // Check if the entry's key matches the specified key using the equality comparer.
                 if (_comparer.Equals(entry.Key, key))
                 {
@@ -482,7 +496,7 @@ public class DenseMap<TKey, TValue>
         // which helps in efficient and quick indexing.
         var index = hashcode & _lengthMinusOne;
         // Initialize the probing jump distance to zero, which will increase with each probe iteration.
-        uint jumpDistance = 0;
+        byte jumpDistance = 0;
 
         while (true)
         {
@@ -571,7 +585,7 @@ public class DenseMap<TKey, TValue>
         // which helps in efficient and quick indexing.
         var index = hashcode & _lengthMinusOne;
         // Initialize `jumpDistance` to control the distance between probes, starting at zero.
-        uint jumpDistance = 0;
+        byte jumpDistance = 0;
 
         // Loop until we either find the key to update or confirm it's absent.
         while (true)
@@ -654,7 +668,7 @@ public class DenseMap<TKey, TValue>
         // which helps in efficient and quick indexing.
         var index = hashcode & _lengthMinusOne;
         // Initialize `jumpDistance` to control the distance between probes, starting at zero.
-        uint jumpDistance = 0;
+        byte jumpDistance = 0;
 
         // Begin probing until either the key is found and removed, or it's confirmed as absent.
         while (true)
@@ -758,7 +772,7 @@ public class DenseMap<TKey, TValue>
         // which helps in efficient and quick indexing.
         var index = hashcode & _lengthMinusOne;
         // Initialize `jumpDistance` to control the distance between probes, starting at zero.
-        uint jumpDistance = 0;
+        byte jumpDistance = 0;
 
         // Begin probing the hash map until the key is found or confirmed absent.
         while (true)
@@ -919,7 +933,7 @@ public class DenseMap<TKey, TValue>
 
             var hashcode = _hasher.ComputeHash(entry.Key);
             var index = hashcode & _lengthMinusOne;
-            uint jumpDistance = 0;
+            byte jumpDistance = 0;
 
             while (true)
             {

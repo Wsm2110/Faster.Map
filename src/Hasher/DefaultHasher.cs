@@ -8,6 +8,9 @@ namespace Faster.Map.Hasher
         ulong _goldenRatio = 11400714819323198485;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ulong ComputeHash(TKey key) => (uint)key.GetHashCode() * _goldenRatio;
+        public ulong ComputeHash(TKey key)
+        {
+            return (uint)key.GetHashCode() * _goldenRatio;
+        }     
     }
 }

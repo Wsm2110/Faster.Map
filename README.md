@@ -20,25 +20,91 @@ You can include Faster.Map in your C# project via NuGet Package Manager:
 Install-Package Faster.Map
 ```
 
-## How to use
+## Basic Usage
 
-### DenseMap Example
+### Default Hasher
 
-```C#
-// Example usage in C# (using DenseMap with SIMD Instructions)
-using Faster.Map.DenseMap;
+By default, `DenseMap` uses the `DefaultHasher<TKey>`, which computes hashes based on the .NET `GetHashCode` method and uses Knuth's Multiplicative Hashing
 
-// Create a DenseMapSIMD object
-var map = new DenseMap<string, string>();
+```csharp
+var map = new DenseMap<int, string>();
+map.Emplace(1, "Value One");
+map.Emplace(2, "Value Two");
 
-// Add key-value pairs
-map.Emplace("key1", "value1");
+if (map.Get(1, out var value))
+{
+    Console.WriteLine($"Key 1 has value: {value}");
+}
 
-// Retrieve values
-var result = map.Get("key1", out var retrievedValue);
+map.Remove(1);
+```
 
-Console.WriteLine(retrievedValue); // Output: "value1"
-  ``` 
+### Custom Hasher
+
+You can provide your own `IHasher<TKey>` implementation to customize hash computation.
+
+#### Step 1: Implement a Custom Hasher
+
+```csharp
+public class CustomIntHasher : IHasher<int>
+{
+    public ulong ComputeHash(int key)
+    {
+        return (ulong)(key * 2654435761); // Multiplicative hashing
+    }
+}
+```
+
+#### Step 2: Use the Custom Hasher in DenseMap
+
+```csharp
+var customHasher = new CustomIntHasher();
+var map = new DenseMap<int, string>(customHasher);
+
+map.Emplace(1, "Value One");
+map.Emplace(42, "Value Two");
+
+if (map.Get(42, out var value))
+{
+    Console.WriteLine($"Key 42 has value: {value}");
+}
+
+map.Update(42, "Updated Value Two");
+map.Remove(1);
+```
+
+### Advanced Example: Hashing Strings with XxHash
+
+#### Custom String Hasher
+
+```csharp
+public class XxHash3StringHasher : IHasher<string>
+{
+    public ulong ComputeHash(string key)
+    {
+        return XxHash3.HashToUInt64(MemoryMarshal.AsBytes(key.AsSpan()));
+    }
+}
+```
+
+#### Using the String Hasher
+
+```csharp
+var stringHasher = new XxHash3StringHasher();
+var stringMap = new DenseMap<string, int>(stringHasher);
+
+stringMap.Emplace("Hello", 100);
+stringMap.Emplace("World", 200);
+
+if (stringMap.Get("Hello", out var value))
+{
+    Console.WriteLine($"Key 'Hello' has value: {value}");
+}
+
+stringMap.Remove("World");
+```
+
+---
 
  ## Tested on platforms:
 * x86
