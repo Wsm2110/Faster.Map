@@ -41,6 +41,13 @@ map.Remove(1);
 
 ### Custom Hasher
 
+By default, Faster.Map provides four built-in hashers, each optimized for different performance characteristics:
+
+DefaultHasher
+GxHasher
+XxHash3StringHasher
+XxHash3Hasher
+
 You can provide your own `IHasher<TKey>` implementation to customize hash computation.
 
 #### Step 1: Implement a Custom Hasher
@@ -234,49 +241,40 @@ BenchmarkDotNet v0.13.12, Windows 11 (10.0.22631.3880/23H2/2023Update/SunValley3
 | RobinhoodMap | 1000000    | 14.54652 ms |  0.24280 ms  |  0.27960 ms  | 14.55285 ms |  736 B       |
 | Dictionary   | 1000000    | 19.09788 ms |  0.37338 ms  |  0.39952 ms  | 19.06965 ms |  736 B       |
 
+### Get String Benchmark
 
-### Add and resize
-
-| Method       | Length   | Mean         | Error      | StdDev       | Median       | Gen0      | Gen1      | Gen2      | Allocated   |
-|--------------|----------|-------------:|-----------:|-------------:|-------------:|----------:|----------:|----------:|------------:|
-| **DenseMap** | **1000**     | **0.08942 ms**  | **0.00234 ms**  | **0.00675 ms**  | **0.08880 ms**  |         **-** |         **-** |         **-** |    **37.75 KB** |
-| RobinhoodMap | 1000       |  0.09152 ms   |   0.00414 ms  |   0.01181 ms  |   0.08890 ms   |         - |         - |         - |    37.51 KB |
-| Dictionary   | 1000       |  0.06777 ms   |   0.00519 ms  |   0.01522 ms  |   0.06260 ms   |         - |         - |         - |    72.09 KB |
-| **DenseMap** | **10000**    | **0.22937 ms** | **0.00458 ms**  | **0.01061 ms** | **0.22780 ms** |         **-** |         **-** |         **-** |   **290.31 KB** |
-| RobinhoodMap | 10000      |  0.34865 ms  |   0.00692 ms  |   0.00769 ms  |  0.34860 ms  |         - |         - |         - |   578.18 KB |
-| Dictionary   | 10000      |  0.39528 ms  |   0.01529 ms  |   0.04484 ms  |  0.37380 ms  |         - |         - |         - |   657.93 KB |
-| **DenseMap** | **100000**   | **1.29055 ms** | **0.01850 ms** | **0.01545 ms** | **1.29280 ms** |         **-** |         **-** |         **-** |  **2306.88 KB** |
-| RobinhoodMap | 100000     |  2.34004 ms |  0.03486 ms  |   0.05428 ms  |  2.32295 ms |         - |         - |         - |  4610.78 KB |
-| Dictionary   | 100000     |  3.32307 ms |  0.06625 ms  |   0.11776 ms  |  3.29280 ms |         - |         - |         - |  5896.77 KB |
-| **DenseMap** | **400000**   | **5.04851 ms** | **0.09965 ms** | **0.25364 ms** | **5.05355 ms** |         **-** |         **-** |         **-** |  **9219.25 KB** |
-| RobinhoodMap | 400000     |  9.31596 ms |  0.18625 ms  |   0.30602 ms  |  9.23980 ms |         - |         - |         - | 18435.23 KB |
-| Dictionary   | 400000     | 11.52668 ms |  0.40434 ms  |   1.12042 ms  | 11.20910 ms |         - |         - |         - | 25374.59 KB |
-| **DenseMap** | **900000**   | **12.38025 ms** | **0.22981 ms** | **0.62521 ms** | **12.22785 ms** |         **-** |         **-** |         **-** | **18435.44 KB** |
-| RobinhoodMap | 900000     | 22.62544 ms |  0.69841 ms  |   2.01507 ms  | 21.66310 ms |         - |         - |         - | 36867.18 KB |
-| Dictionary   | 900000     | 31.53625 ms |  0.85001 ms  |   2.43885 ms  | 31.31300 ms | 1000.0000 | 1000.0000 | 1000.0000 | 52626.84 KB |
-| **DenseMap** | **1000000**  | **21.15451 ms** | **0.40257 ms** | **0.43075 ms** | **21.11780 ms** |         **-** |         **-** |         **-** | **36867.63 KB** |
-| RobinhoodMap | 1000000    | 26.03638 ms |  0.41907 ms  |   0.37149 ms  | 26.13220 ms |         - |         - |         - | 36867.46 KB |
-| Dictionary   | 1000000    | 34.51489 ms |  0.68455 ms  |   0.89011 ms  | 34.59730 ms | 1000.0000 | 1000.0000 | 1000.0000 | 52626.84 KB |
-
-### Get string benchmark using XXHash3StringHasher
-
-| Method       | Length   | Mean         | Error      | StdDev     | Allocated |
-|--------------|----------|-------------:|-----------:|-----------:|----------:|
-| **DenseMap** | **10000**    | **0.06328 ms**  | **0.00119 ms**  | **0.00117 ms**  |         **-** |
-| RobinhoodMap | 10000     | 0.11138 ms  |   0.00089 ms  |   0.00083 ms  |         - |
-| Dictionary   | 10000     | 0.14030 ms  |   0.00101 ms  |   0.00084 ms  |         - |
-| **DenseMap** | **100000**   | **0.89303 ms**  | **0.00092 ms**  | **0.00081 ms**  |       **1 B** |
-| RobinhoodMap | 100000    | 1.74953 ms  |   0.00542 ms  |   0.00507 ms  |       1 B |
-| Dictionary   | 100000    | 1.82837 ms  |   0.00251 ms  |   0.00222 ms  |       1 B |
-| **DenseMap** | **400000**   | **5.69521 ms** | **0.08819 ms** | **0.07364 ms** |       **6 B** |
-| RobinhoodMap | 400000    | 17.48812 ms | 0.11409 ms | 0.10672 ms |      23 B |
-| Dictionary   | 400000    |  8.90541 ms | 0.10513 ms | 0.09319 ms |      12 B |
-| **DenseMap** | **900000**   | **25.03465 ms** | **0.15671 ms** | **0.12235 ms** |      **23 B** |
-| RobinhoodMap | 900000    | 52.43294 ms | 0.71473 ms | 0.63359 ms |      74 B |
-| Dictionary   | 900000    | 29.69477 ms | 0.19468 ms | 0.15200 ms |      23 B |
-| **DenseMap** | **1000000**  | **33.72319 ms** | **0.28449 ms** | **0.25219 ms** |      **49 B** |
-| RobinhoodMap | 1000000   | 62.24546 ms | 0.39693 ms | 0.37129 ms |      92 B |
-| Dictionary   | 1000000   | 34.00727 ms | 0.10688 ms | 0.08925 ms |      49 B |
+| Method           | Length  | Mean       | Error      | StdDev     | Allocated |
+|------------------|-------- |-----------:|-----------:|-----------:|----------:|
+| DenseMap_Default | 10000   |    0.125 ms |   0.001 ms |   0.000 ms |         - |
+| DenseMap_Xxhash3 | 10000   |    0.090 ms |   0.001 ms |   0.001 ms |         - |
+| **DenseMap_GxHash**  | **10000**   |    **0.088 ms** |   **0.000 ms** |   **0.000 ms** |         - |
+| RobinhoodMap     | 10000   |    0.109 ms |   0.001 ms |   0.001 ms |         - |
+| Dictionary       | 10000   |    0.139 ms |   0.000 ms |   0.000 ms |         - |
+| DenseMap_Default | 100000  |    1.571 ms |   0.011 ms |   0.008 ms |       1 B |
+| DenseMap_Xxhash3 | 100000  |    1.313 ms |   0.002 ms |   0.002 ms |       1 B |
+| **DenseMap_GxHash**  | **100000**  |    **1.230 ms** |   **0.004 ms** |   **0.003 ms** |       1 B |
+| RobinhoodMap     | 100000  |    1.801 ms |   0.007 ms |   0.006 ms |       1 B |
+| Dictionary       | 100000  |    1.830 ms |   0.003 ms |   0.003 ms |       1 B |
+| DenseMap_Default | 400000  |    8.602 ms |   0.168 ms |   0.173 ms |      12 B |
+| DenseMap_Xxhash3 | 400000  |    6.453 ms |   0.032 ms |   0.025 ms |       6 B |
+| **DenseMap_GxHash**  | **400000**  |    **6.191 ms** |   **0.043 ms** |   **0.041 ms** |       6 B |
+| RobinhoodMap     | 400000  |   17.033 ms |   0.155 ms |   0.138 ms |      23 B |
+| Dictionary       | 400000  |    8.841 ms |   0.061 ms |   0.051 ms |      12 B |
+| DenseMap_Default | 800000  |   29.155 ms |   0.132 ms |   0.117 ms |      23 B |
+| DenseMap_Xxhash3 | 800000  |   21.616 ms |   0.241 ms |   0.214 ms |      23 B |
+| **DenseMap_GxHash**  | **800000**  |   **17.977 ms** |   **0.086 ms** |   **0.081 ms** |      23 B |
+| RobinhoodMap     | 800000  |   42.700 ms |   0.187 ms |   0.156 ms |      61 B |
+| Dictionary       | 800000  |   25.280 ms |   0.086 ms |   0.081 ms |      23 B |
+| DenseMap_Default | 900000  |   34.148 ms |   0.348 ms |   0.325 ms |      49 B |
+| DenseMap_Xxhash3 | 900000  |   25.203 ms |   0.087 ms |   0.073 ms |      23 B |
+| **DenseMap_GxHash**  | **900000**  |   **21.758 ms** |   **0.105 ms** |   **0.087 ms** |      23 B |
+| RobinhoodMap     | 900000  |   51.350 ms |   0.184 ms |   0.172 ms |      74 B |
+| Dictionary       | 900000  |   29.715 ms |   0.076 ms |   0.063 ms |      23 B |
+| DenseMap_Default | 1000000 |   42.762 ms |   0.282 ms |   0.264 ms |      61 B |
+| DenseMap_Xxhash3 | 1000000 |   30.722 ms |   0.087 ms |   0.081 ms |      23 B |
+| **DenseMap_GxHash**  | **1000000** |   **25.237 ms** |   **0.070 ms** |   **0.066 ms** |      23 B |
+| RobinhoodMap     | 1000000 |   61.434 ms |   0.364 ms |   0.322 ms |      92 B |
+| Dictionary       | 1000000 |   34.179 ms |   0.650 ms |   0.798 ms |      49 B |
 
 
 ### Add string benchmark

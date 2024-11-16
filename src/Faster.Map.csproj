@@ -10,20 +10,19 @@
     <CopyRight>MIT</CopyRight>
     <PackageReleaseNotes>
       New Features:
+      
+      Add custom hasher:
+      
+      - GxHash
+      - XX3Hash
+      - XX3HashString
 
-      Enhanced emplace Behavior: The emplace function now operates with improved efficiency:
-      Duplicate Management: When a duplicate entry is detected, emplace updates the existing entry instead of creating a new one.
-      New Entry Insertion: If no duplicate is found, a new entry is added.
-
-      Optimizations:
-
-      Smart Tombstone Management: Introduced an optimized approach to manage and avoid tombstones, enhancing data integrity and reducing unnecessary overhead.
     </PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/Wsm2110/Faster.Map</PackageProjectUrl>
-    <AssemblyVersion>6.1.1</AssemblyVersion>
-    <FileVersion>6.1.1</FileVersion>
+    <AssemblyVersion>6.1.2</AssemblyVersion>
+    <FileVersion>6.1.2</FileVersion>
     <Title>Fastest .net hashmap</Title>
-    <Version>6.1.1</Version>
+    <Version>6.1.2</Version>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Description>
       Incredibly fast (concurrent) hashmap
@@ -53,6 +52,11 @@
     <PackageReference Include="System.IO.Hashing" Version="9.0.0-rc.2.24473.5" />
   </ItemGroup>
 
+  <ItemGroup Condition="'$(TargetFramework)' != 'net7.0'">
+    <PackageReference Include="GxHash">
+      <Version>2.0.0</Version>
+    </PackageReference>
+  </ItemGroup>
 
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">

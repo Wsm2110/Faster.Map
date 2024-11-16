@@ -16,6 +16,8 @@ namespace Faster.Map.Benchmark
         #region Fields
 
         private DenseMap<string, string> _denseMap;
+        private DenseMap<string, string> _denseMapxxHash;
+        private DenseMap<string, string> _denseMapGxHash;
         private Dictionary<string, string> _dictionary;
         private RobinhoodMap<string, string> _robinhoodMap;
 
@@ -25,7 +27,7 @@ namespace Faster.Map.Benchmark
 
         #region Properties
 
-        [Params(10000, 100000, 400000, 900000, 1000000)]
+        [Params(10000, 100000, 400000, 800000, 900000, 1000000)]
         public uint Length { get; set; }
 
         #endregion
@@ -50,24 +52,48 @@ namespace Faster.Map.Benchmark
             uint length = BitOperations.RoundUpToPowerOf2(Length);
             int dicLength = HashHelpers.GetPrime((int)Length);
 
-            _denseMap = new DenseMap<string, string>(length, 0.875, new XxHash3StringHasher());
+            _denseMap = new DenseMap<string, string>(length, 0.875);
+
+            _denseMapxxHash = new DenseMap<string, string>(length, 0.875, new XxHash3StringHasher());
+            _denseMapGxHash = new DenseMap<string, string>(length, 0.875, new GxHasher());
+
             _dictionary = new Dictionary<string, string>(dicLength);
-            _robinhoodMap = new RobinhoodMap<string, string>(length);
+            _robinhoodMap = new RobinhoodMap<string, string>(length * 2);
 
             foreach (var key in keys)
             {
                 _dictionary.Add(key, key);
                 _denseMap.Emplace(key, key);
+                _denseMapxxHash.Emplace(key, key);
+                _denseMapGxHash.Emplace(key, key);
                 _robinhoodMap.Emplace(key, key);
             }
         }
 
         [Benchmark]
-        public void DenseMap()
+        public void DenseMap_Default()
         {
             foreach (var key in keys)
             {
                 _denseMap.Get(key, out var result);
+            }
+        }
+
+        [Benchmark]
+        public void DenseMap_Xxhash3()
+        {
+            foreach (var key in keys)
+            {
+                _denseMapxxHash.Get(key, out var result);
+            }
+        }
+
+        [Benchmark]
+        public void DenseMap_GxHash()
+        {
+            foreach (var key in keys)
+            {
+                _denseMapGxHash.Get(key, out var result);
             }
         }
 

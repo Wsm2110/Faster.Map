@@ -14,4 +14,6 @@ namespace Faster.Map.Hasher
             return XxHash3.HashToUInt64(span);
         }
     }
+
+
 }
