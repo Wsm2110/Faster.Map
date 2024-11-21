@@ -187,7 +187,7 @@ public class DenseMap<TKey, TValue>
     /// var map = new DenseMap<int, string>();
     /// </code>
     /// </summary>
-    public DenseMap() : this(16, 0.875, new DefaultHasher<TKey>()) { }
+    public DenseMap() : this(16, 0.875, new GoldenRatioHasher<TKey>()) { }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class with the specified length and default load factor.
@@ -197,7 +197,7 @@ public class DenseMap<TKey, TValue>
     /// </code>
     /// </summary>
     /// <param name="length">The length of the hashmap. Will always take the closest power of two.</param>
-    public DenseMap(uint length) : this(length, 0.875, new DefaultHasher<TKey>()) { }
+    public DenseMap(uint length) : this(length, 0.875, new GoldenRatioHasher<TKey>()) { }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class with the specified parameters.
@@ -218,7 +218,7 @@ public class DenseMap<TKey, TValue>
 
         _length = length;
         _loadFactor = loadFactor;
-        _hasher = hasher ?? new DefaultHasher<TKey>();
+        _hasher = hasher ?? new GoldenRatioHasher<TKey>();
 
         if (loadFactor > 0.875)
         {

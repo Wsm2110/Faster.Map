@@ -1,16 +1,13 @@
-﻿using System.Runtime.CompilerServices;
-using Faster.Map.Contracts;
+﻿using Faster.Map.Contracts;
+using System.Runtime.CompilerServices;
 
 namespace Faster.Map.Hasher
 {
-    public class DefaultHasher<TKey> : IHasher<TKey>
+    internal class DefaultHasher<T> : IHasher<T>
     {
-        ulong _goldenRatio = 11400714819323198485;
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ulong ComputeHash(TKey key)
-        {
-            return (uint)key.GetHashCode() * _goldenRatio;
-        }     
+
+        public ulong ComputeHash(T key) => (uint)key.GetHashCode();
+
     }
 }
