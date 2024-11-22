@@ -17,10 +17,8 @@ namespace Faster.Map.Hasher
             var span = MemoryMarshal.AsBytes(MemoryMarshal.CreateReadOnlySpan(ref Unsafe.AsRef(in key), 1));
 
             return GxHash.GxHash.HashU64(span, _seed);
-
         }
     }
-
 
     public class GxHasher : IHasher<string>
     {

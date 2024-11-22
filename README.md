@@ -243,38 +243,56 @@ BenchmarkDotNet v0.13.12, Windows 11 (10.0.22631.3880/23H2/2023Update/SunValley3
 
 ### Get String Benchmark
 
-| Method           | Length  | Mean       | Error      | StdDev     | Allocated |
-|------------------|-------- |-----------:|-----------:|-----------:|----------:|
-| DenseMap_Default | 10000   |    0.125 ms |   0.001 ms |   0.000 ms |         - |
-| DenseMap_Xxhash3 | 10000   |    0.090 ms |   0.001 ms |   0.001 ms |         - |
-| **DenseMap_GxHash**  | **10000**   |    **0.088 ms** |   **0.000 ms** |   **0.000 ms** |         - |
-| RobinhoodMap     | 10000   |    0.109 ms |   0.001 ms |   0.001 ms |         - |
-| Dictionary       | 10000   |    0.139 ms |   0.000 ms |   0.000 ms |         - |
-| DenseMap_Default | 100000  |    1.571 ms |   0.011 ms |   0.008 ms |       1 B |
-| DenseMap_Xxhash3 | 100000  |    1.313 ms |   0.002 ms |   0.002 ms |       1 B |
-| **DenseMap_GxHash**  | **100000**  |    **1.230 ms** |   **0.004 ms** |   **0.003 ms** |       1 B |
-| RobinhoodMap     | 100000  |    1.801 ms |   0.007 ms |   0.006 ms |       1 B |
-| Dictionary       | 100000  |    1.830 ms |   0.003 ms |   0.003 ms |       1 B |
-| DenseMap_Default | 400000  |    8.602 ms |   0.168 ms |   0.173 ms |      12 B |
-| DenseMap_Xxhash3 | 400000  |    6.453 ms |   0.032 ms |   0.025 ms |       6 B |
-| **DenseMap_GxHash**  | **400000**  |    **6.191 ms** |   **0.043 ms** |   **0.041 ms** |       6 B |
-| RobinhoodMap     | 400000  |   17.033 ms |   0.155 ms |   0.138 ms |      23 B |
-| Dictionary       | 400000  |    8.841 ms |   0.061 ms |   0.051 ms |      12 B |
-| DenseMap_Default | 800000  |   29.155 ms |   0.132 ms |   0.117 ms |      23 B |
-| DenseMap_Xxhash3 | 800000  |   21.616 ms |   0.241 ms |   0.214 ms |      23 B |
-| **DenseMap_GxHash**  | **800000**  |   **17.977 ms** |   **0.086 ms** |   **0.081 ms** |      23 B |
-| RobinhoodMap     | 800000  |   42.700 ms |   0.187 ms |   0.156 ms |      61 B |
-| Dictionary       | 800000  |   25.280 ms |   0.086 ms |   0.081 ms |      23 B |
-| DenseMap_Default | 900000  |   34.148 ms |   0.348 ms |   0.325 ms |      49 B |
-| DenseMap_Xxhash3 | 900000  |   25.203 ms |   0.087 ms |   0.073 ms |      23 B |
-| **DenseMap_GxHash**  | **900000**  |   **21.758 ms** |   **0.105 ms** |   **0.087 ms** |      23 B |
-| RobinhoodMap     | 900000  |   51.350 ms |   0.184 ms |   0.172 ms |      74 B |
-| Dictionary       | 900000  |   29.715 ms |   0.076 ms |   0.063 ms |      23 B |
-| DenseMap_Default | 1000000 |   42.762 ms |   0.282 ms |   0.264 ms |      61 B |
-| DenseMap_Xxhash3 | 1000000 |   30.722 ms |   0.087 ms |   0.081 ms |      23 B |
-| **DenseMap_GxHash**  | **1000000** |   **25.237 ms** |   **0.070 ms** |   **0.066 ms** |      23 B |
-| RobinhoodMap     | 1000000 |   61.434 ms |   0.364 ms |   0.322 ms |      92 B |
-| Dictionary       | 1000000 |   34.179 ms |   0.650 ms |   0.798 ms |      49 B |
+| Method            | Length  | Mean (ms)       | Error (ms)    | StdDev (ms)   | Allocated |
+|-------------------|---------|-----------------|---------------|---------------|-----------|
+| DenseMap_Default  | 100     | 0.7877       | 0.00488        | 0.00407        | -         |
+| DenseMap_Xxhash3  | 100     | 0.5638          | 0.00237        | 0.00210        | -         |
+| DenseMap_GxHash   | 100     | 0.4934          | 0.00495        | 0.00463        | -         |
+| **DenseMap_FastHash** | **100**     | **0.4423**       | 0.00184        | 0.00144        | -         |
+| RobinhoodMap      | 100     | 0.6755          | 0.00825        | 0.00771        | -         |
+| Dictionary        | 100     | 0.6573          | 0.01266        | 0.01408        | -         |
+| DenseMap_Default  | 1000    |7.9540      | 0.15528        | 0.13765        | -         |
+| DenseMap_Xxhash3  | 1000    | 5.9863          | 0.11213        | 0.11013        | -         |
+| DenseMap_GxHash   | 1000    | 5.2577          | 0.03646        | 0.03411        | -         |
+| **DenseMap_FastHash** | **1000**    | **4.5143**       | 0.08599        | 0.09558        | -         |
+| RobinhoodMap      | 1000    | 7.8287          | 0.05559        | 0.04928        | -         |
+| Dictionary        | 1000    | 7.4062          | 0.13805        | 0.12914        | -         |
+| DenseMap_Default  | 10000   | 115.7674     | 0.37631        | 0.33359        | -         |
+| DenseMap_Xxhash3  | 10000   | 89.3335         | 0.30373        | 0.23713        | -         |
+| DenseMap_GxHash   | 10000   | 89.3103         | 0.52041        | 0.46133        | -         |
+| **DenseMap_FastHash** | **10000**   | **81.7969**      | 0.61676        | 0.54674        | -         |
+| RobinhoodMap      | 10000   | 111.0056        | 1.03930        | 0.97216        | -         |
+| Dictionary        | 10000   | 142.7456        | 0.56217        | 0.49835        | -         |
+| DenseMap_Default  | 100000  | 1567.0900       | 17.38346       | 14.51598       | 1 B       |
+| DenseMap_Xxhash3  | 100000  | 1154.3523       | 3.08295        | 2.73296        | 1 B       |
+| DenseMap_GxHash   | 100000  | 1215.4789       | 4.05174        | 3.16333        | 1 B       |
+| **DenseMap_FastHash** | **100000**  | **1032.0671**    | 10.77159       | 8.99477        | 1 B       |
+| RobinhoodMap      | 100000  | 1864.2588       | 22.85317       | 19.08343       | 1 B       |
+| Dictionary        | 100000  | 1882.8305       | 35.33849       | 42.06796       | 1 B       |
+| DenseMap_Default  | 200000  | 3627.3379       | 68.77079       | 86.97303       | 3 B       |
+| DenseMap_Xxhash3  | 200000  | 2558.1723       | 10.47182       | 8.74444        | 3 B       |
+| DenseMap_GxHash   | 200000  | 2661.8776       | 49.53749       | 43.91369       | 3 B       |
+| **DenseMap_FastHash** | **200000 ** | **2252.3690**    | 35.63210       | 33.33029       | 3 B       |
+| RobinhoodMap      | 200000  | 5201.6671       | 55.90280       | 49.55637       | 6 B       |
+| Dictionary        | 200000  | 3900.8612       | 18.59936       | 15.53131       | 3 B       |
+| DenseMap_Default  | 400000  | 8787.455        | 102.67141      | 96.03890       | 12 B      |
+| DenseMap_Xxhash3  | 400000  | 6620.0023       | 101.26791      | 89.77137       | 12 B      |
+| DenseMap_GxHash   | 400000  | 6252.5252       | 24.02417       | 22.47222       | 6 B       |
+| **DenseMap_FastHash** | **400000**  | **5609.3088**    | 28.09836       | 23.46340       | 6 B       |
+| RobinhoodMap      | 400000  | 17440.6204      | 115.65609      | 108.18478      | 23 B      |
+| Dictionary        | 400000  | 8838.5934       | 52.30617       | 46.36806       | 12 B      |
+| DenseMap_Default | 800000   | 29897.6681      | 183.71964      | 162.86268      | 23 B      |
+| DenseMap_Xxhash3  | 800000  | 23740.6419      | 461.06354      | 512.47090      | 23 B      |
+| DenseMap_GxHash   | 800000  | 18662.8382      | 163.51705      | 136.54414      | 23 B      |
+| **DenseMap_FastHash** | **800000**  | **17516.7710**   | 173.69462      | 145.04287      | 23 B      |
+| RobinhoodMap      | 800000  | 45399.0412      | 752.47203      | 703.86280      | 67 B      |
+| Dictionary        | 800000  | 26328.6341      | 122.59703      | 95.71569       | 23 B      |
+| DenseMap_Default  | 1000000 | 43746.8455      | 255.44660      | 238.94491      | 67 B      |
+| DenseMap_Xxhash3  | 1000000 | 30988.9967      | 138.94068      | 129.96520      | 46 B      |
+| DenseMap_GxHash   | 1000000 | 23901.5047      | 91.89792       | 81.46511       | 23 B      |
+| **DenseMap_FastHash** | **1000000** | **22579.2328**   | 60.22346       | 50.28931       | 23 B      |
+| RobinhoodMap      | 1000000 | 62235.2917      | 339.28829      | 317.37048      | 92 B      |
+| Dictionary        | 1000000 | 34091.9248      | 387.37558      | 343.39836      | 49 B      |
 
 
 ### Add string benchmark

@@ -1,4 +1,5 @@
 ﻿using Faster.Map.Contracts;
+using Faster.Map.Hash;
 using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;

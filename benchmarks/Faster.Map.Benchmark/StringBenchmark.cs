@@ -1,4 +1,5 @@
 ﻿using BenchmarkDotNet.Attributes;
+using Faster.Map.Hash;
 using Faster.Map.Hasher;
 using System;
 using System.Collections;
@@ -28,7 +29,7 @@ namespace Faster.Map.Benchmark
 
         #region Properties
 
-        [Params(1000000)]
+        [Params(100, 1000, 10000, 100000, 200000, 400000, 800000, 1000000)]
         public uint Length { get; set; }
 
         #endregion
@@ -70,34 +71,35 @@ namespace Faster.Map.Benchmark
                 _denseMapFastHash.Emplace(key, key);
                 _robinhoodMap.Emplace(key, key);
             }
+
         }
 
-        //[Benchmark]
-        //public void DenseMap_Default()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        _denseMap.Get(key, out var result);
-        //    }
-        //}
+        [Benchmark]
+        public void DenseMap_Default()
+        {
+            foreach (var key in keys)
+            {
+                _denseMap.Get(key, out var result);
+            }
+        }
 
-        //[Benchmark]
-        //public void DenseMap_Xxhash3()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        _denseMapxxHash.Get(key, out var result);
-        //    }
-        //}
+        [Benchmark]
+        public void DenseMap_Xxhash3()
+        {
+            foreach (var key in keys)
+            {
+                _denseMapxxHash.Get(key, out var result);
+            }
+        }
 
-        //[Benchmark]
-        //public void DenseMap_GxHash()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        _denseMapGxHash.Get(key, out var result);
-        //    }
-        //}
+        [Benchmark]
+        public void DenseMap_GxHash()
+        {
+            foreach (var key in keys)
+            {
+                _denseMapGxHash.Get(key, out var result);
+            }
+        }
 
         [Benchmark]
         public void DenseMap_FastHash()
@@ -108,14 +110,14 @@ namespace Faster.Map.Benchmark
             }
         }
 
-        //[Benchmark]
-        //public void RobinhoodMap()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        _robinhoodMap.Get(key, out var result);
-        //    }
-        //}
+        [Benchmark]
+        public void RobinhoodMap()
+        {
+            foreach (var key in keys)
+            {
+                _robinhoodMap.Get(key, out var result);
+            }
+        }
 
         [Benchmark]
         public void Dictionary()
