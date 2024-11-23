@@ -20,6 +20,9 @@ namespace Faster.Map.Benchmark
         private DenseMap<string, string> _dense;
         private Dictionary<string, string> dic;
         private RobinhoodMap<string, string> _robinhoodMap;
+        private DenseMap<string, string> _denseMapxxHash;
+        private DenseMap<string, string> _denseMapGxHash;
+        private DenseMap<string, string> _denseMapFastHash;
 
         private string[] keys;
 
@@ -27,7 +30,8 @@ namespace Faster.Map.Benchmark
 
         #region Properties
 
-        [Params(10000, 100000, 400000, 800000, 900000)]
+        [Params(100, 1000, 10000, 100000, 200000, 400000, 800000)]
+
         public uint Length { get; set; }
 
         #endregion
@@ -57,6 +61,10 @@ namespace Faster.Map.Benchmark
             int dicLength = HashHelpers.GetPrime((int)Length);
 
             _dense = new DenseMap<string, string>(length, 0.875, new XxHash3StringHasher());
+            _denseMapxxHash = new DenseMap<string, string>(length, 0.875, new XxHash3StringHasher());
+            _denseMapGxHash = new DenseMap<string, string>(length, 0.875, new GxHasher());
+            _denseMapFastHash = new DenseMap<string, string>(length, 0.875, new FastHasher());
+
             dic = new Dictionary<string, string>(dicLength);
             _robinhoodMap = new RobinhoodMap<string, string>(length * 2);
         }
@@ -70,6 +78,37 @@ namespace Faster.Map.Benchmark
             {
                 var key = keys[i];
                 _dense.Emplace(key, key);
+            }
+        }
+
+
+        [Benchmark]
+        public void DenseMap_Xxhash3()
+        {
+            for (int i = 0; i < Length; i++)
+            {
+                var key = keys[i];
+                _denseMapxxHash.Emplace(key, key);
+            }
+        }
+
+        [Benchmark]
+        public void DenseMap_GxHash()
+        {
+            for (int i = 0; i < Length; i++)
+            {
+                var key = keys[i];
+                _denseMapGxHash.Emplace(key, key);
+            }
+        }
+
+        [Benchmark]
+        public void DenseMap_FastHash()
+        {
+            for (int i = 0; i < Length; i++)
+            {
+                var key = keys[i];
+                _denseMapFastHash.Emplace(key, key);
             }
         }
 

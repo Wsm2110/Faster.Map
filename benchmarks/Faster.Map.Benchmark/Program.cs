@@ -7,7 +7,7 @@ namespace Faster.Map.Benchmark
     {
         static void Main(string[] args)
         {
-            BenchmarkRunner.Run<StringBenchmark>();
+            BenchmarkRunner.Run<AddStringBenchmark>(new DebugInProcessConfig());
             //BenchmarkRunner.Run<AddAndResizeBenchmark>();
             //BenchmarkRunner.Run<UpdateBenchmark>();
             //BenchmarkRunner.Run<RemoveBenchmark>();
