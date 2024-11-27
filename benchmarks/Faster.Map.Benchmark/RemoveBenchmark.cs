@@ -18,7 +18,10 @@ namespace Faster.Map.Benchmark
         private DenseMap<uint, uint> _denseMap;
         private Dictionary<uint, uint> _dictionary;
         private RobinhoodMap<uint, uint> _robinhoodMap;
- 
+        private DenseMap<uint, uint> _denseMapxxHash;
+        private DenseMap<uint, uint> _denseMapGxHash;
+        private DenseMap<uint, uint> _denseMapFastHash;
+
         private uint[] keys;
 
         #endregion
@@ -44,10 +47,7 @@ namespace Faster.Map.Benchmark
             for (var index = 0; index < Length; index++)
             {
                 keys[index] = uint.Parse(splittedOutput[index]);
-            }
-          
-
-            // Shuffle(new Random(), keys);
+            }          
         }
 
         [IterationSetup]
@@ -65,6 +65,9 @@ namespace Faster.Map.Benchmark
             {
                 _dictionary.Add(key, key);
                 _denseMap.Emplace(key, key);
+                _denseMapxxHash.Emplace(key, key);
+                _denseMapGxHash.Emplace(key, key);
+                _denseMapFastHash.Emplace(key, key);
                 _robinhoodMap.Emplace(key, key);
             }
         }
@@ -77,6 +80,33 @@ namespace Faster.Map.Benchmark
             foreach (var key in keys)
             {
                 _denseMap.Remove(key);
+            }
+        }
+
+        [Benchmark]
+        public void DenseMap_Xxhash3()
+        {
+            foreach (var key in keys)
+            {
+                _denseMapxxHash.Remove(key);
+            }
+        }
+
+        [Benchmark]
+        public void DenseMap_GxHash()
+        {
+            foreach (var key in keys)
+            {
+                _denseMapGxHash.Remove(key);
+            }
+        }
+
+        [Benchmark]
+        public void DenseMap_FastHash()
+        {
+            foreach (var key in keys)
+            {
+                _denseMapFastHash.Remove(key);
             }
         }
 

@@ -13,10 +13,10 @@ namespace Faster.Map.Hash.Benchmark
         private FastHash _hash = new FastHash();
         private string source;
 
-        [Params(10, 16, 32, 48, 100)]
+        [Params(1000)]
         public uint StringLength { get; set; }
 
-        [Params(10, 100, 1000, 10000)]
+        [Params(10000)]
         public uint Iterations { get; set; }
 
                 [GlobalSetup]

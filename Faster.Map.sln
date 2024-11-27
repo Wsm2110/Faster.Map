@@ -23,7 +23,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Faster.Map", "src\Faster.Ma
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Faster.Map.Hash.Benchmark", "benchmarks\Faster.Map.Hash.Benchmark\Faster.Map.Hash.Benchmark.csproj", "{84129404-D8F5-1687-BF71-4A68D6206742}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Faster.Map.Hash", "unittests\Faster.Map.Hash.Tests\Faster.Map.Hash.csproj", "{81386703-5478-35CB-C5D9-DF6D2B64F97C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Faster.Map.Hash.Tests", "unittests\Faster.Map.Hash.Tests\Faster.Map.Hash.Tests.csproj", "{81386703-5478-35CB-C5D9-DF6D2B64F97C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

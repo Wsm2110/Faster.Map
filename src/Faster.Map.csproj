@@ -9,20 +9,31 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <CopyRight>MIT</CopyRight>
     <PackageReleaseNotes>
-      New Features:
-      
-      Add custom hasher:
-      
-      - GxHash
-      - XX3Hash
-      - XX3HashString
+      ✨ What’s New?
+      🏎️ Incredible Hashing Speed with Faster.Hash
+
+      Optimized Performance: Harnesses hardware-accelerated AES instructions for lightning-fast hashing.
+      Deterministic and Reliable: Ensures consistent and collision-resistant hashes for uint, ulong, and arbitrary byte spans.
+      Highly Flexible: Hash support for various data types:
+      HashU64(uint source): Quickly hash 32-bit integers.
+      HashU64(ulong source): Hash 64-bit integers with efficiency.
+      HashU64(ReadOnlyspan): Process byte arrays with incredible speed.
+
+🗂️ Map Enhancements
+
+    Seamlessly integrates with Faster.Hash to deliver high-speed key lookups and optimized map operations.
+    Improved handling of large datasets with reduced memory overhead and faster hash-based operations.
+
+🛡️ Secure Hashing with HashU64Secure
+
+    Generate stronger hashes with additional randomness and encryption rounds for scenarios requiring enhanced data integrity.
 
     </PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/Wsm2110/Faster.Map</PackageProjectUrl>
-    <AssemblyVersion>6.1.2</AssemblyVersion>
-    <FileVersion>6.1.2</FileVersion>
+    <AssemblyVersion>6.1.3</AssemblyVersion>
+    <FileVersion>6.1.3</FileVersion>
     <Title>Fastest .net hashmap</Title>
-    <Version>6.1.2</Version>
+    <Version>6.1.3</Version>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Description>
       Incredibly fast (concurrent) hashmap

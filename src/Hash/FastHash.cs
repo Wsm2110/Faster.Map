@@ -110,34 +110,58 @@ namespace Faster.Map.Hash
         /// <param name="bytes">The input data to hash, provided as a read-only byte span.</param>
         /// <returns>A 64-bit hash value derived from the input bytes.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ulong HashU64(ReadOnlySpan<byte> bytes)
+        public static Vector128<byte> HashU64(ReadOnlySpan<byte> bytes)
         {
-            return Finalize(Compress(bytes)).AsUInt64().GetElement(0);
+            return Finalize(Compress(bytes));
         }
 
         /// <summary>
         /// Computes a 64-bit hash value for a given 32-bit unsigned integer using AES encryption.
         /// </summary>
         /// <param name="source">The 32-bit unsigned integer to hash.</param>
-        /// <returns>
-        /// A 64-bit unsigned integer representing the hash of the input value.
-        /// </returns>
+        /// /// <returns>A <see cref="Vector128{Byte}"/> containing the hashed value.
+        /// Use <c>.AsUInt32().GetElement(0)</c> to extract the 32-bit result from the hash.</returns>
+        /// <example>
+        /// Example usage:
+        /// <code>
+        /// uint input = 123456;
+        /// uint hash = HashU64(input).AsUInt32().GetElement(0);
+        /// Console.WriteLine($"Hash: {hash}");
+        /// </code>
+        /// </example>
         /// <remarks>
         /// This method leverages hardware-accelerated AES encryption (via `X86Aes.Encrypt`) to generate
         /// a secure and efficient hash from the input. The 32-bit input is first expanded to a `Vector128<byte>`,
         /// encrypted with a predefined empty vector, and the resulting 64-bit value is extracted.
         /// </remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ulong HashU64(uint source)
+        public static Vector128<byte> HashU64(uint source)
         {
             // Create a Vector128<byte> containing the source value as bytes
-            Vector128<byte> sourceVector = Vector128.Create(source).AsByte();
+            var result = Vector128.Create(source);
+            return X86Aes.EncryptLast(Unsafe.As<Vector128<uint>, Vector128<byte>>(ref result), _emptyVector);
+        }
 
-            // Encrypt the source vector with a predefined empty vector (_emptyVector)
-            Vector128<byte> encrypted = X86Aes.Encrypt(sourceVector, _emptyVector);
-
-            // Convert the encrypted vector to a 64-bit unsigned integer and return the first element
-            return encrypted.AsUInt64().GetElement(0);
+        /// <summary>
+        /// Computes a hash for a 64-bit unsigned integer (ulong) using AES encryption.
+        /// </summary>
+        /// <param name="source">The 64-bit unsigned integer to hash.</param>
+        /// <returns>A <see cref="Vector128{Byte}"/> containing the hashed value.
+        /// Use <c>.AsUInt64().GetElement(0)</c> to extract the 64-bit result from the hash.</returns>
+        /// <example>
+        /// Example usage:
+        /// <code>
+        /// ulong input = 123456789;
+        /// ulong hash = HashU64(input).AsUInt64().GetElement(0);
+        /// Console.WriteLine($"Hash: {hash}");
+        /// </code>
+        /// </example>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Vector128<byte> HashU64(ulong source)
+        {
+            // Create a Vector128<byte> containing the source value as bytes
+            var result = Vector128.Create(source);
+            return X86Aes.EncryptLast(Unsafe.As<Vector128<ulong>, Vector128<byte>>(ref result), _emptyVector);
         }
 
         /// <summary>
@@ -239,35 +263,54 @@ namespace Faster.Map.Hash
         private static Vector128<byte> Compress(ReadOnlySpan<byte> source)
         {
             // Obtain a reference to the span's first byte and reinterpret it as a Vector128<byte>
-            ref var ptr = ref Unsafe.As<byte, Vector128<byte>>(ref MemoryMarshal.GetReference(source));
+            ref var start = ref Unsafe.As<byte, Vector128<byte>>(ref MemoryMarshal.GetReference(source));
             int len = source.Length; // Get the length of the input span
 
             // Handle short spans (<= 16 bytes) as a single partial vector
             if (len <= 16)
             {
-                return GetPartialVector(ref ptr, Unsafe.As<int, byte>(ref len));
+                // Create a mask where bytes at positions less than `remainingBytes` are set to 0xFF and others to 0x00
+                var mask = Vector128.GreaterThan(Vector128.Create(Unsafe.As<int, byte>(ref len)), _indices);
+                // Apply the mask to the source block to zero out bytes beyond `remainingBytes`
+                return Vector128.BitwiseAnd(mask, start);
             }
 
             // Handle medium spans (17 to 31 bytes) by processing two partial blocks
             if (len < 32)
             {
-                Vector128<byte> hashVector = ptr; // Load the first block
-                ptr = ref Unsafe.AddByteOffset(ref ptr, len & 15); // Move pointer to the second partial block
-                return CompressBlock(hashVector, ptr); // Compress the two blocks
+                // Load the first block of data into the hash vector
+                // `ptr` is assumed to reference the beginning of the first block
+                Vector128<byte> hashVector = start;
+
+                // Adjust the pointer to point to the second partial block
+                // `16 - len & 15` ensures proper alignment for the remaining data:
+                //   - `(len & 15)` gives the remainder of `len` divided by 16 (bytes left in the last incomplete block)
+                //   - `16 - (len & 15)` computes the offset needed to reach the next aligned block boundary
+                start = ref Unsafe.AddByteOffset(ref start, 16 - (len & 15));
+
+                // Combine the two blocks: the first block and the second partial block
+                // The `CompressBlock` function integrates the data into a final hash
+                return CombineBlock(hashVector, start);
             }
 
             // Handle larger spans (32 to 47 bytes) by processing three blocks
             if (len < 48)
             {
-                Vector128<byte> hashVector = ptr; // Load the first block
-                ptr = ref Unsafe.AddByteOffset(ref ptr, 16); // Move pointer to the second block
-                return CompressBlock(CompressBlock(hashVector, ptr), // Compress the first two blocks
-                    Unsafe.AddByteOffset(ref ptr, len & 15) // Compress the last partial block
-                );
+                // Load the first block
+                Vector128<byte> hashVector = start;
+
+                // Move to the second block
+                ref Vector128<byte> secondBlock = ref Unsafe.AddByteOffset(ref start, 16);
+
+                // Compute the offset for the partial third block
+                ref Vector128<byte> partialBlock = ref Unsafe.AddByteOffset(ref secondBlock, 32 - (len & 15));
+
+                // Compress the blocks and return the result
+                return CombineBlock(CombineBlock(hashVector, secondBlock), partialBlock);
             }
 
             // Delegate to CompressMultipleBlocks for spans of 48 bytes or more
-            return CompressMultipleBlocks(ref ptr, source);
+            return CombineMultipleBlocks(ref start, source);
         }
 
         /// <summary>
@@ -283,7 +326,7 @@ namespace Faster.Map.Hash
         /// instructions for optimal performance.
         /// </remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static Vector128<byte> CompressBlock(Vector128<byte> a, Vector128<byte> b)
+        private static Vector128<byte> CombineBlock(Vector128<byte> a, Vector128<byte> b)
         {
             // Use AES encryption to combine the two input vectors
             return X86Aes.Encrypt(a, b);
@@ -316,147 +359,68 @@ namespace Faster.Map.Hash
         /// span is appropriately aligned and uses low-level intrinsics for fast memory manipulation.
         /// </remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static Vector128<byte> CompressMultipleBlocks(ref Vector128<byte> start, ReadOnlySpan<byte> source)
+        private static Vector128<byte> CombineMultipleBlocks(ref Vector128<byte> start, ReadOnlySpan<byte> source)
         {
-            // Calculate the end pointer based on the source length
-            ref var end = ref Unsafe.Add(ref start, source.Length);
+            // Calculate the total number of blocks
+            int totalBlocks = source.Length >> 4; // Each block is 16 bytes
 
-            // Initialize the hash vector to zero
+            // Calculate the number of full groups
+            int fullGroups = totalBlocks >> 2; // divide by 4
+
+            // Calculate the end pointer for full groups
+            ref var end = ref Unsafe.Add(ref start, fullGroups << 2); // multiply by 4
+
             Vector128<byte> hashVector = Vector128<byte>.Zero;
 
-            // Process blocks of 64 bytes (4 x 16-byte blocks) at a time
-            while (Unsafe.IsAddressLessThan(ref start, ref Unsafe.Subtract(ref end, 64)))
-            {
-                // Compress 4 blocks sequentially and update the hash vector
-                hashVector = CompressBlock(hashVector, start);
-                hashVector = CompressBlock(hashVector, Unsafe.AddByteOffset(ref start, 16));
-                hashVector = CompressBlock(hashVector, Unsafe.AddByteOffset(ref start, 32));
-                hashVector = CompressBlock(hashVector, Unsafe.AddByteOffset(ref start, 48));
-
-                // Move the pointer forward by 64 bytes
-                start = ref Unsafe.Add(ref start, 64);
-            }
-
-            // Process any remaining full blocks of 16 bytes
+            // Loop until the pointer 'start' reaches the 'end' pointer
             while (Unsafe.IsAddressLessThan(ref start, ref end))
             {
-                hashVector = CompressBlock(hashVector, start);
-                start = ref Unsafe.Add(ref start, 16);
+                // Load the first block of data to initialize the blockHash
+                Vector128<byte> blockHash = start;
+
+                // Combine the next three blocks into the blockHash
+                // CompressBlock applies a hashing/compression function on blockHash and the next block
+                blockHash = CombineBlock(blockHash, Unsafe.Add(ref start, 1)); // Combine with the second block
+                blockHash = CombineBlock(blockHash, Unsafe.Add(ref start, 2)); // Combine with the third block
+                blockHash = CombineBlock(blockHash, Unsafe.Add(ref start, 3)); // Combine with the fourth block
+
+                // Merge the blockHash result into the final hashVector
+                // hashVector accumulates the combined results of all processed blocks
+                hashVector = CombineBlock(hashVector, blockHash);
+
+                // Advance the start pointer by 4 blocks (each block is 16 bytes)
+                // This skips the 4 blocks just processed and prepares for the next iteration
+                start = ref Unsafe.Add(ref start, 4);
             }
 
-            // Handle any remaining bytes (less than 16)
-            int remainingBytes = (int)Unsafe.ByteOffset(ref start, ref end);
+            // Adjust the `end` pointer to process remaining blocks (less than 4 blocks)
+            // `totalBlocks & 3` computes the number of remaining blocks after dividing totalBlocks by 4
+            end = ref Unsafe.Add(ref end, totalBlocks & 3);
+
+            // Process the remaining full 16-byte blocks
+            while (Unsafe.IsAddressLessThan(ref start, ref end))
+            {
+                // Compress the current block with a predefined key (_keys4)
+                hashVector = CombineBlock(start, _keys4);
+
+                // Move to the next block (advance by 16 bytes)
+                start = ref Unsafe.Add(ref start, 1);
+            }
+
+            // Process remaining bytes (less than 16 bytes, not forming a full block)
+            // `remainingBytes` computes the leftover bytes by performing a bitwise AND with 15 (equivalent to mod 16)
+            int remainingBytes = source.Length & 15; // Equivalent to source.Length % 16
             if (remainingBytes > 0)
             {
-                // Create a partial vector for the remaining bytes
-                Vector128<byte> partial = GetPartialVector(ref start, Unsafe.As<int, byte>(ref remainingBytes));
-                hashVector = CompressBlock(hashVector, partial);
+                // Adjust the `start` pointer backward by the difference (16 - remainingBytes) to align the remaining bytes
+                // This creates a 16-byte region for padding or alignment
+                ref var alignedStart = ref Unsafe.SubtractByteOffset(ref start, 16 - remainingBytes);
+
+                // Compress the remaining bytes (padded or aligned to 16 bytes) with the predefined key (_keys4)
+                hashVector = CombineBlock(alignedStart, _keys4);
             }
 
-            // Return the final hash vector
             return hashVector;
         }
-
-        /// <summary>
-        /// Creates a partial vector from the remaining bytes of the input.
-        /// </summary>
-        /// <param name="start">Reference to the start of the vector.</param>
-        /// <param name="remainingBytes">The number of remaining bytes.</param>
-        /// <returns>A partial vector.</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static Vector128<byte> GetPartialVector(ref Vector128<byte> start, byte remainingBytes)
-        {
-            if (IsReadBeyondSafe(ref start))
-            {
-                return GetPartialVectorUnsafe(ref start, remainingBytes);
-            }
-
-            return GetPartialVectorSafe(ref start, remainingBytes);
-        }
-
-        /// <summary>
-        /// Safely creates a partial `Vector128<byte>` from the remaining bytes of a source block.
-        /// </summary>
-        /// <param name="start">A reference to the start of the source block as `Vector128<byte>`.</param>
-        /// <param name="remainingBytes">The number of valid bytes to copy into the vector.</param>
-        /// <returns>
-        /// A `Vector128<byte>` containing the copied bytes from the source block, with the remaining space filled with zeros.
-        /// </returns>
-        /// <remarks>
-        /// This method ensures safe handling of partial blocks by copying the specified number of bytes (`remainingBytes`) 
-        /// from the source into a zero-initialized `Vector128<byte>`. The remaining bytes in the vector are left as zeros.
-        /// It is particularly useful when the source block does not contain a full 16 bytes and needs padding.
-        /// </remarks>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static Vector128<byte> GetPartialVectorSafe(ref Vector128<byte> start, int remainingBytes)
-        {
-            // Initialize a zeroed-out Vector128<byte>
-            Vector128<byte> input = Vector128<byte>.Zero;
-
-            // Reinterpret the `start` reference as a byte reference for byte-level operations
-            ref byte source = ref Unsafe.As<Vector128<byte>, byte>(ref start);
-
-            // Reinterpret the `input` vector as a writable byte reference
-            ref byte dest = ref Unsafe.As<Vector128<byte>, byte>(ref input);
-
-            // Copy `remainingBytes` from the source to the destination (zero-padding the rest)
-            Unsafe.CopyBlockUnaligned(ref dest, ref source, (uint)remainingBytes);
-
-            // Return the resulting Vector128<byte> with the partial data
-            return input;
-        }
-
-        /// <summary>
-        /// Creates a partial `Vector128<byte>` by masking out unused bytes based on the number of remaining bytes.
-        /// </summary>
-        /// <param name="start">A reference to the starting `Vector128<byte>` block.</param>
-        /// <param name="remainingBytes">The number of valid bytes in the source block.</param>
-        /// <returns>
-        /// A `Vector128<byte>` containing only the valid bytes from the source block, with the remaining bytes zeroed out.
-        /// </returns>
-        /// <remarks>
-        /// This method uses a comparison mask to retain only the valid bytes in the source block.
-        /// Bytes beyond the `remainingBytes` count are zeroed out. This approach avoids explicit memory copying
-        /// and relies on SIMD operations for efficiency.
-        /// </remarks>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static Vector128<byte> GetPartialVectorUnsafe(ref Vector128<byte> start, byte remainingBytes)
-        {
-            // Create a mask where bytes at positions less than `remainingBytes` are set to 0xFF and others to 0x00
-            var mask = Vector128.GreaterThan(Vector128.Create(remainingBytes), _indices).AsByte();
-
-            // Apply the mask to the source block to zero out bytes beyond `remainingBytes`
-            return Vector128.BitwiseAnd(mask, start);
-        }
-
-        /// <summary>
-        /// Determines whether a memory read for a `Vector128<byte>` reference is safe
-        /// with respect to page boundaries.
-        /// </summary>
-        /// <param name="reference">The reference to the `Vector128<byte>` block to check.</param>
-        /// <returns>
-        /// `true` if the memory read is safe (does not cross a page boundary); otherwise, `false`.
-        /// </returns>
-        /// <remarks>
-        /// This method calculates the memory address of the reference and checks whether
-        /// reading a full `Vector128<byte>` (16 bytes) starting at the given address remains
-        /// within the bounds of the current memory page. This is useful for preventing
-        /// potential access violations in low-level memory operations.
-        /// </remarks>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static unsafe bool IsReadBeyondSafe(ref Vector128<byte> reference)
-        {
-            const int PAGE_SIZE = 0x1000; // Standard page size (4 KB)
-
-            // Get the memory address of the reference as an unsigned 64-bit integer
-            ulong address = (ulong)Unsafe.AsPointer(ref reference);
-
-            // Calculate the offset within the page by masking the lower bits of the address
-            ulong offsetWithinPage = address & (PAGE_SIZE - 1);
-
-            // Check if the remaining bytes in the page are sufficient for a full Vector128<byte> read
-            return offsetWithinPage <= (ulong)(PAGE_SIZE - Vector128<byte>.Count);
-        }
-
     }
 }
