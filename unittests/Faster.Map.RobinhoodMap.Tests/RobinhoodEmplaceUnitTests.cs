@@ -60,5 +60,30 @@ namespace Faster.Map.RobinHoodMap.Tests
             // Assert
             Assert.Contains(key2, dictionary.Keys); // Key2 should be inserted successfully despite having greater Psl
         }
+
+        [Fact]
+        public void Emplace_AddKeysFromEnumeratorToAnotherHashmap()
+        {
+            var robinhoodMap = new RobinhoodMap<uint, uint>(12_000_000);
+            var rnd0 = new Random(3);
+
+            for (int j = 0; j < 50_000_000; j++)
+            {
+                robinhoodMap.Emplace((uint)rnd0.Next(), 0);
+                if (robinhoodMap.Count == 100000) break;
+            }
+
+            var rndInts = robinhoodMap.Keys.ToArray();
+
+            RobinhoodMap<uint, uint> map = new(16);
+
+            for (uint i = 0; i < rndInts.Length; i++)
+            {
+                var v = rndInts[i];
+
+                map.Emplace(v, v);
+            }
+        }
+
     }
 }

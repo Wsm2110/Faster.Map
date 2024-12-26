@@ -82,7 +82,7 @@ public class RobinhoodMap<TKey, TValue> where TKey : notnull
     {
         get
         {
-            for (int i = _meta.Length - 1; i >= 0; --i)
+            for (int i = 0; i< _meta.Length; ++i)
             {
                 var meta = _meta[i];
                 if (meta is not 0)
@@ -109,7 +109,7 @@ public class RobinhoodMap<TKey, TValue> where TKey : notnull
     {
         get
         {
-            for (int i = _meta.Length - 1; i >= 0; --i)
+            for (int i = 0; i < _meta.Length; ++i)
             {
                 var meta = _meta[i];
                 if (meta > 0)
@@ -136,7 +136,7 @@ public class RobinhoodMap<TKey, TValue> where TKey : notnull
     {
         get
         {
-            for (int i = _meta.Length - 1; i >= 0; --i)
+            for (int i = 0; i < _meta.Length; ++i)
             {
                 var meta = _meta[i];
                 if (meta is not 0)
@@ -563,7 +563,8 @@ public class RobinhoodMap<TKey, TValue> where TKey : notnull
     private uint Hash(TKey key)
     {
         var hashcode = (uint)key.GetHashCode();
-        return (_goldenRatio * hashcode) >> _shift;
+        var result = _goldenRatio * hashcode;
+        return result >> _shift;
     }
 
     /// <summary>

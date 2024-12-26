@@ -80,7 +80,7 @@ public class DenseMap<TKey, TValue>
     {
         get
         {
-            for (int i = _controlBytes.Length - 1; i >= 0; --i)
+            for (int i = 0; i < _controlBytes.Length; ++i)
             {
                 if (_controlBytes[i] >= 0)
                 {
@@ -107,7 +107,7 @@ public class DenseMap<TKey, TValue>
     {
         get
         {
-            for (int i = _controlBytes.Length - 1; i >= 0; --i)
+            for (int i = 0; i < _controlBytes.Length; ++i)
             {
                 if (_controlBytes[i] >= 0)
                 {
@@ -133,7 +133,7 @@ public class DenseMap<TKey, TValue>
     {
         get
         {
-            for (int i = _controlBytes.Length - 1; i >= 0; --i)
+            for (int i = 0; i < _controlBytes.Length; ++i)
             {
                 if (_controlBytes[i] >= 0)
                 {
