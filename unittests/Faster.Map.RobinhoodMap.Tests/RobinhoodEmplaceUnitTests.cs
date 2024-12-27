@@ -62,7 +62,7 @@ namespace Faster.Map.RobinHoodMap.Tests
         }
 
         [Fact]
-        public void Emplace_AddKeysFromEnumeratorToAnotherHashmap()
+        public void Emplace_AddKeysFromKeysEnumeratorToAnotherHashmap()
         {
             var robinhoodMap = new RobinhoodMap<uint, uint>(12_000_000);
             var rnd0 = new Random(3);
@@ -75,7 +75,7 @@ namespace Faster.Map.RobinHoodMap.Tests
 
             var rndInts = robinhoodMap.Keys.ToArray();
 
-            RobinhoodMap<uint, uint> map = new(16);
+            RobinhoodMap<uint, uint> map = new(64);
 
             for (uint i = 0; i < rndInts.Length; i++)
             {
@@ -84,6 +84,5 @@ namespace Faster.Map.RobinHoodMap.Tests
                 map.Emplace(v, v);
             }
         }
-
     }
 }

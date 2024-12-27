@@ -41,7 +41,7 @@ namespace Faster.Map.Concurrent
             get
             {
                 var table = _table;
-                for (int i = 0; i < table.Entries.Length; i++)
+                for (int i = table.Entries.Length - 1; i >= 0; i--)
                 {
                     var entry = table.Entries[i];
                     if (entry.Meta > -1)
@@ -60,7 +60,7 @@ namespace Faster.Map.Concurrent
             get
             {
                 var table = _table;
-                for (int i = 0; i < table.Entries.Length; i++)
+                for (int i = table.Entries.Length - 1; i >= 0; i--)
                 {
                     var entry = table.Entries[i];
                     if (entry.Meta > -1)
@@ -79,7 +79,7 @@ namespace Faster.Map.Concurrent
             get
             {
                 var table = _table;
-                for (int i = 0; i < table.Entries.Length; i++)
+                for (int i = table.Entries.Length - 1; i >= 0; i--)
                 {
                     var entry = table.Entries[i];
                     if (entry.Meta > -1)
@@ -491,7 +491,7 @@ namespace Faster.Map.Concurrent
                         // This means that when you perform an Interlocked operation, it guarantees that any changes made to other variables(not just the variable involved in the Interlocked operation) are also visible to other threads.
                         // Note this also means we dont need any explicit memorybarriers.
                         // This code, using Interlocked operations, will also work correctly on ARM architectures without needing additional explicit memory barriers.The memory ordering and visibility are managed by the Interlocked methods.
-                        _counter.Decrement();
+                        _counter.Decrement();                    
                         // Remove operation succeeded
                         return true;
                     }
@@ -568,7 +568,7 @@ namespace Faster.Map.Concurrent
                         entry.Value = default;
                         // Setting tombstone will release the lock
                         entry.Metadata = _tombstone;
-
+          
                         // _counter.Decrement() uses a Interlocked.Decrement() which provides a full memory fence, meaning they ensure all preceding memory writes are completed and visible to other threads before the Interlocked operation completes.
                         // This means that when you perform an Interlocked operation, it guarantees that any changes made to other variables(not just the variable involved in the Interlocked operation) are also visible to other threads.
                         // Note this also means we dont need any explicit memorybarriers.

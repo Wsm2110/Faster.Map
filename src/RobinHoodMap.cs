@@ -82,7 +82,7 @@ public class RobinhoodMap<TKey, TValue> where TKey : notnull
     {
         get
         {
-            for (int i = 0; i< _meta.Length; ++i)
+            for (int i = _meta.Length - 1; i >= 0; --i)
             {
                 var meta = _meta[i];
                 if (meta is not 0)
@@ -109,7 +109,7 @@ public class RobinhoodMap<TKey, TValue> where TKey : notnull
     {
         get
         {
-            for (int i = 0; i < _meta.Length; ++i)
+            for (int i = _meta.Length - 1; i >= 0; --i)
             {
                 var meta = _meta[i];
                 if (meta > 0)
@@ -136,7 +136,7 @@ public class RobinhoodMap<TKey, TValue> where TKey : notnull
     {
         get
         {
-            for (int i = 0; i < _meta.Length; ++i)
+            for (int i = _meta.Length - 1; i >= 0; --i)
             {
                 var meta = _meta[i];
                 if (meta is not 0)
@@ -257,6 +257,14 @@ public class RobinhoodMap<TKey, TValue> where TKey : notnull
                 ++distance;
                 ++index;
                 continue;
+            }
+
+            if (distance >= _maxProbeSequenceLength) 
+            {
+                Resize();
+                EmplaceInternal(ref entry);
+                Count++;
+                return true;
             }
 
             if (_keyComparer.Equals(key, Find(_entries, index).Key))
@@ -563,8 +571,7 @@ public class RobinhoodMap<TKey, TValue> where TKey : notnull
     private uint Hash(TKey key)
     {
         var hashcode = (uint)key.GetHashCode();
-        var result = _goldenRatio * hashcode;
-        return result >> _shift;
+        return (_goldenRatio * hashcode) >> _shift;
     }
 
     /// <summary>
