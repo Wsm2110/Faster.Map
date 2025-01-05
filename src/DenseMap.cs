@@ -360,7 +360,7 @@ public class DenseMap<TKey, TValue>
             // Note: that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
             // Note: that we expect to almost never actually probe, since that’s WIDTH(16) non-EMPTY buckets we need to fail to find our key in.
 
-            jumpDistance += 1; // Increase the jump distance by 16 to probe the next cluster.
+            jumpDistance += 16; // Increase the jump distance by 16 to probe the next cluster.
             index += jumpDistance; // Move the index forward by the jump distance.           
             index &= _lengthMinusOne; // Use bitwise AND to ensure the index wraps around within the bounds of the map. Thus preventing out of bounds exceptions
         }
