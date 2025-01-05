@@ -5,6 +5,7 @@ using Faster.Map.Contracts;
 using Faster.Map.Hasher;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -163,7 +164,7 @@ public class DenseMap<TKey, TValue>
     private double _maxLookupsBeforeResize;
     private uint _lengthMinusOne;
     private readonly double _loadFactor;
-    private readonly IHasher<TKey> _hasher;    
+    private readonly IHasher<TKey> _hasher;
     private readonly IEqualityComparer<TKey> _comparer;
     private const double _baseThreshold = 0.125; // 12.5% of entries as tombstones
 
@@ -242,7 +243,7 @@ public class DenseMap<TKey, TValue>
         _comparer = EqualityComparer<TKey>.Default;
         _shift = (byte)(_shift - BitOperations.Log2(_length));
 
-        _controlBytes = new sbyte[_length + 16];
+        _controlBytes = GC.AllocateUninitializedArray<sbyte>((int)_length + 16, true);
         _entries = new Entry[_length + 16];
 
         _maxTombstoneBeforeRehash = _length * _baseThreshold;
@@ -301,18 +302,16 @@ public class DenseMap<TKey, TValue>
 
         while (true)
         {
-            // Load a 128-bit vector from `_controlBytes` at 'index' to check for matching control bytes.
             var source = Vector128.LoadUnsafe(ref Find(_controlBytes, index));
             // Compare `source` and `target` vectors to find any positions with a matching control byte.
             var resultMask = Vector128.Equals(source, target).ExtractMostSignificantBits();
-
             // Loop over each set bit in `mask` (indicating matching positions).
             while (resultMask != 0)
             {
                 // Find the lowest set bit in `mask` (first matching position).
                 var bitPos = BitOperations.TrailingZeroCount(resultMask);
                 // Use `bitPos` to access the corresponding entry in `_entries`.
-                ref var entry = ref Find(_entries, index + Unsafe.As<int, uint>(ref bitPos));
+                ref var entry = ref Find(_entries, index + (uint)bitPos);
                 // If a matching key is found, update the entry's value and return the old value.
                 if (_comparer.Equals(entry.Key, key))
                 {
@@ -320,7 +319,7 @@ public class DenseMap<TKey, TValue>
                     return;
                 }
 
-                // Clear the lowest set bit in `mask` to continue with the next matching bit.
+                //// Clear the lowest set bit in `mask` to continue with the next matching bit.
                 resultMask = ResetLowestSetBit(resultMask);
             }
 
@@ -338,16 +337,16 @@ public class DenseMap<TKey, TValue>
                 var bitPos = BitOperations.TrailingZeroCount(emptyMask);
                 // Convert `bitPos` to an unsigned integer and add it to `index` to calculate the absolute position `i`.
                 // This gives the exact position of the slot in `_entries` relative to the table's base index.
-                var i = index + Unsafe.As<int, uint>(ref bitPos);
+                var i = index + (uint)bitPos;
+                // Update the control byte at position `i` in `_controlBytes` to `h2`, marking it as occupied.
+                // The control byte typically indicates the status of the slot (occupied, empty, or tombstone).
+                Find(_controlBytes, i) = h2;
                 // Access the entry in `_entries` at position `i` for insertion or update.
                 ref var entry = ref Find(_entries, i);
                 // Assign the specified `key` to the `Key` field of the located entry.
                 entry.Key = key;
                 // Assign the specified `value` to the `Value` field of the located entry.
                 entry.Value = value;
-                // Update the control byte at position `i` in `_controlBytes` to `h2`, marking it as occupied.
-                // The control byte typically indicates the status of the slot (occupied, empty, or tombstone).
-                Find(_controlBytes, i) = h2;
                 // Increment the total count of entries in the hash table, reflecting the new insertion.
                 Count++;
                 // Return immediately to indicate the insertion is complete.
@@ -360,7 +359,7 @@ public class DenseMap<TKey, TValue>
             // Note: that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
             // Note: that we expect to almost never actually probe, since that’s WIDTH(16) non-EMPTY buckets we need to fail to find our key in.
 
-            jumpDistance += 16; // Increase the jump distance by 16 to probe the next cluster.
+            jumpDistance += 1; // Increase the jump distance by 16 to probe the next cluster.
             index += jumpDistance; // Move the index forward by the jump distance.           
             index &= _lengthMinusOne; // Use bitwise AND to ensure the index wraps around within the bounds of the map. Thus preventing out of bounds exceptions
         }
@@ -395,19 +394,6 @@ public class DenseMap<TKey, TValue>
         var index = hashcode & _lengthMinusOne;
         // Initialize a variable to keep track of the distance to jump when probing the map.
 
-        //Fast path: 
-        if (Find(_controlBytes, index) == h2)
-        {
-            var e = Find(_entries, index);
-            // Check if the entry's key matches the specified key using the equality comparer.
-            if (_comparer.Equals(e.Key, key))
-            {
-                // If a match is found, set the output value and return true.
-                value = e.Value;
-                return true;
-            }
-        }
-
         byte jumpDistance = 0;
 
         // Loop until we find either a match or an empty slot.
@@ -425,7 +411,7 @@ public class DenseMap<TKey, TValue>
                 // Get the position of the first set bit in the mask (indicating a match).
                 var bitPos = BitOperations.TrailingZeroCount(mask);
                 // Retrieve the entry corresponding to the matched bit position within the map's entries.
-                var entry = Find(_entries, index + Unsafe.As<int, uint>(ref bitPos));
+                var entry = Find(_entries, index + (uint)bitPos);
                 // Check if the entry's key matches the specified key using the equality comparer.
                 if (_comparer.Equals(entry.Key, key))
                 {
@@ -508,7 +494,7 @@ public class DenseMap<TKey, TValue>
                 // Find the lowest set bit in `mask` (first matching position).
                 var bitPos = BitOperations.TrailingZeroCount(mask);
                 // Use `bitPos` to access the corresponding entry in `_entries`.
-                ref var entry = ref Find(_entries, index + Unsafe.As<int, uint>(ref bitPos));
+                ref var entry = ref Find(_entries, index + (uint)bitPos);
                 // If a matching key is found, update the entry's value and return the old value.
                 if (_comparer.Equals(entry.Key, key))
                 {
@@ -532,7 +518,7 @@ public class DenseMap<TKey, TValue>
                 var bitPos = BitOperations.TrailingZeroCount(mask);
                 // Convert `bitPos` to an unsigned integer and add it to `index` to get the absolute position `i`.
                 // This calculates the offset within the group where the match or available slot is located.
-                var i = index + Unsafe.As<int, uint>(ref bitPos);
+                var i = index + (uint)bitPos;
                 // Access the entry in `_entries` at the calculated position `i`.
                 ref var entry = ref Find(_entries, i);
                 // Set the key for the located entry to the specified `key`.
@@ -603,7 +589,7 @@ public class DenseMap<TKey, TValue>
                 var bitPos = BitOperations.TrailingZeroCount(mask);
 
                 // Find the corresponding entry in `_entries` by calculating the exact position from `index` and `bitPos`.
-                ref var entry = ref Find(_entries, index + Unsafe.As<int, uint>(ref bitPos));
+                ref var entry = ref Find(_entries, index + (uint)bitPos);
 
                 // Check if the current entry's key matches the specified key using the equality comparer.
                 if (_comparer.Equals(entry.Key, key))
@@ -686,7 +672,7 @@ public class DenseMap<TKey, TValue>
                 // Get the position of the first set bit in `mask`, indicating a potential key match.
                 var bitPos = BitOperations.TrailingZeroCount(resultMask);
 
-                var i = index + Unsafe.As<int, uint>(ref bitPos);
+                var i = index + (uint)bitPos;
 
                 // Check if the entry at the matched position has a key that equals the specified key.
                 // Use `_comparer` to ensure accurate key comparison.              
@@ -788,7 +774,7 @@ public class DenseMap<TKey, TValue>
                 var bitPos = BitOperations.TrailingZeroCount(mask);
                 // Check if the entry at this position has a key that matches the specified key.
                 // Use `_comparer` to ensure accurate key comparison.
-                if (_comparer.Equals(Find(_entries, index + Unsafe.As<int, uint>(ref bitPos)).Key, key))
+                if (_comparer.Equals(Find(_entries, index + (uint)bitPos).Key, key))
                 {
                     // If a match is found, return `true` to indicate the key exists in the map.
                     return true;
@@ -914,7 +900,7 @@ public class DenseMap<TKey, TValue>
 
         var size = Unsafe.As<uint, int>(ref _length);
 
-        _controlBytes = GC.AllocateUninitializedArray<sbyte>(size + 16);
+        _controlBytes = GC.AllocateUninitializedArray<sbyte>(size + 16, true);
         _entries = GC.AllocateArray<Entry>(size + 16);
 
         _controlBytes.AsSpan().Fill(_emptyBucket);
@@ -939,7 +925,7 @@ public class DenseMap<TKey, TValue>
                 if (mask != 0)
                 {
                     var bitPos = BitOperations.TrailingZeroCount(mask);
-                    index += Unsafe.As<int, uint>(ref bitPos);
+                    index += (uint)bitPos;
 
                     Find(_controlBytes, index) = h2;
                     Find(_entries, index) = entry;
@@ -965,7 +951,7 @@ public class DenseMap<TKey, TValue>
     {
         ref var arr0 = ref MemoryMarshal.GetArrayDataReference(array);
         return ref Unsafe.Add(ref arr0, Unsafe.As<ulong, nuint>(ref index));
-    }
+    } 
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static ref T Find<T>(T[] array, int index)
@@ -1028,4 +1014,3 @@ public class DenseMap<TKey, TValue>
         public TValue Value;
     };
 }
-
