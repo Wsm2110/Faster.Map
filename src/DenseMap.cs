@@ -278,7 +278,7 @@ public class DenseMap<TKey, TValue>
     /// <param name="value">The value.</param>
     /// <returns>Returns the old value</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void Emplace(TKey key, TValue value)
+    public unsafe void Emplace(TKey key, TValue value)
     {
         // Check if the table is full based on the maximum lookups before needing to resize.
         // Resize if the count exceeds the threshold.
@@ -303,7 +303,10 @@ public class DenseMap<TKey, TValue>
         {
             // Load a vector from the control bytes starting at the computed index.
             // Control bytes hold metadata about the entries in the map.
-            var source = ReadVector128Aligned(_controlBytes, index);
+            // var source = ReadVector128Aligned(_controlBytes, index);
+            var source = ReadVector128(_controlBytes, index);
+            // Compare `source` and `target` vectors to find any positions with a matching control byte.
+
             // Compare `source` and `target` vectors to find any positions with a matching control byte.
             var resultMask = Vector128.Equals(source, target).ExtractMostSignificantBits();
             // Loop over each set bit in `mask` (indicating matching positions).
@@ -402,7 +405,7 @@ public class DenseMap<TKey, TValue>
         {
             // Load a vector from the control bytes starting at the computed index.
             // Control bytes hold metadata about the entries in the map.
-            var source = ReadVector128Aligned(_controlBytes, index);
+            var source = ReadVector128(_controlBytes, index);
             // Compare the target vector (hashed key) with the loaded source vector to find matches.
             // `ExtractMostSignificantBits()` returns a mask where each bit set indicates a match.
             var mask = Vector128.Equals(target, source).ExtractMostSignificantBits();
@@ -487,7 +490,7 @@ public class DenseMap<TKey, TValue>
         {
             // Load a vector from the control bytes starting at the computed index.
             // Control bytes hold metadata about the entries in the map.
-            var source = ReadVector128Aligned(_controlBytes, index);
+            var source = ReadVector128(_controlBytes, index);
             // Compare `source` and `target` vectors to find any positions with a matching control byte.
             var mask = Vector128.Equals(source, target).ExtractMostSignificantBits();
             // Loop over each set bit in `mask` (indicating matching positions).
@@ -578,7 +581,7 @@ public class DenseMap<TKey, TValue>
         {
             // Load a vector from the control bytes starting at the computed index.
             // Control bytes hold metadata about the entries in the map.
-            var source = ReadVector128Aligned(_controlBytes, index);
+            var source = ReadVector128(_controlBytes, index);
 
             // Compare the `source` vector with the `target` vector. `ExtractMostSignificantBits` produces a bit mask
             // where each set bit corresponds to a position that matches the target hash.
@@ -661,7 +664,7 @@ public class DenseMap<TKey, TValue>
         {
             // Load a vector from the control bytes starting at the computed index.
             // Control bytes hold metadata about the entries in the map.
-            var source = ReadVector128Aligned(_controlBytes, index);
+            var source = ReadVector128(_controlBytes, index);
 
             // Compare `source` with `target`. `ExtractMostSignificantBits` returns a bitmask
             // where each set bit represents a potential match with `target`.
@@ -765,7 +768,7 @@ public class DenseMap<TKey, TValue>
         {
             // Load a vector from the control bytes starting at the computed index.
             // Control bytes hold metadata about the entries in the map.
-            var source = ReadVector128Aligned(_controlBytes, index);
+            var source = ReadVector128(_controlBytes, index);
             // Compare `source` with `target`, and `ExtractMostSignificantBits` returns a bitmask
             // where each set bit indicates a position in `source` that matches `target`.
             var mask = Vector128.Equals(source, target).ExtractMostSignificantBits();
@@ -962,37 +965,11 @@ public class DenseMap<TKey, TValue>
         return ref Unsafe.Add(ref arr0, index);
     }
 
-    /// <summary>
-    /// Using a read aligned approach instead of ReadUnaligned, under the assumption that:
-    /// 1. The underlying array is pinned and stable in memory.
-    /// 2. The offset (index) is guaranteed to be 16‑byte aligned.
-    /// As a result, this method performs a direct pointer-based load of a 128-bit vector.
-    /// </summary>
-    /// <param name="array">
-    /// The source array containing sbyte data. Must be pinned in memory to guarantee
-    /// the pointer remains valid.
-    /// </param>
-    /// <param name="index">
-    /// The byte offset into the array at which the 128-bit vector starts.
-    /// This offset must be 16‑byte aligned for proper aligned access.
-    /// </param>
-    /// <returns>
-    /// A <see cref="System.Runtime.Intrinsics.Vector128{T}"/> of <see cref="sbyte"/> 
-    /// read from the specified aligned offset.
-    /// </returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static unsafe Vector128<sbyte> ReadVector128Aligned(sbyte[] array, ulong index)
+    public static Vector128<sbyte> ReadVector128(sbyte[] array, ulong index)
     {
-        // Convert the index to a native-sized unsigned integer (nuint) for pointer arithmetic.
-        nuint offset = (nuint)index;
-
-        // Acquire an unsafe pointer to the first element of the array.
-        // Because 'array' is assumed to be pinned and vector-aligned, we can
-        // safely add 'offset' bytes to this pointer for direct memory access.
-        //
-        // Cast the resulting address to a pointer of type Vector128<sbyte>,
-        // and then dereference (*) to retrieve the 128-bit vector.
-        return *(Vector128<sbyte>*)((byte*)Unsafe.AsPointer(ref array[0]) + offset);
+        // Fast reinterpret-cast without copying
+        return Unsafe.As<sbyte, Vector128<sbyte>>(ref Find(array, index));       
     }
 
     /// <summary>
