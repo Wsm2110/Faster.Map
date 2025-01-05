@@ -92,14 +92,14 @@ namespace Faster.Map.Benchmark
         //    }
         //}
 
-        //[Benchmark]
-        //public void DenseMap_GxHash()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        _denseMapGxHash.Get(key, out var result);
-        //    }
-        //}
+        [Benchmark]
+        public void DenseMap_GxHash()
+        {
+            foreach (var key in keys)
+            {
+                _denseMapGxHash.Get(key, out var result);
+            }
+        }
 
         [Benchmark]
         public void DenseMap_FastHash()
@@ -107,27 +107,25 @@ namespace Faster.Map.Benchmark
             foreach (var key in keys)
             {
                 _denseMapFastHash.Get(key, out var result);
+            }  
+        }
+
+        [Benchmark]
+        public void RobinhoodMap()
+        {
+            foreach (var key in keys)
+            {
+                _robinhoodMap.Get(key, out var result);
             }
-            //}
+        }
 
-            //[Benchmark]
-            //public void RobinhoodMap()
-            //{
-            //    foreach (var key in keys)
-            //    {
-            //        _robinhoodMap.Get(key, out var result);
-            //    }
-            //}
-
-            //[Benchmark]
-            //public void Dictionary()
-            //{
-            //    foreach (var key in keys)
-            //    {
-            //        _dictionary.TryGetValue(key, out var result);
-            //    }
-            //}
-
+        [Benchmark]
+        public void Dictionary()
+        {
+            foreach (var key in keys)
+            {
+                _dictionary.TryGetValue(key, out var result);
+            }
         }
     }
 }

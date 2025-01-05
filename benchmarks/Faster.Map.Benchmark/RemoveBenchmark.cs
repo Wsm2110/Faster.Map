@@ -58,8 +58,13 @@ namespace Faster.Map.Benchmark
             int dicLength = HashHelpers.GetPrime((int)Length);
 
             _denseMap = new DenseMap<uint, uint>(length);
+            _denseMapFastHash = new DenseMap<uint, uint>(length);
+            _denseMapGxHash = new DenseMap<uint, uint>(length);
+           
+
             _dictionary = new Dictionary<uint, uint>(dicLength);
             _robinhoodMap = new RobinhoodMap<uint, uint>(length * 2);
+
 
             foreach (var key in keys)
             {

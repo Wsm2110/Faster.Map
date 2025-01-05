@@ -6,11 +6,16 @@ using System.Linq;
 using System.Numerics;
 
 using System.Collections;
+using BenchmarkDotNet.Engines;
 
 namespace Faster.Map.Benchmark
 {
     [MarkdownExporterAttribute.GitHub]
+    [DisassemblyDiagnoser]
     [MemoryDiagnoser]
+    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, iterationCount: 5, warmupCount: 5)]
+    [GcServer(true)]
+    [GcForce(true)]
     public class AddBenchmark
     {
         #region Fields
@@ -26,7 +31,8 @@ namespace Faster.Map.Benchmark
 
         #region Properties
 
-        [Params(10000, 100000, 400000, 800000, 900000)]
+
+        [Params(80_000_000)]
         public uint Length { get; set; }
 
         #endregion
@@ -37,15 +43,16 @@ namespace Faster.Map.Benchmark
         [GlobalSetup]
         public void Add()
         {
-            var output = File.ReadAllText("Numbers.txt");
-            var splittedOutput = output.Split(',');
+            var rnd = new Random(3);
 
-            keys = new uint[1000000];
+            var uni = new HashSet<uint>();
 
-            for (var index = 0; index < Length; index++)
+            while (uni.Count < Length)
             {
-                keys[index] = uint.Parse(splittedOutput[index]);
+                uni.Add((uint)rnd.NextInt64());
             }
+
+            keys = uni.ToArray();         
         }
 
         [IterationSetup]
@@ -69,28 +76,28 @@ namespace Faster.Map.Benchmark
             {
                 var key = keys[i];
                 _dense.Emplace(key, key);
-            } 
-        }
-
-        [Benchmark]
-        public void RobinhoodMap()
-        {
-            for (int i = 0; i < Length; i++)
-            {
-                var key = keys[i];
-                _robinhoodMap.Emplace(key, key);
             }
         }
 
-        [Benchmark]
-        public void Dictionary()
-        {
-            for (int i = 0; i < Length; i++)
-            {
-                var key = keys[i];
-                dic.Add(key, key);
-            }
-        }
+        //[Benchmark]
+        //public void RobinhoodMap()
+        //{
+        //    for (int i = 0; i < Length; i++)
+        //    {
+        //        var key = keys[i];
+        //        _robinhoodMap.Emplace(key, key);
+        //    }
+        //}
+
+        //[Benchmark]
+        //public void Dictionary()
+        //{
+        //    for (int i = 0; i < Length; i++)
+        //    {
+        //        var key = keys[i];
+        //        dic.Add(key, key);
+        //    }
+        //}
 
         #endregion
     }

@@ -276,7 +276,7 @@ namespace Faster.Map.Hash
             }
 
             // Handle medium spans (17 to 31 bytes) by processing two partial blocks
-            if (len < 32)
+            if (len <= 32)
             {
                 // Load the first block of data into the hash vector
                 // `ptr` is assumed to reference the beginning of the first block

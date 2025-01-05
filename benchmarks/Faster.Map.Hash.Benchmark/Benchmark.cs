@@ -1,10 +1,5 @@
 ﻿using BenchmarkDotNet.Attributes;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Faster.Map.Hash.Benchmark
 {
@@ -13,13 +8,13 @@ namespace Faster.Map.Hash.Benchmark
         private FastHash _hash = new FastHash();
         private string source;
 
-        [Params(1000)]
+        [Params(100, 1000, 10000)]
         public uint StringLength { get; set; }
 
         [Params(10000)]
         public uint Iterations { get; set; }
 
-                [GlobalSetup]
+        [GlobalSetup]
         public void Setup()
         {
             FastHash.CreateSeed();

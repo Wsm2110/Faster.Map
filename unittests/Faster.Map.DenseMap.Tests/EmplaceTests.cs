@@ -17,7 +17,7 @@ namespace Faster.Map.DenseMap.Tests
         [Fact]
         public void Emplace_ShouldInsertNewKeyValuePair_WhenKeyDoesNotExist()
         {
-            _map.Emplace(1, "value1");           
+            _map.Emplace(1, "value1");
             Assert.True(_map.Contains(1));
             Assert.Equal("value1", _map[1]);
         }
@@ -27,7 +27,7 @@ namespace Faster.Map.DenseMap.Tests
         {
             _map.Emplace(1, "initialValue");
             _map.Emplace(1, "updatedValue");
-           
+
             Assert.True(_map.Contains(1));
             Assert.Equal("updatedValue", _map[1]);
         }
@@ -99,7 +99,7 @@ namespace Faster.Map.DenseMap.Tests
         {
             _map.Emplace(1, "newValue");
 
-         
+
             Assert.True(_map.Contains(1));
             Assert.Equal("newValue", _map[1]);
         }
@@ -109,7 +109,7 @@ namespace Faster.Map.DenseMap.Tests
         {
             _map.Emplace(1, "initialValue");
             _map.Emplace(1, "updatedValue");
-        
+
             Assert.Equal("updatedValue", _map[1]);
         }
 
@@ -118,7 +118,7 @@ namespace Faster.Map.DenseMap.Tests
         {
             _map.Emplace(1, "initialValue");
             _map.Emplace(1, "duplicateValue");
-       
+
             Assert.True(_map.Contains(1));
             Assert.Equal("duplicateValue", _map[1]);
         }
@@ -129,7 +129,7 @@ namespace Faster.Map.DenseMap.Tests
             _map.Emplace(1, "value1");
             _map.Emplace(1, "value2");
             _map.Emplace(1, "finalValue");
-          
+
             Assert.True(_map.Contains(1));
             Assert.Equal("finalValue", _map[1]);
         }
@@ -231,8 +231,8 @@ namespace Faster.Map.DenseMap.Tests
             _map.Emplace(2, "value2");
             _map.Remove(1);
 
-           _map.Emplace(1, "newValue");
-       
+            _map.Emplace(1, "newValue");
+
             Assert.Equal("newValue", _map[1]);
             Assert.Equal("value2", _map[2]);
         }
@@ -293,8 +293,8 @@ namespace Faster.Map.DenseMap.Tests
             _map.Emplace(1, "value1");
             _map.Remove(1);
 
-           _map.Emplace(1, "newValue");
-      
+            _map.Emplace(1, "newValue");
+
             Assert.Equal("newValue", _map[1]);
         }
 
@@ -497,7 +497,7 @@ namespace Faster.Map.DenseMap.Tests
             _map.Remove(2);
 
             // Step 4: Re-add an existing entry (should update, not duplicate)
-             _map.Emplace(1, "newValue1");
+            _map.Emplace(1, "newValue1");
 
             // Step 5: Assertions   
             Assert.Equal("newValue1", _map[1]); // Verify updated value for key 1
@@ -508,7 +508,7 @@ namespace Faster.Map.DenseMap.Tests
 
         [Fact]
         public void Emplace_ShouldNotAddDuplicate_WhenReAddedAfterRemoval_WhileInDifferentGroups()
-        {         
+        {
             // Step 1: Add multiple entries
             List<int> coll = new List<int>();
 
@@ -531,14 +531,14 @@ namespace Faster.Map.DenseMap.Tests
             _map.Remove(13);
 
             // Try to add a duplicate which is in the second group of 16
-           _map.Emplace(767, "UpdatedValue");
-            
+            _map.Emplace(767, "UpdatedValue");
+
             Assert.True(_map[767] == "UpdatedValue");
         }
 
         [Fact]
         public void Emplace_ShouldEmlace_WhenReAddedAfterRemoval_WhileInDifferentGroups()
-        {         
+        {
             // Step 1: Add multiple entries
             List<int> coll = new List<int>();
 
@@ -562,8 +562,22 @@ namespace Faster.Map.DenseMap.Tests
 
             // Try to add _map duplicate which is in the second group of 16
             _map.Emplace(coll.ElementAt(100), "newValue");
-         
+
             Assert.True(_map[coll.ElementAt(100)] == "newValue");
         }
+
+        [Fact]
+        public void Emplaxce_ShouldTriggerResize()
+        {
+            var map = new DenseMap<int, string>();
+            var random = Random.Shared;
+            for (int i = 0; i < 512; i++)
+            {
+               map.Emplace(random.Next(), "test");
+            }
+
+
+        }
+
     }
 }

@@ -78,4 +78,8 @@
       <_Parameter1>Faster.Map.CMap.Tests</_Parameter1>
     </AssemblyAttribute>
   </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Hash\Faster.Map.Hash\Faster.Map.Hash.csproj" />
+  </ItemGroup>
 </Project>

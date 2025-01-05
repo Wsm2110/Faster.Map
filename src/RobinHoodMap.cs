@@ -254,18 +254,11 @@ public class RobinhoodMap<TKey, TValue> where TKey : notnull
                 Swap(ref distance, ref meta);
                 Swap(ref entry, ref Find(_entries, index));
 
-                ++distance;
+
+                             
                 ++index;
                 continue;
-            }
-
-            if (distance >= _maxProbeSequenceLength) 
-            {
-                Resize();
-                EmplaceInternal(ref entry);
-                Count++;
-                return true;
-            }
+            }  
 
             if (_keyComparer.Equals(key, Find(_entries, index).Key))
             {
