@@ -148,7 +148,8 @@ public class DenseMap<TKey, TValue>
     #endregion
 
     #region Fields
-
+    private ulong _groupMask;
+    private const uint ElementsInGroupMinusOne = 15;
     private const sbyte _emptyBucket = -127;
     private const sbyte _tombstone = -126;
     private static readonly Vector128<sbyte> _emptyBucketVector = Vector128.Create(_emptyBucket);
@@ -157,15 +158,12 @@ public class DenseMap<TKey, TValue>
     private double _maxTombstoneBeforeRehash;
     private uint _tombstoneCounter;
     private Entry[] _entries;
-    private const uint _goldenRatio = 0x9E3779B9; // 2654435769;
     private uint _length;
-    private byte _shift = 32;
     private double _maxLookupsBeforeResize;
     private uint _lengthMinusOne;
     private readonly double _loadFactor;
     private readonly IHasher<TKey> _hasher;
     private readonly IEqualityComparer<TKey> _comparer;
-    private const double _baseThreshold = 0.125; // 12.5% of entries as tombstones
 
     #endregion
 
@@ -240,15 +238,14 @@ public class DenseMap<TKey, TValue>
 
         _maxLookupsBeforeResize = (uint)(_length * _loadFactor);
         _comparer = EqualityComparer<TKey>.Default;
-        _shift = (byte)(_shift - BitOperations.Log2(_length));
 
-        _controlBytes = GC.AllocateUninitializedArray<sbyte>((int)_length + 16, true);
-        _entries = new Entry[_length + 16];
-
-        _maxTombstoneBeforeRehash = _length * _baseThreshold;
-
+        _controlBytes = GC.AllocateArray<sbyte>((int)_length, true);
+        _entries = GC.AllocateArray<Entry>((int)_length);
         Array.Fill(_controlBytes, _emptyBucket);
+        
+        _maxTombstoneBeforeRehash = _length * 0.125;
         _lengthMinusOne = _length - 1;
+        _groupMask = _lengthMinusOne & ~ElementsInGroupMinusOne;
     }
 
     #endregion
@@ -295,7 +292,7 @@ public class DenseMap<TKey, TValue>
         var target = Vector128.Create(h2);
         // This operation ensures that `index` is in the range [0, capacity - 1] by using only the lower bits of `hashcode`,
         // which helps in efficient and quick indexing.
-        var index = hashcode & _lengthMinusOne;
+        var index = hashcode & _groupMask;
         // Initialize the probing jump distance to zero, which will increase with each probe iteration.
         byte jumpDistance = 0;
 
@@ -303,19 +300,14 @@ public class DenseMap<TKey, TValue>
         {
             // Load a vector from the control bytes starting at the computed index.
             // Control bytes hold metadata about the entries in the map.
-            // var source = ReadVector128Aligned(_controlBytes, index);
             var source = ReadVector128(_controlBytes, index);
-            // Compare `source` and `target` vectors to find any positions with a matching control byte.
-
             // Compare `source` and `target` vectors to find any positions with a matching control byte.
             var resultMask = Vector128.Equals(source, target).ExtractMostSignificantBits();
             // Loop over each set bit in `mask` (indicating matching positions).
             while (resultMask != 0)
             {
-                // Find the lowest set bit in `mask` (first matching position).
-                var bitPos = BitOperations.TrailingZeroCount(resultMask);
-                // Use `bitPos` to access the corresponding entry in `_entries`.
-                ref var entry = ref Find(_entries, index + (uint)bitPos);
+                // Find the lowest set bit in `mask` (first matching position). 
+                ref var entry = ref Find(_entries, index + (uint)BitOperations.TrailingZeroCount(resultMask));
                 // If a matching key is found, update the entry's value and return the old value.
                 if (_comparer.Equals(entry.Key, key))
                 {
@@ -323,7 +315,7 @@ public class DenseMap<TKey, TValue>
                     return;
                 }
 
-                //// Clear the lowest set bit in `mask` to continue with the next matching bit.
+                // Clear the lowest set bit in `mask` to continue with the next matching bit.
                 resultMask = ResetLowestSetBit(resultMask);
             }
 
@@ -338,10 +330,7 @@ public class DenseMap<TKey, TValue>
             {
                 // Find the lowest set bit in `mask`, which represents the first matching position in the current probe group.
                 // This identifies the first available slot or match within the group.
-                var bitPos = BitOperations.TrailingZeroCount(emptyMask);
-                // Convert `bitPos` to an unsigned integer and add it to `index` to calculate the absolute position `i`.
-                // This gives the exact position of the slot in `_entries` relative to the table's base index.
-                var i = index + (uint)bitPos;
+                var i = index + (uint)BitOperations.TrailingZeroCount(emptyMask);
                 // Update the control byte at position `i` in `_controlBytes` to `h2`, marking it as occupied.
                 // The control byte typically indicates the status of the slot (occupied, empty, or tombstone).
                 Find(_controlBytes, i) = h2;
@@ -363,9 +352,7 @@ public class DenseMap<TKey, TValue>
             // Note: that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
             // Note: that we expect to almost never actually probe, since that’s WIDTH(16) non-EMPTY buckets we need to fail to find our key in.
 
-            jumpDistance += 16; // Increase the jump distance by 16 to probe the next cluster.
-            index += jumpDistance; // Move the index forward by the jump distance.           
-            index &= _lengthMinusOne; // Use bitwise AND to ensure the index wraps around within the bounds of the map. Thus preventing out of bounds exceptions
+            index = (index + (jumpDistance += 16)) & _lengthMinusOne;
         }
     }
 
@@ -846,7 +833,7 @@ public class DenseMap<TKey, TValue>
     public void Clear()
     {
         Array.Clear(_entries);
-        Array.Fill(_controlBytes, _emptyBucket);
+        _controlBytes.AsSpan().Fill(_emptyBucket);
         Count = 0;
     }
 
@@ -892,23 +879,22 @@ public class DenseMap<TKey, TValue>
     /// </summary>     
     private void Resize()
     {
-        _shift--;
         _length <<= 1;
         _lengthMinusOne = _length - 1;
         _maxLookupsBeforeResize = _length * _loadFactor;
 
         _tombstoneCounter = 0;
-        _maxTombstoneBeforeRehash = _length * _baseThreshold;
+        _maxTombstoneBeforeRehash = _length * 0.125;
+        _groupMask = _lengthMinusOne & ~ElementsInGroupMinusOne;
 
         var oldEntries = _entries;
         var oldMetadata = _controlBytes;
 
         var size = Unsafe.As<uint, int>(ref _length);
 
-        _controlBytes = GC.AllocateUninitializedArray<sbyte>(size + 16, true);
-        _entries = GC.AllocateArray<Entry>(size + 16);
-
-        _controlBytes.AsSpan().Fill(_emptyBucket);
+        _controlBytes = GC.AllocateArray<sbyte>(size, true);
+        _entries = GC.AllocateArray<Entry>(size);
+        Array.Fill(_controlBytes, _emptyBucket);
 
         for (uint i = 0; i < oldEntries.Length; ++i)
         {
@@ -921,12 +907,12 @@ public class DenseMap<TKey, TValue>
             var entry = Find(oldEntries, i);
 
             var hashcode = _hasher.ComputeHash(entry.Key);
-            var index = hashcode & _lengthMinusOne;
+            var index = (hashcode & _lengthMinusOne) & ~ElementsInGroupMinusOne;
             byte jumpDistance = 0;
 
             while (true)
             {
-                var mask = Vector128.LoadUnsafe(ref Find(_controlBytes, index)).ExtractMostSignificantBits();
+                var mask = ReadVector128(_controlBytes, index).ExtractMostSignificantBits();
                 if (mask != 0)
                 {
                     var bitPos = BitOperations.TrailingZeroCount(mask);
@@ -943,6 +929,8 @@ public class DenseMap<TKey, TValue>
             }
         }
     }
+
+
 
     /// <summary>
     /// Finds the element in the array at the specified index.
@@ -966,10 +954,12 @@ public class DenseMap<TKey, TValue>
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Vector128<sbyte> ReadVector128(sbyte[] array, ulong index)
+    public unsafe static Vector128<sbyte> ReadVector128(sbyte[] array, ulong index)
     {
-        // Fast reinterpret-cast without copying
-        return Unsafe.As<sbyte, Vector128<sbyte>>(ref Find(array, index));       
+        // Use `Unsafe.AsPointer` and pointer arithmetic for direct memory access
+        // Calculate the pointer offset and load the vector directly
+        ref var arr0 = ref MemoryMarshal.GetArrayDataReference(array);
+        return Vector128.LoadAligned((sbyte*)Unsafe.AsPointer(ref arr0) + index);
     }
 
     /// <summary>
@@ -987,34 +977,6 @@ public class DenseMap<TKey, TValue>
     internal static uint ResetLowestSetBit(uint value)
     {
         return value & (value - 1);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal void SetCtrl(uint index, sbyte ctrl)
-    {
-        // When a probe sequence reaches the last few slots in the control array(e.g., starting at slot 60 in a 64 - slot table), loading a group of 16 bytes would naturally overflow beyond the array bounds, leading to an out-of - bounds memory read.
-        // By duplicating the first GroupSize control bytes(e.g., the first 16 bytes) at the end of the control array, SwissTable allows a single SIMD load to wrap seamlessly from the end of the array to the beginning, without any special handling.
-
-        // Imagine a control byte array for a hash table with 64 slots, where each slot has a corresponding control byte.If we use SIMD instructions to check 16 bytes at a time, we need an array of control bytes with an extra 16 bytes at the end to mirror the start of the array:
-
-        // Control Byte Array Size: capacity + GroupSize(e.g., 64 + 16 = 80 bytes).
-        // Mirrored Bytes: The last 16 bytes(indices 64–79) are duplicates of the first 16 bytes(indices 0–15).
-        //    So, when probing in a table of 64 slots:
-
-        // If probing starts at index 60, a SIMD load from 60–75 will read indices 60–63 in the main array and wrap into the mirrored control bytes(64–75), which mirror indices 0–11.
-        // This allows the probe to seamlessly continue from the end of the array to the start, simulating a circular array without needing additional checks or modular arithmetic.
-
-        // Warning: This approach may lead to unintended behavior in some edge cases.
-        // For example, suppose we hash a key to slot 3 with a control byte (h2) of 68, 
-        // and slots 12–15 in the control array are occupied. If another key hashes to 
-        // slot 14 with an h2 of 68, the mirrored control bytes could cause it to appear 
-        // as a "match" at the beginning of the table when probed. This false match could 
-        // lead to unintended lookups or modifications and potentially out-of-bounds issues 
-        // during probing if not properly checked against the actual key data in the entries array.
-
-        var index2 = ((index - _groupWidth) & _lengthMinusOne) + _groupWidth;
-        Find(_controlBytes, index) = ctrl;
-        Find(_controlBytes, Unsafe.As<long, int>(ref index2)) = ctrl;
     }
 
     #endregion
