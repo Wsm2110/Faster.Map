@@ -61,7 +61,6 @@ namespace Faster.Map.Benchmark
 
             _denseMap_Default = new DenseMap<uint, uint>(length);
             _denseMap_Xxhash3 = new DenseMap<uint, uint>(length, 0.875, new XxHash3Hasher<uint>());
-            _denseMap_GxHash = new DenseMap<uint, uint>(length, 0.875, new GxHasher<uint>());
             _denseMap_fastHash = new DenseMap<uint, uint>(length, 0.875, new FastHasherUint());
 
             _dictionary = new Dictionary<uint, uint>(dicLength);

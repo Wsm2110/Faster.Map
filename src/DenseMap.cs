@@ -154,7 +154,7 @@ public class DenseMap<TKey, TValue>
     private const sbyte _tombstone = -126;
     private static readonly Vector128<sbyte> _emptyBucketVector = Vector128.Create(_emptyBucket);
     private static readonly Vector128<sbyte> _tombstoneVector = Vector128.Create(_tombstone);
-    private sbyte[] _controlBytes;
+    private ControlBytes _controlBytes;
     private double _maxTombstoneBeforeRehash;
     private uint _tombstoneCounter;
     private Entry[] _entries;
@@ -239,10 +239,11 @@ public class DenseMap<TKey, TValue>
         _maxLookupsBeforeResize = (uint)(_length * _loadFactor);
         _comparer = EqualityComparer<TKey>.Default;
 
-        _controlBytes = GC.AllocateArray<sbyte>((int)_length, true);
+        _controlBytes = new ControlBytes((int)_length);
         _entries = GC.AllocateArray<Entry>((int)_length);
-        Array.Fill(_controlBytes, _emptyBucket);
-        
+
+        _controlBytes.AsSpan().Fill(_emptyBucket);
+
         _maxTombstoneBeforeRehash = _length * 0.125;
         _lengthMinusOne = _length - 1;
         _groupMask = _lengthMinusOne & ~ElementsInGroupMinusOne;
@@ -275,7 +276,7 @@ public class DenseMap<TKey, TValue>
     /// <param name="value">The value.</param>
     /// <returns>Returns the old value</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public unsafe void Emplace(TKey key, TValue value)
+    public void Emplace(TKey key, TValue value)
     {
         // Check if the table is full based on the maximum lookups before needing to resize.
         // Resize if the count exceeds the threshold.
@@ -303,6 +304,7 @@ public class DenseMap<TKey, TValue>
             var source = ReadVector128(_controlBytes, index);
             // Compare `source` and `target` vectors to find any positions with a matching control byte.
             var resultMask = Vector128.Equals(source, target).ExtractMostSignificantBits();
+            var emptyMask = Vector128.Equals(source, _emptyBucketVector).ExtractMostSignificantBits();
             // Loop over each set bit in `mask` (indicating matching positions).
             while (resultMask != 0)
             {
@@ -324,18 +326,18 @@ public class DenseMap<TKey, TValue>
             // Probe sequences terminate at the first empty slot they encounter, having an empty slot in the group means that "removing" the current entry without placing a tombstone won’t disrupt probe chains.
             // More information at "Remove()"
 
-            var emptyMask = Vector128.Equals(source, _emptyBucketVector).ExtractMostSignificantBits();
+      
             // Check for empty buckets in the current vector.
             if (emptyMask != 0)
             {
                 // Find the lowest set bit in `mask`, which represents the first matching position in the current probe group.
                 // This identifies the first available slot or match within the group.
-                var i = index + (uint)BitOperations.TrailingZeroCount(emptyMask);
+                index = index + (uint)BitOperations.TrailingZeroCount(emptyMask);
                 // Update the control byte at position `i` in `_controlBytes` to `h2`, marking it as occupied.
                 // The control byte typically indicates the status of the slot (occupied, empty, or tombstone).
-                Find(_controlBytes, i) = h2;
+                _controlBytes[index] = h2;
                 // Access the entry in `_entries` at position `i` for insertion or update.
-                ref var entry = ref Find(_entries, i);
+                ref var entry = ref Find(_entries, index);
                 // Assign the specified `key` to the `Key` field of the located entry.
                 entry.Key = key;
                 // Assign the specified `value` to the `Value` field of the located entry.
@@ -516,7 +518,7 @@ public class DenseMap<TKey, TValue>
                 // Set the key for the located entry to the specified `key`.
                 entry.Key = key;
                 // Set the control byte for the entry at position `i` to `h2` to mark it as occupied.
-                Find(_controlBytes, i) = h2;
+                _controlBytes[i] = h2;
                 // Increment the total count of entries in the hash table.
                 Count++;
 
@@ -684,11 +686,11 @@ public class DenseMap<TKey, TValue>
 
                     if (emptyMask > 0)
                     {
-                        Find(_controlBytes, i) = _emptyBucket;
+                        _controlBytes[i] = _emptyBucket;
                     }
                     else
                     {
-                        Find(_controlBytes, i) = _tombstone;
+                        _controlBytes[i] = _tombstone;
                         _tombstoneCounter++;
                     }
 
@@ -879,47 +881,50 @@ public class DenseMap<TKey, TValue>
     /// </summary>     
     private void Resize()
     {
+        // Update length-related fields
         _length <<= 1;
         _lengthMinusOne = _length - 1;
-        _maxLookupsBeforeResize = _length * _loadFactor;
+        _maxLookupsBeforeResize = (int)(_length * _loadFactor);
 
         _tombstoneCounter = 0;
-        _maxTombstoneBeforeRehash = _length * 0.125;
+        _maxTombstoneBeforeRehash = (int)(_length * 0.125);
         _groupMask = _lengthMinusOne & ~ElementsInGroupMinusOne;
 
-        var oldEntries = _entries;
-        var oldMetadata = _controlBytes;
+        // Allocate new arrays
+        var size = (int)_length; // Safely cast _length to int for array allocation
 
-        var size = Unsafe.As<uint, int>(ref _length);
+        // Save references to old data
+        var newEntries = GC.AllocateArray<Entry>(size);
+        var newControlBytes = new ControlBytes(size);
 
-        _controlBytes = GC.AllocateArray<sbyte>(size, true);
-        _entries = GC.AllocateArray<Entry>(size);
-        Array.Fill(_controlBytes, _emptyBucket);
+        // Initialize the control bytes to represent empty buckets
+        newControlBytes.AsSpan().Fill(_emptyBucket);
 
-        for (uint i = 0; i < oldEntries.Length; ++i)
+        // Rehash and reinsert all valid entries
+        for (uint i = 0; i < _controlBytes.Length; ++i)
         {
-            var h2 = Find(oldMetadata, i);
+            var h2 = _controlBytes[i];
             if (h2 < 0)
             {
                 continue;
             }
 
-            var entry = Find(oldEntries, i);
+            var entry = Find(_entries, i);
 
             var hashcode = _hasher.ComputeHash(entry.Key);
-            var index = (hashcode & _lengthMinusOne) & ~ElementsInGroupMinusOne;
+            var index = hashcode & _groupMask;
             byte jumpDistance = 0;
 
             while (true)
             {
-                var mask = ReadVector128(_controlBytes, index).ExtractMostSignificantBits();
+                var mask = _controlBytes.LoadAligned(index).ExtractMostSignificantBits();
                 if (mask != 0)
                 {
                     var bitPos = BitOperations.TrailingZeroCount(mask);
                     index += (uint)bitPos;
 
-                    Find(_controlBytes, index) = h2;
-                    Find(_entries, index) = entry;
+                    newControlBytes[index] = h2;
+                    newEntries[index] = entry;
                     break;
                 }
 
@@ -928,9 +933,42 @@ public class DenseMap<TKey, TValue>
                 index &= _lengthMinusOne;
             }
         }
+
+        _controlBytes.Dispose();
+        _controlBytes = newControlBytes;
+        _entries = newEntries;
+
+        //var hashcode = _hasher.ComputeHash(entry.Key);
+        //var index = hashcode & _groupMask;
+        //byte jumpDistance = 0;
+
+
+        //// Retrieve the old entry
+        //ref var entry = ref oldEntries[i];
+
+        //// Recalculate the hash and determine the new index
+        //var hashcode = _hasher.ComputeHash(entry.Key);
+        //var index = hashcode & _groupMask;
+        //byte jumpDistance = 0;
+
+        //// Probe for the next available slot
+        //while (true)
+        //{
+        //    // Check for empty slots in the current probe group
+        //    var mask = ReadVector128(_controlBytes, index).ExtractMostSignificantBits();
+        //    if (mask != 0)
+        //    {
+        //        // Find the first available slot in the empty bucket mask
+        //        index = index + (uint)BitOperations.TrailingZeroCount(mask);
+        //        // Insert the control byte and the entry at the new index
+        //        _controlBytes[index] = h2;
+        //        _entries[index] = entry;
+        //        break;
+        //    }
+
+        //    index = (index + (jumpDistance += 16)) & _lengthMinusOne;
+        //}
     }
-
-
 
     /// <summary>
     /// Finds the element in the array at the specified index.
@@ -947,19 +985,29 @@ public class DenseMap<TKey, TValue>
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ref T Find<T>(T[] array, int index)
+    public unsafe static Vector128<sbyte> ReadVector128(ControlBytes array, ulong index)
     {
-        ref var arr0 = ref MemoryMarshal.GetArrayDataReference(array);
-        return ref Unsafe.Add(ref arr0, index);
-    }
+#if DEBUG
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public unsafe static Vector128<sbyte> ReadVector128(sbyte[] array, ulong index)
-    {
+        if ((index & 15) != 0)
+        {
+            throw new ArgumentException("Offset must be 16-byte aligned.", nameof(index));
+        }
+
+#endif
         // Use `Unsafe.AsPointer` and pointer arithmetic for direct memory access
         // Calculate the pointer offset and load the vector directly
-        ref var arr0 = ref MemoryMarshal.GetArrayDataReference(array);
-        return Vector128.LoadAligned((sbyte*)Unsafe.AsPointer(ref arr0) + index);
+        // ref var arr0 = ref MemoryMarshal.GetArrayDataReference(array);
+        // return Vector128.LoadAligned((sbyte*)Unsafe.AsPointer(ref array[0]) + index);
+
+        //// Get the pointer to the start of the array
+        //fixed (sbyte* ptr = &array[index])
+        //{
+        //    // Read the 16-byte-aligned data as a Vector128
+        //    return Vector128.LoadAligned(ptr);
+        //}
+
+        return Vector128.LoadAligned((sbyte*)array.Pointer + index);
     }
 
     /// <summary>
@@ -987,4 +1035,66 @@ public class DenseMap<TKey, TValue>
         public TKey Key;
         public TValue Value;
     };
+}
+
+
+public unsafe class ControlBytes : IDisposable // Implement IDisposable
+{
+    private readonly IntPtr _alignedPointer;
+    public readonly int Length;
+    private readonly IntPtr _originalAllocation; // Store the original allocation
+
+    public ControlBytes(int length)
+    {
+        Length = length;
+
+        // Allocate extra memory to ensure we can align
+        _originalAllocation = Marshal.AllocHGlobal(length + 15);
+
+        // Calculate the aligned address
+        long alignedAddress = (_originalAllocation.ToInt64() + 15) & ~15L;
+        _alignedPointer = new IntPtr(alignedAddress);
+    }
+
+
+    public ref sbyte this[int index] // Use ref byte for better performance
+    {
+        get
+        {
+            return ref Unsafe.AddByteOffset(ref Unsafe.AsRef<sbyte>((void*)_alignedPointer), index);
+        }
+    }
+
+    public ref sbyte this[uint index] // Use ref byte for better performance
+    {
+        get
+        {
+            return ref Unsafe.AddByteOffset(ref Unsafe.AsRef<sbyte>((void*)_alignedPointer), index);
+        }
+    }
+
+    public ref sbyte this[ulong index] // Use ref byte for better performance
+    {
+        get
+        {
+            return ref Unsafe.AddByteOffset(ref Unsafe.AsRef<sbyte>((void*)_alignedPointer), (nint)index);
+        }
+    }
+
+    public Span<sbyte> AsSpan() => new Span<sbyte>((void*)_alignedPointer, Length); // Expose as Span
+
+    public ReadOnlySpan<sbyte> AsReadOnlySpan() => new ReadOnlySpan<sbyte>((void*)_alignedPointer, Length);
+
+    public IntPtr Pointer => _alignedPointer;
+
+    public void Dispose() // Implement Dispose pattern
+    {
+        Marshal.FreeHGlobal(_originalAllocation);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal Vector128<sbyte> LoadAligned(ulong index)
+    {
+        return Vector128.LoadAligned((sbyte*)Pointer);
+    }
 }

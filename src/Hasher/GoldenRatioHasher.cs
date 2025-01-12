@@ -10,7 +10,7 @@ namespace Faster.Map.Hasher
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ulong ComputeHash(TKey key)
         {
-            return (uint)key.GetHashCode() * _goldenRatio;
+            return ((uint)key.GetHashCode()) * _goldenRatio;
         }     
     }
 }
