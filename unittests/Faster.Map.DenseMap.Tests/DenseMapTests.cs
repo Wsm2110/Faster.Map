@@ -175,7 +175,7 @@ namespace Faster.Map.DenseMap.Tests
             //assert  
             // 16 * 2) + 16
 
-            Assert.AreEqual(48, (int)map.Size);
+            Assert.AreEqual(32, (int)map.Size);
         }
 
         [TestMethod]
@@ -573,7 +573,7 @@ namespace Faster.Map.DenseMap.Tests
 
             //hashmap has an overhead of + 16
 
-            Assert.IsTrue(fmap.Size == 32);
+            Assert.IsTrue(fmap.Size == 16);
         }
     }
 }

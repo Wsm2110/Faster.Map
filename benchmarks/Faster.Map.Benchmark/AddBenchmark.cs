@@ -13,9 +13,7 @@ namespace Faster.Map.Benchmark
     [MarkdownExporterAttribute.GitHub]
     [DisassemblyDiagnoser]
     [MemoryDiagnoser]
-    //[SimpleJob(RunStrategy.Monitoring, launchCount: 1, iterationCount: 5, warmupCount: 5)]
-    //[GcServer(true)]
-    //[GcForce(true)]
+    //[SimpleJob(RunStrategy.Monitoring, launchCount: 1, iterationCount: 5, warmupCount: 5)]  
     public class AddBenchmark
     {
         #region Fields

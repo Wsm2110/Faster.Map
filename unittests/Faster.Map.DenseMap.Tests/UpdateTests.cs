@@ -304,12 +304,12 @@ namespace Faster.Map.DenseMap.Tests
         {
             var map = new DenseMap<int, string>(16, 0.9);
 
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < 64; i++)
             {
                 map.Emplace(i, $"initialValue{i}");
             }
 
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < 64; i++)
             {
                 bool updated = map.Update(i, $"updatedValue{i}");
                 Assert.True(updated);

@@ -304,7 +304,6 @@ public class DenseMap<TKey, TValue>
             var source = ReadVector128(_controlBytes, index);
             // Compare `source` and `target` vectors to find any positions with a matching control byte.
             var resultMask = Vector128.Equals(source, target).ExtractMostSignificantBits();
-            var emptyMask = Vector128.Equals(source, _emptyBucketVector).ExtractMostSignificantBits();
             // Loop over each set bit in `mask` (indicating matching positions).
             while (resultMask != 0)
             {
@@ -326,7 +325,7 @@ public class DenseMap<TKey, TValue>
             // Probe sequences terminate at the first empty slot they encounter, having an empty slot in the group means that "removing" the current entry without placing a tombstone won’t disrupt probe chains.
             // More information at "Remove()"
 
-      
+            var emptyMask = Vector128.Equals(source, _emptyBucketVector).ExtractMostSignificantBits();
             // Check for empty buckets in the current vector.
             if (emptyMask != 0)
             {
@@ -374,7 +373,7 @@ public class DenseMap<TKey, TValue>
     /// <param name="value">The value.</param>
     /// <returns>Returns false if the key is not found.</returns>       
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public unsafe bool Get(TKey key, out TValue value)
+    public bool Get(TKey key, out TValue value)
     {
         // Compute the hash code for the given key and cast it to an unsigned integer for bitwise operations.
         var hashcode = _hasher.ComputeHash(key);
@@ -384,9 +383,8 @@ public class DenseMap<TKey, TValue>
         var target = Vector128.Create(h2);
         // This operation ensures that `index` is in the range [0, capacity - 1] by using only the lower bits of `hashcode`,
         // which helps in efficient and quick indexing.
-        var index = hashcode & _lengthMinusOne;
+        var index = hashcode & _groupMask;
         // Initialize a variable to keep track of the distance to jump when probing the map.
-
         byte jumpDistance = 0;
 
         // Loop until we find either a match or an empty slot.
@@ -432,9 +430,7 @@ public class DenseMap<TKey, TValue>
             // Note: that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
             // Note: that we expect to almost never actually probe, since that’s WIDTH(16) non-EMPTY buckets we need to fail to find our key in.
 
-            jumpDistance += 16; // Increase the jump distance by 16 to probe the next cluster.
-            index += jumpDistance; // Move the index forward by the jump distance.           
-            index &= _lengthMinusOne; // Use bitwise AND to ensure the index wraps around within the bounds of the map. Thus preventing out of bounds exceptions
+            index = (index + (jumpDistance += 16)) & _lengthMinusOne;
         }
     }
 
@@ -471,7 +467,7 @@ public class DenseMap<TKey, TValue>
         var target = Vector128.Create(h2);
         // This operation ensures that `index` is in the range [0, capacity - 1] by using only the lower bits of `hashcode`,
         // which helps in efficient and quick indexing.
-        var index = hashcode & _lengthMinusOne;
+        var index = hashcode & _groupMask;
         // Initialize the probing jump distance to zero, which will increase with each probe iteration.
         byte jumpDistance = 0;
 
@@ -532,9 +528,7 @@ public class DenseMap<TKey, TValue>
             // Note: that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
             // Note: that we expect to almost never actually probe, since that’s WIDTH(16) non-EMPTY buckets we need to fail to find our key in.
 
-            jumpDistance += 16; // Increase the jump distance by 16 to probe the next cluster.
-            index += jumpDistance; // Move the index forward by the jump distance.           
-            index &= _lengthMinusOne; // Use bitwise AND to ensure the index wraps around within the bounds of the map. Thus preventing out of bounds exceptions
+            index = (index + (jumpDistance += 16)) & _lengthMinusOne;
         }
     }
 
@@ -561,7 +555,7 @@ public class DenseMap<TKey, TValue>
         var target = Vector128.Create(h2);
         // This operation ensures that `index` is in the range [0, capacity - 1] by using only the lower bits of `hashcode`,
         // which helps in efficient and quick indexing.
-        var index = hashcode & _lengthMinusOne;
+        var index = hashcode & _groupMask;
         // Initialize `jumpDistance` to control the distance between probes, starting at zero.
         byte jumpDistance = 0;
 
@@ -611,9 +605,7 @@ public class DenseMap<TKey, TValue>
             // Note: that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
             // Note: that we expect to almost never actually probe, since that’s WIDTH(16) non-EMPTY buckets we need to fail to find our key in.
 
-            jumpDistance += 16;
-            index += jumpDistance;
-            index &= _length - 1;
+            index = (index + (jumpDistance += 16)) & _lengthMinusOne;
         }
     }
 
@@ -644,7 +636,7 @@ public class DenseMap<TKey, TValue>
         var target = Vector128.Create(h2);
         // This operation ensures that `index` is in the range [0, capacity - 1] by using only the lower bits of `hashcode`,
         // which helps in efficient and quick indexing.
-        var index = hashcode & _lengthMinusOne;
+        var index = hashcode & _groupMask;
         // Initialize `jumpDistance` to control the distance between probes, starting at zero.
         byte jumpDistance = 0;
 
@@ -720,9 +712,8 @@ public class DenseMap<TKey, TValue>
             // Interestingly, this pattern perfectly lines up with our power-of-two size such that we will visit every single bucket exactly once without any repeats(searching is therefore guaranteed to terminate as we always have at least one EMPTY bucket).
             // Note: that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
             // Note: that we expect to almost never actually probe, since that’s WIDTH(16) non-EMPTY buckets we need to fail to find our key in.
-            jumpDistance += 16;
-            index += jumpDistance;
-            index &= _lengthMinusOne; // Ensures `index` stays within valid map indices.
+
+            index = (index + (jumpDistance += 16)) & _lengthMinusOne;
         }
     }
 
@@ -748,7 +739,7 @@ public class DenseMap<TKey, TValue>
         var target = Vector128.Create(h2);
         // This operation ensures that `index` is in the range [0, capacity - 1] by using only the lower bits of `hashcode`,
         // which helps in efficient and quick indexing.
-        var index = hashcode & _lengthMinusOne;
+        var index = hashcode & _groupMask;
         // Initialize `jumpDistance` to control the distance between probes, starting at zero.
         byte jumpDistance = 0;
 
@@ -792,10 +783,7 @@ public class DenseMap<TKey, TValue>
             // Note: that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
             // Note: that we expect to almost never actually probe, since that’s WIDTH(16) non-EMPTY buckets we need to fail to find our key in.
 
-            jumpDistance += 16;
-            // Move the index forward by the updated `jumpDistance`, wrapping within map bounds.
-            index += jumpDistance;
-            index &= _lengthMinusOne; // Ensures the index remains within the valid range of the map.
+            index = (index + (jumpDistance += 16)) & _lengthMinusOne;
         }
     }
 
@@ -917,57 +905,26 @@ public class DenseMap<TKey, TValue>
 
             while (true)
             {
-                var mask = _controlBytes.LoadAligned(index).ExtractMostSignificantBits();
+                var source = ReadVector128(newControlBytes, index);
+
+                //var equalsResult = Vector128.Equals(source, _emptyBucketVector);
+                var mask = source.ExtractMostSignificantBits();
                 if (mask != 0)
                 {
-                    var bitPos = BitOperations.TrailingZeroCount(mask);
-                    index += (uint)bitPos;
-
+                    var pos = (uint)BitOperations.TrailingZeroCount(mask);
+                    index += pos;
                     newControlBytes[index] = h2;
                     newEntries[index] = entry;
                     break;
                 }
 
-                jumpDistance += 16;
-                index += jumpDistance;
-                index &= _lengthMinusOne;
+                index = (index + (jumpDistance += 16)) & _lengthMinusOne;
             }
         }
 
         _controlBytes.Dispose();
         _controlBytes = newControlBytes;
         _entries = newEntries;
-
-        //var hashcode = _hasher.ComputeHash(entry.Key);
-        //var index = hashcode & _groupMask;
-        //byte jumpDistance = 0;
-
-
-        //// Retrieve the old entry
-        //ref var entry = ref oldEntries[i];
-
-        //// Recalculate the hash and determine the new index
-        //var hashcode = _hasher.ComputeHash(entry.Key);
-        //var index = hashcode & _groupMask;
-        //byte jumpDistance = 0;
-
-        //// Probe for the next available slot
-        //while (true)
-        //{
-        //    // Check for empty slots in the current probe group
-        //    var mask = ReadVector128(_controlBytes, index).ExtractMostSignificantBits();
-        //    if (mask != 0)
-        //    {
-        //        // Find the first available slot in the empty bucket mask
-        //        index = index + (uint)BitOperations.TrailingZeroCount(mask);
-        //        // Insert the control byte and the entry at the new index
-        //        _controlBytes[index] = h2;
-        //        _entries[index] = entry;
-        //        break;
-        //    }
-
-        //    index = (index + (jumpDistance += 16)) & _lengthMinusOne;
-        //}
     }
 
     /// <summary>
@@ -1007,7 +964,7 @@ public class DenseMap<TKey, TValue>
         //    return Vector128.LoadAligned(ptr);
         //}
 
-        return Vector128.LoadAligned((sbyte*)array.Pointer + index);
+        return array.LoadAligned(index);
     }
 
     /// <summary>
@@ -1038,63 +995,137 @@ public class DenseMap<TKey, TValue>
 }
 
 
-public unsafe class ControlBytes : IDisposable // Implement IDisposable
+/// <summary>
+/// Represents a memory-aligned byte control class that provides direct access to a block of unmanaged memory.
+/// </summary>
+public unsafe class ControlBytes : IDisposable
 {
-    private readonly IntPtr _alignedPointer;
-    public readonly int Length;
-    private readonly IntPtr _originalAllocation; // Store the original allocation
+    /// <summary>
+    /// Pointer to the aligned memory block.
+    /// </summary>
+    private readonly sbyte* _alignedPointer;
 
+    /// <summary>
+    /// Length of the allocated memory block in bytes.
+    /// </summary>
+    public readonly int Length;
+
+    /// <summary>
+    /// Pointer to the original allocated memory block.
+    /// </summary>
+    private readonly IntPtr _originalAllocation;
+
+    /// <summary>
+    /// Indicates whether the object has been disposed.
+    /// </summary>
+    private bool _disposed = false;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ControlBytes"/> class with the specified length.
+    /// </summary>
+    /// <param name="length">The length of the memory block to allocate.</param>
     public ControlBytes(int length)
     {
         Length = length;
-
-        // Allocate extra memory to ensure we can align
         _originalAllocation = Marshal.AllocHGlobal(length + 15);
-
-        // Calculate the aligned address
-        long alignedAddress = (_originalAllocation.ToInt64() + 15) & ~15L;
-        _alignedPointer = new IntPtr(alignedAddress);
+        sbyte* ptr = (sbyte*)_originalAllocation;
+        _alignedPointer = (sbyte*)(((long)ptr + 15) & ~15);
     }
 
+    /// <summary>
+    /// Provides access to the memory block at the specified index.
+    /// </summary>
+    /// <param name="index">The zero-based index.</param>
+    /// <returns>A reference to the sbyte at the specified index.</returns>
+    public ref sbyte this[int index] => ref _alignedPointer[index];
 
-    public ref sbyte this[int index] // Use ref byte for better performance
-    {
-        get
-        {
-            return ref Unsafe.AddByteOffset(ref Unsafe.AsRef<sbyte>((void*)_alignedPointer), index);
-        }
-    }
+    /// <summary>
+    /// Provides access to the memory block at the specified index.
+    /// </summary>
+    /// <param name="index">The zero-based unsigned index.</param>
+    /// <returns>A reference to the sbyte at the specified index.</returns>
+    public ref sbyte this[uint index] => ref _alignedPointer[index];
 
-    public ref sbyte this[uint index] // Use ref byte for better performance
-    {
-        get
-        {
-            return ref Unsafe.AddByteOffset(ref Unsafe.AsRef<sbyte>((void*)_alignedPointer), index);
-        }
-    }
+    /// <summary>
+    /// Provides access to the memory block at the specified index.
+    /// </summary>
+    /// <param name="index">The zero-based unsigned long index.</param>
+    /// <returns>A reference to the sbyte at the specified index.</returns>
+    public ref sbyte this[ulong index] => ref _alignedPointer[index];
 
-    public ref sbyte this[ulong index] // Use ref byte for better performance
-    {
-        get
-        {
-            return ref Unsafe.AddByteOffset(ref Unsafe.AsRef<sbyte>((void*)_alignedPointer), (nint)index);
-        }
-    }
+    /// <summary>
+    /// Creates a span that represents the memory block.
+    /// </summary>
+    /// <remarks>
+    /// Accessing this after the object is disposed will result in undefined behavior.
+    /// </remarks>
+    /// <returns>A span of the memory block.</returns>
+    public Span<sbyte> AsSpan() => new Span<sbyte>(_alignedPointer, Length);
 
-    public Span<sbyte> AsSpan() => new Span<sbyte>((void*)_alignedPointer, Length); // Expose as Span
+    /// <summary>
+    /// Creates a read-only span that represents the memory block.
+    /// </summary>
+    /// <remarks>
+    /// Accessing this after the object is disposed will result in undefined behavior.
+    /// </remarks>
+    /// <returns>A read-only span of the memory block.</returns>
+    public ReadOnlySpan<sbyte> AsReadOnlySpan() => new ReadOnlySpan<sbyte>(_alignedPointer, Length);
 
-    public ReadOnlySpan<sbyte> AsReadOnlySpan() => new ReadOnlySpan<sbyte>((void*)_alignedPointer, Length);
-
-    public IntPtr Pointer => _alignedPointer;
-
-    public void Dispose() // Implement Dispose pattern
-    {
-        Marshal.FreeHGlobal(_originalAllocation);
-    }
-
+    /// <summary>
+    /// Loads a 128-bit vector from the aligned memory block at the specified index.
+    /// </summary>
+    /// <param name="index">The index from which to load the vector.</param>
+    /// <returns>A 128-bit vector containing the data.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal Vector128<sbyte> LoadAligned(ulong index)
+    public Vector128<sbyte> LoadAligned(ulong index)
     {
-        return Vector128.LoadAligned((sbyte*)Pointer);
+        return Vector128.LoadAligned(_alignedPointer + index);
+    }
+
+    /// <summary>
+    /// Loads a 128-bit vector from the memory block at the specified index.
+    /// </summary>
+    /// <param name="index">The index from which to load the vector.</param>
+    /// <returns>A 128-bit vector containing the data.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Vector128<sbyte> Load(ulong index)
+    {
+        return Vector128.Load((sbyte*)(_alignedPointer + index));
+    }
+
+    /// <summary>
+    /// Releases the unmanaged resources used by the class.
+    /// </summary>
+    /// <param name="disposing">Indicates whether the method is called from Dispose() or a finalizer.</param>
+    protected virtual void Dispose(bool disposing)
+    {
+        if (_disposed)
+            return;
+
+        if (disposing)
+        {
+            // Dispose of managed resources here (if any).
+        }
+
+        Marshal.FreeHGlobal(_originalAllocation);
+        _disposed = true;
+    }
+
+    /// <summary>
+    /// Releases all resources used by the class.
+    /// </summary>
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// Finalizes the class and releases unmanaged resources.
+    /// </summary>
+    ~ControlBytes()
+    {
+        Dispose(false);
     }
 }
+
