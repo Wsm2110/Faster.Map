@@ -2,10 +2,6 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Runtime.Intrinsics;
 
 namespace Faster.Map.DenseMap.Tests
 {
@@ -16,15 +12,12 @@ namespace Faster.Map.DenseMap.Tests
 
         [TestInitialize]
         public void Setup()
-        {
-            var output = File.ReadAllText("Numbers.txt");
-            var splittedOutput = output.Split(',');
-
-            keys = new uint[splittedOutput.Length];
-
-            for (var index = 0; index < splittedOutput.Length; index++)
+        {          
+            keys = new uint[1000000];
+            var random = new Random(3);
+            for (var index = 0; index < 1000000; index++)
             {
-                keys[index] = uint.Parse(splittedOutput[index]);
+                keys[index] = (uint)random.Next();
             }
 
             //     Shuffle(new Random(), keys);

@@ -15,7 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Hash\Faster.Map.Hash\Faster.Map.Hash.csproj" />
+    <ProjectReference Include="..\..\Hash\Faster.Map.Hash.csproj" />
   </ItemGroup>
 
   <ItemGroup>
