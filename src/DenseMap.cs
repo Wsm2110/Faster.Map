@@ -1090,7 +1090,7 @@ public unsafe class ControlBytes : IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector128<sbyte> Load(ulong index)
     {
-        return Vector128.Load((sbyte*)(_alignedPointer + index));
+        return Vector128.Load(_alignedPointer + index);
     }
 
     /// <summary>
