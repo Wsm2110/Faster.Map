@@ -1,7 +1,6 @@
 ﻿# Faster.Map
 
-The goal of Faster.Map is to create a more efficient and performant alternative to the Dictionary and ConcurrentDictionary classes provided by .NET.
-These standard collections are widely used for key-value pair storage in .NET applications, but they have certain limitations, particularly in high-performance and concurrent scenarios.
+Faster.Map provides high-performance hashmaps, each with unique features to suit different needs. It’s built to be faster and more efficient than standard Dictionary and ConcurrentDictionary.
 
 ## Available Implementations:
 
