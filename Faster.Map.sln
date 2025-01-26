@@ -27,6 +27,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Faster.Map.Hash.Tests", "un
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Faster.Map.Hash", "Hash\Faster.Map.Hash.csproj", "{2DAA9DFC-A340-55A3-94C8-F7E3479BA398}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Faster.Map.BlitzMap.Tests", "Faster.Map.BlitzMap.Tests\Faster.Map.BlitzMap.Tests.csproj", "{16BBB696-C463-48DF-8DF2-E703483D1DA3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -107,6 +109,14 @@ Global
 		{2DAA9DFC-A340-55A3-94C8-F7E3479BA398}.Release|Any CPU.Build.0 = Release|Any CPU
 		{2DAA9DFC-A340-55A3-94C8-F7E3479BA398}.Release|x86.ActiveCfg = Release|Any CPU
 		{2DAA9DFC-A340-55A3-94C8-F7E3479BA398}.Release|x86.Build.0 = Release|Any CPU
+		{16BBB696-C463-48DF-8DF2-E703483D1DA3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{16BBB696-C463-48DF-8DF2-E703483D1DA3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{16BBB696-C463-48DF-8DF2-E703483D1DA3}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{16BBB696-C463-48DF-8DF2-E703483D1DA3}.Debug|x86.Build.0 = Debug|Any CPU
+		{16BBB696-C463-48DF-8DF2-E703483D1DA3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{16BBB696-C463-48DF-8DF2-E703483D1DA3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{16BBB696-C463-48DF-8DF2-E703483D1DA3}.Release|x86.ActiveCfg = Release|Any CPU
+		{16BBB696-C463-48DF-8DF2-E703483D1DA3}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -121,6 +131,7 @@ Global
 		{84129404-D8F5-1687-BF71-4A68D6206742} = {717F512C-A5FC-4B01-9532-17D2663884A0}
 		{81386703-5478-35CB-C5D9-DF6D2B64F97C} = {D14F1A94-1E12-40B7-95AD-458306CAC233}
 		{2DAA9DFC-A340-55A3-94C8-F7E3479BA398} = {21A59AB1-1ABE-404A-972E-21ECAE7DC24A}
+		{16BBB696-C463-48DF-8DF2-E703483D1DA3} = {D14F1A94-1E12-40B7-95AD-458306CAC233}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {B844430C-F4DE-4B2B-BD01-0E455BD01E41}

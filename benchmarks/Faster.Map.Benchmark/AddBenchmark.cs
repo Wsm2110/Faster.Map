@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using BenchmarkDotNet.Attributes;
 using System.Linq;
 using System.Numerics;
@@ -13,16 +12,17 @@ namespace Faster.Map.Benchmark
     [MarkdownExporterAttribute.GitHub]
     [DisassemblyDiagnoser]
     [MemoryDiagnoser]
-    //[SimpleJob(RunStrategy.Monitoring, launchCount: 1, iterationCount: 5, warmupCount: 5)]  
+    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, iterationCount: 100, warmupCount: 1)]  
     public class AddBenchmark
     {
         #region Fields
 
-        //fixed size, dont want to measure resize()
+        ////fixed size, dont want to measure resize()
         private DenseMap<uint, uint> _dense;
         private Dictionary<uint, uint> dic;
         private RobinhoodMap<uint, uint> _robinhoodMap;
-    
+        private BlitzMap<uint, uint> blitzMap;
+
         private uint[] keys;
 
         #endregion
@@ -50,7 +50,7 @@ namespace Faster.Map.Benchmark
                 uni.Add((uint)rnd.NextInt64());
             }
 
-            keys = uni.ToArray();         
+            keys = uni.ToArray();
         }
 
         [IterationSetup]
@@ -60,22 +60,33 @@ namespace Faster.Map.Benchmark
             uint length = BitOperations.RoundUpToPowerOf2(Length);
             int dicLength = HashHelpers.GetPrime((int)Length);
 
-            _dense = new DenseMap<uint, uint>(length);
-            dic = new Dictionary<uint, uint>(dicLength);          
-            _robinhoodMap = new RobinhoodMap<uint, uint>(length * 2);
+            blitzMap = new BlitzMap<uint, uint>((int)length, 0.9, null);
+            //_dense = new DenseMap<uint, uint>(length);
+            //dic = new Dictionary<uint, uint>(dicLength);          
+            //_robinhoodMap = new RobinhoodMap<uint, uint>(length * 2);
         }
 
         #region Benchmarks
 
         [Benchmark]
-        public void DenseMap()
+        public void BlitzMap()
         {
             for (int i = 0; i < Length; i++)
             {
                 var key = keys[i];
-                _dense.Emplace(key, key);
-            }
+                blitzMap.Insert(key, key);
+            }          
         }
+
+        //[Benchmark]
+        //public void DenseMap()
+        //{
+        //    for (int i = 0; i < Length; i++)
+        //    {
+        //        var key = keys[i];
+        //        _dense.Emplace(key, key);
+        //    }
+        //}
 
         //[Benchmark]
         //public void RobinhoodMap()
