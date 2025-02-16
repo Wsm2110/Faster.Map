@@ -12,7 +12,7 @@ namespace Faster.Map.Benchmark
     [MarkdownExporterAttribute.GitHub]
     [DisassemblyDiagnoser]
     [MemoryDiagnoser]
-    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, iterationCount: 100, warmupCount: 1)]  
+    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, iterationCount: 5, warmupCount: 1)]  
     public class AddBenchmark
     {
         #region Fields
@@ -60,9 +60,9 @@ namespace Faster.Map.Benchmark
             uint length = BitOperations.RoundUpToPowerOf2(Length);
             int dicLength = HashHelpers.GetPrime((int)Length);
 
-            blitzMap = new BlitzMap<uint, uint>((int)length, 0.9, null);
-            //_dense = new DenseMap<uint, uint>(length);
-            //dic = new Dictionary<uint, uint>(dicLength);          
+            blitzMap = new BlitzMap<uint, uint>((int)length, 0.9);
+            _dense = new DenseMap<uint, uint>(length);
+            dic = new Dictionary<uint, uint>(dicLength);          
             //_robinhoodMap = new RobinhoodMap<uint, uint>(length * 2);
         }
 
@@ -78,15 +78,15 @@ namespace Faster.Map.Benchmark
             }          
         }
 
-        //[Benchmark]
-        //public void DenseMap()
-        //{
-        //    for (int i = 0; i < Length; i++)
-        //    {
-        //        var key = keys[i];
-        //        _dense.Emplace(key, key);
-        //    }
-        //}
+        [Benchmark]
+        public void DenseMap()
+        {
+            for (int i = 0; i < Length; i++)
+            {
+                var key = keys[i];
+                _dense.Emplace(key, key);
+            }
+        }
 
         //[Benchmark]
         //public void RobinhoodMap()
@@ -98,15 +98,15 @@ namespace Faster.Map.Benchmark
         //    }
         //}
 
-        //[Benchmark]
-        //public void Dictionary()
-        //{
-        //    for (int i = 0; i < Length; i++)
-        //    {
-        //        var key = keys[i];
-        //        dic.Add(key, key);
-        //    }
-        //}
+        [Benchmark]
+        public void Dictionary()
+        {
+            for (int i = 0; i < Length; i++)
+            {
+                var key = keys[i];
+                dic.Add(key, key);
+            }
+        }
 
         #endregion
     }

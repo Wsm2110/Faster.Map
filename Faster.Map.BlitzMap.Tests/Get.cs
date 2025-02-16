@@ -1,4 +1,5 @@
-﻿using System;
+﻿
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,7 +13,7 @@ namespace Faster.Map.BlitzMap.Tests
         [Fact]
         public void ShouldReturnCorrectKeyValue()
         {
-            var length = 800000;
+            var length = 80_000_000;
             var rng1 = new Random(3);
 
             var keys = new int[length];
@@ -24,10 +25,15 @@ namespace Faster.Map.BlitzMap.Tests
             }
 
             var rng2 = new Random(3);
-            var map = new BlitzMap<int, int>(length, 0.9, null);
+            var map = new BlitzMap<int, int>(length, 0.9);
 
             for (int i = 0; i < length; i++)
-            {        
+            {
+                if (i == 8) 
+                {
+                
+                }
+
                 map.Insert(keys[i], i + 2);
             }
 
