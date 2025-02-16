@@ -28,6 +28,10 @@ namespace Faster.Map.BlitzMap.Tests
             map.Insert(69, 69 * 1000);
 
             Assert.True(map.Count == 5);
+
+            map.Insert(65, 65);
+
+
         }
 
         [Fact]

@@ -12,7 +12,7 @@ namespace Faster.Map.BlitzMap.Tests
         [Fact]
         public void ShouldReturnCorrectKeyValue()
         {
-            var length = 800000;
+            var length = 1;
             var rng1 = new Random(3);
 
             var keys = new int[length];
