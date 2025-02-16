@@ -25,7 +25,7 @@ public class BlitzMap<TKey, TValue>
     private uint _count;
     private uint _mask;
     private uint _last;
-    private const byte quadraticProbeLength = 12;
+    private const byte quadraticProbeLength = 6;
 
     private static readonly uint INACTIVE = int.MaxValue;
     private int _length;

@@ -21,9 +21,7 @@ namespace Faster.Map.Benchmark
         #region Fields
 
         private DenseMap<uint, uint> _denseMap_Default;
-        private DenseMap<uint, uint> _denseMap_Xxhash3;
-        private DenseMap<uint, uint> _denseMap_GxHash;
-        private DenseMap<uint, uint> _denseMap_fastHash;
+        private BlitzMap<uint, uint> _blitz;
         private Dictionary<uint, uint> _dictionary;
         private RobinhoodMap<uint, uint> _robinHoodMap;
 
@@ -33,7 +31,7 @@ namespace Faster.Map.Benchmark
 
         #region Properties
 
-        [Params(80_000_000)]
+        [Params(107_000_000)]
         public uint Length { get; set; }
 
         #endregion
@@ -60,8 +58,7 @@ namespace Faster.Map.Benchmark
             int dicLength = HashHelpers.GetPrime((int)Length);
 
             _denseMap_Default = new DenseMap<uint, uint>(length);
-            _denseMap_Xxhash3 = new DenseMap<uint, uint>(length, 0.875, new XxHash3Hasher<uint>());
-            _denseMap_fastHash = new DenseMap<uint, uint>(length, 0.875, new FastHasherUint());
+            _blitz = new BlitzMap<uint, uint>((int)length, 0.9);
 
             _dictionary = new Dictionary<uint, uint>(dicLength);
             _robinHoodMap = new RobinhoodMap<uint, uint>(length * 2);
@@ -70,10 +67,21 @@ namespace Faster.Map.Benchmark
             {
                // _dictionary.Add(key, key);
                 _denseMap_Default.Emplace(key, key);
+                _blitz.Insert(key, key);
                 //_denseMap_Xxhash3.Emplace(key, key);
                 //_denseMap_fastHash.Emplace(key, key);
                 //_denseMap_GxHash.Emplace(key, key);
                 //_robinHoodMap.Emplace(key, key);
+            }
+        }
+
+        [Benchmark]
+        public void BlitzMap()
+        {
+            for (int i = 0; i < Length; ++i)
+            {
+                var key = keys[i];
+                _blitz.Get(key, out var _);
             }
         }
 
