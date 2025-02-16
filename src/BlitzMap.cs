@@ -107,85 +107,49 @@ public class BlitzMap<TKey, TValue>
         var index = hashcode & _mask; // Primary index
         var signature = hashcode & ~_mask; // Secondary mask for collision handling
 
-        // d
         ref var bucketBase = ref MemoryMarshal.GetArrayDataReference(_buckets);
+        ref var entryBase = ref MemoryMarshal.GetArrayDataReference(_entries);
+
         ref var bucket = ref FindRef(ref bucketBase, index);
 
-        // Fast path: Insert directly if the bucket is empty    
+        // Fast path: Insert directly if the bucket is empty
         if (bucket.Signature == INACTIVE)
         {
             bucket.Signature = _count | signature;
-            bucket.SetHomeBucket();
-            _entries[_count++] = new Entry(key, value);
+            Unsafe.Add(ref entryBase, _count++) = new Entry(key, value);
             return true;
         }
 
-        // Check if key already exists
-        if (signature == (bucket.Signature & ~_mask))
+        // Check if the bucket contains the key
+        if (signature == (bucket.Signature & ~_mask) && _eq.Equals(key, _entries[bucket.Signature & _mask].Key))
         {
-            if (_eq.Equals(key, _entries[bucket.Signature & _mask].Key))
-            {
-                return false; // Key already exists
-            }
-        }
-
-        // If not a home bucket, perform a "kickout" relocation preventing long probe chains
-        if (!bucket.IsHomeBucket())
-        {
-            var nextBucket = bucket.Next;
-            var newBucket = FindEmptyBucket(ref bucketBase, index, 1);
-
-            var entry = _entries[bucket.RetrieveIndex(_mask)];
-            var homeBucket = (uint)entry.Key.GetHashCode() & _mask;
-            var prevBucket = FindPreviousBucket(homeBucket, index);
-
-            // Reattach newBucket to chain
-            _buckets[prevBucket].Next = newBucket;
-
-            // Assign old bucket to new 
-            _buckets[newBucket] = bucket;
-
-            _buckets[index] = new Bucket
-            {
-                Signature = _count | signature,
-                Next = INACTIVE
-            };
-
-            _buckets[index].SetHomeBucket();
-
-            _entries[_count++] = new Entry(key, value);
-
-            ++_count;
-            return true;
+            return false; // Key already exists
         }
 
         // If there's an empty next slot, insert directly
         if (bucket.Next == INACTIVE)
         {
-            //// Link a new bucket and insert the pair
             uint nBucket = FindEmptyBucket(ref bucketBase, index, 1);
-            // link previous bucket
             bucket.Next = nBucket;
 
-            _buckets[nBucket].Signature = _count | signature;
-            _entries[_count++] = new Entry(key, value);
+            Unsafe.Add(ref bucketBase, nBucket).Signature = _count | signature;
+            Unsafe.Add(ref entryBase, _count++) = new Entry(key, value);
             return true;
         }
 
         uint cint = 1;
 
-        // Traverse the chain
+        // Traverse the chain efficiently
         while (true)
         {
             index = bucket.Next;
-            bucket = ref _buckets[index];
+            bucket = Unsafe.Add(ref bucketBase, index);
 
             if (signature == (bucket.Signature & ~_mask) && _eq.Equals(key, _entries[bucket.Signature & _mask].Key))
             {
                 return false; // Key already exists
             }
 
-            // Exit the chain when the next bucket is inactive
             if (bucket.Next == INACTIVE)
             {
                 break;
@@ -194,12 +158,12 @@ public class BlitzMap<TKey, TValue>
             ++cint;
         }
 
-        // Link a new bucket and insert the pair
         uint newBucketIndex = FindEmptyBucket(ref bucketBase, index, cint);
-        _buckets[index].Next = newBucketIndex;
-        _buckets[newBucketIndex].Signature = _count | signature;
-        _entries[_count++] = new Entry(key, value);
+        Unsafe.Add(ref bucketBase, index).Next = newBucketIndex;
+        Unsafe.Add(ref bucketBase, newBucketIndex).Signature = _count | signature;
+        Unsafe.Add(ref entryBase, _count++) = new Entry(key, value);
         return true;
+
     }
 
     #endregion
@@ -211,27 +175,16 @@ public class BlitzMap<TKey, TValue>
     /// </summary>
     /// <param name="index"></param>
     /// /// <returns></returns>  
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private uint FindEmptyBucket(ref Bucket bucketBase, uint index, uint csize)
-    {
-        //const uint linearProbeLength = 2 + 2 * 64 / sizeof(int); // 64 for cache line size assumption
-        //for (uint offset = csize + 2, step = 4; offset <= linearProbeLength;)
-        //{
-        //    uint bucket = (index + offset) & _mask;
-        //    if (Unsafe.Add(ref bucketBase, bucket).Signature == INACTIVE ||
-        //            Unsafe.Add(ref bucketBase, ++bucket).Signature == INACTIVE)
-        //    {
-        //        return bucket;
-        //    }
-        //        offset += step;
-        //}
-
+    {       
         uint offset = 1 + csize;
         byte step = 3;
 
         //// Quadratic probing: Expand search range
         while (step < quadraticProbeLength)
         {
-            uint bucket = (index + offset) & _mask;
+           var bucket = (index + offset) & _mask;
 
             // Check if the bucket is empty
             if (Unsafe.Add(ref bucketBase, bucket).Signature == INACTIVE ||

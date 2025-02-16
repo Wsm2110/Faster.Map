@@ -12,7 +12,7 @@ namespace Faster.Map.Benchmark
     [MarkdownExporterAttribute.GitHub]
     [DisassemblyDiagnoser]
     [MemoryDiagnoser]
-    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, iterationCount: 5, warmupCount: 1)]  
+    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, iterationCount: 100, warmupCount: 2)]
     public class AddBenchmark
     {
         #region Fields
@@ -29,9 +29,11 @@ namespace Faster.Map.Benchmark
 
         #region Properties
 
+        [Params(/*0.1, 0.2, 0.3, 0.4, 0.5, 0.6,*/ 0.75/* 0.8*/)]
+        public static double LoadFactor { get; set; }
 
-        [Params(80_000_000)]
-        public uint Length { get; set; }
+        [Params(134217728)]
+        public static uint Length { get; set; }
 
         #endregion
 
@@ -45,7 +47,7 @@ namespace Faster.Map.Benchmark
 
             var uni = new HashSet<uint>();
 
-            while (uni.Count < Length)
+            while (uni.Count < (uint)(Length * LoadFactor))
             {
                 uni.Add((uint)rnd.NextInt64());
             }
@@ -62,8 +64,8 @@ namespace Faster.Map.Benchmark
 
             blitzMap = new BlitzMap<uint, uint>((int)length, 0.9);
             _dense = new DenseMap<uint, uint>(length);
-            dic = new Dictionary<uint, uint>(dicLength);          
-            //_robinhoodMap = new RobinhoodMap<uint, uint>(length * 2);
+            dic = new Dictionary<uint, uint>(dicLength);
+            _robinhoodMap = new RobinhoodMap<uint, uint>(length);
         }
 
         #region Benchmarks
@@ -71,42 +73,42 @@ namespace Faster.Map.Benchmark
         [Benchmark]
         public void BlitzMap()
         {
-            for (int i = 0; i < Length; i++)
+            for (int i = 0; i < keys.Length; i++)
             {
                 var key = keys[i];
                 blitzMap.Insert(key, key);
-            }          
-        }
-
-        [Benchmark]
-        public void DenseMap()
-        {
-            for (int i = 0; i < Length; i++)
-            {
-                var key = keys[i];
-                _dense.Emplace(key, key);
             }
         }
 
         //[Benchmark]
+        //public void DenseMap()
+        //{
+        //    for (int i = 0; i < keys.Length; i++)
+        //    {
+        //        var key = keys[i];
+        //        _dense.Emplace(key, key);
+        //    }
+        //}
+
+        //[Benchmark]
         //public void RobinhoodMap()
         //{
-        //    for (int i = 0; i < Length; i++)
+        //    for (int i = 0; i < keys.Length; i++)
         //    {
         //        var key = keys[i];
         //        _robinhoodMap.Emplace(key, key);
         //    }
         //}
 
-        [Benchmark]
-        public void Dictionary()
-        {
-            for (int i = 0; i < Length; i++)
-            {
-                var key = keys[i];
-                dic.Add(key, key);
-            }
-        }
+        //[Benchmark]
+        //public void Dictionary()
+        //{
+        //    for (int i = 0; i < keys.Length; i++)
+        //    {
+        //        var key = keys[i];
+        //        dic.Add(key, key);
+        //    }
+        //}
 
         #endregion
     }
