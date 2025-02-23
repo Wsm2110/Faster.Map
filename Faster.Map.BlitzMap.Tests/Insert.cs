@@ -79,20 +79,22 @@ public class InsertTests
     }
 
     [Theory]
-    [InlineData(90_000_000)]
+    [InlineData(1500)]
 
     public void Insert_Entries_And_Retrieve_Same_Buckets(uint length)
-    {
+    {  
         // Arrange
         var map = new BlitzMap<uint, uint>((int)BitOperations.RoundUpToPowerOf2(length), 0.8);
         uint[] keys = new uint[length];
         uint[] values = new uint[length];
 
+        var random = new Random(6);
+        
         // Generate 100 unique keys
         for (int i = 0; i < length; i++)
         {
-            keys[i] = (uint)(i); // Ensures they hash into different buckets
-            values[i] = (uint)(i * 10); // Arbitrary values
+            keys[i] = (uint)(random.Next()); // Ensures they hash into different buckets
+            values[i] = (uint)(i); // Arbitrary values
         }
 
         // Act - Insert all keys

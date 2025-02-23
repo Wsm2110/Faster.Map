@@ -29,7 +29,7 @@ namespace Faster.Map.Benchmark
 
         #region Properties
 
-        [Params(/*0.1, 0.2, 0.3, 0.4, 0.5, 0.6,*/ 0.75/* 0.8*/)]
+        [Params(0.79)]
         public static double LoadFactor { get; set; }
 
         [Params(134217728)]
@@ -70,6 +70,8 @@ namespace Faster.Map.Benchmark
 
         #region Benchmarks
 
+
+
         [Benchmark]
         public void BlitzMap()
         {
@@ -80,6 +82,7 @@ namespace Faster.Map.Benchmark
             }
         }
 
+
         //[Benchmark]
         //public void DenseMap()
         //{
@@ -89,6 +92,7 @@ namespace Faster.Map.Benchmark
         //        _dense.Emplace(key, key);
         //    }
         //}
+
 
         //[Benchmark]
         //public void RobinhoodMap()
