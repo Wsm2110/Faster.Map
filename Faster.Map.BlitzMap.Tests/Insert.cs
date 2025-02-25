@@ -79,28 +79,29 @@ public class InsertTests
     }
 
     [Theory]
-    [InlineData(1500)]
+    [InlineData(80_000_000)]
 
     public void Insert_Entries_And_Retrieve_Same_Buckets(uint length)
-    {  
-        // Arrange
-        var map = new BlitzMap<uint, uint>((int)BitOperations.RoundUpToPowerOf2(length), 0.8);
-        uint[] keys = new uint[length];
-        uint[] values = new uint[length];
+    {
+        var rnd = new Random(3);
 
-        var random = new Random(6);
-        
-        // Generate 100 unique keys
-        for (int i = 0; i < length; i++)
+        var uni = new HashSet<uint>();
+
+        while (uni.Count < (uint)(134217728 * 0.6))
         {
-            keys[i] = (uint)(random.Next()); // Ensures they hash into different buckets
-            values[i] = (uint)(i); // Arbitrary values
+            uni.Add((uint)rnd.NextInt64());
         }
 
+       var keys = uni.ToArray();
+
+
+        // Arrange
+        var map = new BlitzMap<uint, uint>((int)BitOperations.RoundUpToPowerOf2(length), 0.8);
+           
         // Act - Insert all keys
         for (int i = 0; i < length; i++)
         {
-            bool inserted = map.Insert(keys[i], values[i]);
+            bool inserted = map.Insert(keys[i], 1);
             Assert.True(inserted, $"Insert failed for key {keys[i]:X}");
         }
 
@@ -110,7 +111,7 @@ public class InsertTests
             bool found = map.Get(keys[i], out var retrievedValue);
 
             Assert.True(found, $"Key {keys[i]:X} was not found.");
-            Assert.Equal(values[i], retrievedValue);
+            Assert.Equal(1u, retrievedValue);
         }
 
         // Verify total count

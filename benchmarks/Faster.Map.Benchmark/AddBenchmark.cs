@@ -29,10 +29,10 @@ namespace Faster.Map.Benchmark
 
         #region Properties
 
-        [Params(0.79)]
+        [Params(0.7)]
         public static double LoadFactor { get; set; }
 
-        [Params(134217728)]
+        [Params(107_374_182)]
         public static uint Length { get; set; }
 
         #endregion
