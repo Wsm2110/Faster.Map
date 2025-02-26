@@ -3,32 +3,42 @@ using System;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Faster.Map.Contracts;
 
 namespace Faster.Map;
 
 public class BlitzMap<TKey, TValue>
 {
     #region Properties
+
     public int Count => (int)_count;
+
     #endregion
 
     #region Fields
+
     private Bucket[] _buckets;
     private Entry[] _entries;
     private uint _numBuckets;
     private uint _count;
     private uint _mask;
     private uint _last;
-    private const byte quadraticProbeLength = 12;
+    private const byte quadraticProbeLength = 6;
 
-    private static readonly ushort INACTIVE = ushort.MaxValue;
+    private static readonly uint INACTIVE = int.MaxValue;
     private int _length;
     private double _loadFactor;
 
     // Interfaces
     private IEqualityComparer<TKey> _eq;
+
     #endregion
 
+    /// <summary>
+    ///
+    /// </summary>
+    /// <param name="length"></param>
+    /// <param name="loadFactor"></param>
     public BlitzMap(int length, double loadFactor)
     {
         _length = (int)BitOperations.RoundUpToPowerOf2((uint)length);
@@ -38,164 +48,206 @@ public class BlitzMap<TKey, TValue>
         _eq = EqualityComparer<TKey>.Default;
 
         _buckets = GC.AllocateUninitializedArray<Bucket>(_length, true);
+        // fill array with inactive marker
         _buckets.AsSpan().Fill(new Bucket { Signature = INACTIVE, Next = INACTIVE });
         _entries = GC.AllocateArray<Entry>((int)(_length * loadFactor));
         _numBuckets = (uint)_length >> 1;
+
     }
 
     #region Public Methods
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Get(TKey key, out TValue value)
     {
         uint hashcode = (uint)key.GetHashCode();
-        uint mask = _mask;
-        uint index = hashcode & mask;
-        uint sig = hashcode & ~mask;
+        uint index = hashcode & _mask; // Primary index
+        var signature = hashcode & ~_mask; // Secondary mask for collision handling
 
         ref var bucketBase = ref MemoryMarshal.GetArrayDataReference(_buckets);
         ref var entryBase = ref MemoryMarshal.GetArrayDataReference(_entries);
+
         Bucket bucket = Unsafe.Add(ref bucketBase, index);
 
-        if ((bucket.Signature & ~mask) == sig)
-        {
-            ref var entry = ref Unsafe.Add(ref entryBase, bucket.Signature & mask);
-            if (_eq.Equals(key, entry.Key))
-            {
-                value = entry.Value;
-                return true;
-            }
-        }
-
-        var direction = bucket.IsHomeBucket() ? bucket.Next : bucket.Overflow;
+        // Traverse the chain
         while (true)
         {
-            bucket = Unsafe.Add(ref bucketBase, (index + direction) & _mask);
-            if ((bucket.Signature & ~mask) == sig)
+            if (signature == (bucket.Signature & ~_mask))
             {
-                uint entryIndex = bucket.Signature & mask;
-                ref var entry = ref Unsafe.Add(ref entryBase, (int)entryIndex);
+                var entry = Unsafe.Add(ref entryBase, bucket.Signature & _mask);
                 if (_eq.Equals(key, entry.Key))
                 {
                     value = entry.Value;
-                    return true;
+                    return true; // Key already exists
                 }
             }
 
+            // Exit the chain if the next bucket is inactive
             if (bucket.Next == INACTIVE)
-                break;
+            {
+                value = default;
+                return false;
+            }
 
-            direction = bucket.Next;
+            bucket = Unsafe.Add(ref bucketBase, bucket.Next);
         }
-
-        value = default;
-        return false;
     }
 
+
+    /// <summary>
+    ///
+    /// </summary>
+    /// <param name="key"></param>
+    /// <param name="value"></param>
+    /// <returns></returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Insert(TKey key, TValue value)
     {
-        var hashcode = (uint)key.GetHashCode();
-        var index = hashcode & _mask;
-        var signature = hashcode & ~_mask;
+        var hashcode = Compute((uint)key.GetHashCode());
+        var index = hashcode & _mask; // Primary index
+        var signature = hashcode & ~_mask; // Secondary mask for collision handling
 
         ref var bucketBase = ref MemoryMarshal.GetArrayDataReference(_buckets);
         ref var entryBase = ref MemoryMarshal.GetArrayDataReference(_entries);
+
         ref var bucket = ref Unsafe.Add(ref bucketBase, index);
 
-        // Fast path: bucket is empty
+        // Fast path: Insert directly if the bucket is empty
         if (bucket.Signature == INACTIVE)
         {
             bucket.Signature = _count | signature;
-            bucket.SetHomeBucket();
             Unsafe.Add(ref entryBase, _count++) = new Entry(key, value);
             return true;
         }
 
+        // Check if the bucket contains the key
         if (signature == (bucket.Signature & ~_mask) && _eq.Equals(key, Unsafe.Add(ref entryBase, bucket.Signature & _mask).Key))
         {
-            return false;
-        }
-        
-        var homebucket = bucket.IsHomeBucket();
-
-        // Select the initial link direction: if the bucket is a home bucket, use 'Next';
-        // otherwise, use 'Overflow'.
-        // Note: Using 'overflow' will start a new chain
-        if (!homebucket && bucket.Overflow == 0)
-        {    
-            var h = FindEmptyBucket(ref bucketBase, index, 1);
-            bucket.Overflow = h.Distance;
-            Unsafe.Add(ref bucketBase, h.Index).Signature = _count | signature;
-            Unsafe.Add(ref entryBase, _count++) = new Entry(key, value);
-            return true;
+            return false; // Key already exists
         }
 
-        var direction = homebucket ? bucket.Next : bucket.Overflow;
-        if (direction == INACTIVE)
+        // If there's an empty next slot, insert directly
+        if (bucket.Next == INACTIVE)
         {
-            var h = FindEmptyBucket(ref bucketBase, index, 1);
-            bucket.Next = h.Distance;
-            Unsafe.Add(ref bucketBase, h.Index).Signature = _count | signature;
+            uint nBucket = FindEmptyBucket(ref bucketBase, index, 1);
+            bucket.Next = nBucket;
+
+            Unsafe.Add(ref bucketBase, nBucket).Signature = _count | signature;
             Unsafe.Add(ref entryBase, _count++) = new Entry(key, value);
             return true;
         }
 
-        byte cint = 1;
+        uint cint = 1;
 
-        // Traverse the chain to search for duplicates and to find the last bucket.
+        // Traverse the chain efficiently
         while (true)
         {
-            bucket = ref Unsafe.Add(ref bucketBase, (index + direction) & _mask);
-            if (signature == (bucket.Signature & ~_mask) && _eq.Equals(key, _entries[bucket.Signature & _mask].Key))
+            index = bucket.Next;
+            bucket = Unsafe.Add(ref bucketBase, index);
+
+            if (signature == (bucket.Signature & ~_mask) && _eq.Equals(key, Unsafe.Add(ref entryBase, bucket.Signature & _mask).Key))
             {
-                return false;  // Duplicate found.
+                return false; // Key already exists
             }
 
-            // If this is the end of the chain, break out.
             if (bucket.Next == INACTIVE)
             {
                 break;
             }
 
-            // Continue traversing the chain.
-            direction = bucket.Next;
             ++cint;
         }
 
-        // Find an empty bucket using the accumulated chain length as a parameter.
-        var emptySlot = FindEmptyBucket(ref bucketBase, index, cint);
-        // Attach the new bucket to the chain.
-        bucket.Next = emptySlot.Distance;
-        Unsafe.Add(ref bucketBase, emptySlot.Index).Signature = _count | signature;
+        uint newBucketIndex = FindEmptyBucket(ref bucketBase, index, cint);
+        Unsafe.Add(ref bucketBase, index).Next = newBucketIndex;
+        Unsafe.Add(ref bucketBase, newBucketIndex).Signature = _count | signature;
         Unsafe.Add(ref entryBase, _count++) = new Entry(key, value);
         return true;
+
     }
+
     #endregion
 
     #region Private Methods
 
+    /// <summary>
+    ///
+    /// </summary>
+    /// <param name="index"></param>
+    /// /// <returns></returns>  
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private IndexedDistance FindEmptyBucket(ref Bucket bucketBase, uint index, byte csize)
+    private uint FindEmptyBucket(ref Bucket bucketBase, uint index, uint csize)
     {
         var bucket = index;
-        if (Unsafe.Add(ref bucketBase, ++bucket).Signature == INACTIVE)
+        // Check if the bucket is empty
+        if (Unsafe.Add(ref bucketBase, bucket).Signature == INACTIVE ||
+            Unsafe.Add(ref bucketBase, ++bucket).Signature == INACTIVE)
         {
-            return new IndexedDistance(bucket, 1);
+            return bucket;
         }
 
-        ushort offset = csize;
+        uint offset = 1 + csize;
         byte step = 3;
 
-        while (true)
+        //// Quadratic probing: Expand search range
+        while (step < quadraticProbeLength)
         {
-            bucket = (index + offset) & _mask;
-            if (Unsafe.Add(ref bucketBase, bucket).Signature == INACTIVE)
+             bucket = (index + offset) & _mask;
+
+            // Check if the bucket is empty
+            if (Unsafe.Add(ref bucketBase, bucket).Signature == INACTIVE ||
+                Unsafe.Add(ref bucketBase, ++bucket).Signature == INACTIVE)
             {
-                return new IndexedDistance(bucket, offset);
+                return bucket;
             }
 
-            offset += step++;
-        }     
+            offset += step++; // Increment offset and step
+        }
+
+        // Fallback to a wrapped linear probing for the remaining buckets
+        while (true)
+        {
+            if (Unsafe.Add(ref bucketBase, ++_last).Signature == INACTIVE ||
+                Unsafe.Add(ref bucketBase, ++_last).Signature == INACTIVE) // cannot overflow
+            {
+                return _last;
+            }
+
+            // Try a medium offset (reduces clustering by jumping further)
+            uint medium = (_numBuckets + _last) & _mask;
+            if (Unsafe.Add(ref bucketBase, ++medium).Signature == INACTIVE ||
+                Unsafe.Add(ref bucketBase, ++medium).Signature == INACTIVE)
+            {
+                return medium;
+            }           
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static uint Compute(uint x)
+    {
+        x ^= x >> 15;
+        x *= 0x2c1b3c6dU;
+        x ^= x >> 12;
+        x *= 0x297a2d39U;
+        x ^= x >> 15;
+        return x;         
+    }
+
+    public static ulong Xmx(ulong x)
+    {
+        x ^= x >> 32;
+        x *= 0x94d049bb133111ebUL;
+        x ^= x >> 47;
+        return x;
+    }
+
+    public static ulong Compute(ulong h)
+    {
+        h ^= h >> 23;
+        h *= 0x2127599BF4325C37UL;
+        h ^= h >> 47;
+        return h;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -205,11 +257,5 @@ public class BlitzMap<TKey, TValue>
         public TValue Value = value;
     }
 
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    public readonly struct IndexedDistance(uint index, ushort distance)
-    {
-        public readonly uint Index = index;
-        public readonly ushort Distance = distance;
-    }
     #endregion
 }

@@ -1,13 +1,12 @@
-﻿using BenchmarkDotNet.Configs;
-using BenchmarkDotNet.Running;
+﻿using BenchmarkDotNet.Running;
 
 namespace Faster.Map.Benchmark
 {
     class Program
     {
         static void Main(string[] args)
-        {
-            BenchmarkRunner.Run<GetBenchmark>();
+        {         
+            BenchmarkRunner.Run<AddBenchmark>();
             //BenchmarkRunner.Run<AddAndResizeBenchmark>();
             //BenchmarkRunner.Run<UpdateBenchmark>();
             //BenchmarkRunner.Run<RemoveBenchmark>();

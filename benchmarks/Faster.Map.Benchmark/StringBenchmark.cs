@@ -80,34 +80,7 @@ namespace Faster.Map.Benchmark
         //    {
         //        _denseMap.Get(key, out var result);
         //    }
-        //}
-
-        //[Benchmark]
-        //public void DenseMap_Xxhash3()
-        //{
-        //    foreach (var key in keys)
-        //    {
-        //        _denseMapxxHash.Get(key, out var result);
-        //    }
-        //}
-
-        [Benchmark]
-        public void DenseMap_GxHash()
-        {
-            foreach (var key in keys)
-            {
-                _denseMapGxHash.Get(key, out var result);
-            }
-        }
-
-        [Benchmark]
-        public void DenseMap_FastHash()
-        {
-            foreach (var key in keys)
-            {
-                _denseMapFastHash.Get(key, out var result);
-            }
-        }
+        //}  
 
         [Benchmark]
         public void RobinhoodMap()

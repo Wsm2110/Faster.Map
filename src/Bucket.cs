@@ -1,81 +1,53 @@
-﻿using System.Runtime.CompilerServices;
-
+﻿using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
+namespace Faster.Map;
 
-
-[StructLayout(LayoutKind.Sequential, Pack = 1)]
-
+[StructLayout(LayoutKind.Sequential, Pack = 4)]
 public struct Bucket
-
 {
+    #region Fields
 
-    private const ushort OverflowMask = 0x7FFF;         // 15-bit mask (0b0111_1111_1111_1111)
+    private uint _next;
+    private uint _signature;
 
-    private const ushort HomeBucketFlag = 0x8000;   // MSB for HomeBucket (0b1000_0000_0000_0000)
+    //private const uint ValueMask = 0x7FFFFFFF; // Mask for 31-bit values
+    //private const uint HomeBucketMask = 1U << 31; // Mask for MSB (bit 31)
 
+    #endregion
 
-
-    public ushort Next;   // Secondary collision resolution pointer
-
-    public uint Signature;    // Precomputed hash/signature for ultra-fast lookups
-
-
-
-    private ushort _overflow;     // 15-bit next index + 1-bit HomeBucket flag
 
 
 
     /// <summary>
-
-    /// Gets or sets the 15-bit next bucket index (ensures MSB is not modified).
-
+    /// Gets or sets the signature (secondary part of the hash).
     /// </summary>
-
-    public ushort Overflow
-
+    public uint Signature
     {
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-
-        get => (ushort)(_overflow & OverflowMask);
-
-
-
+        get => _signature;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-
-        set => _overflow = (ushort)((_overflow & HomeBucketFlag) | value);
-
+        set => _signature = value;
     }
 
-
-
     /// <summary>
-
-    /// Checks if this bucket is a HomeBucket.
-
+    /// Gets or sets the Next value (all bits except the last one).
     /// </summary>
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-
-    public bool IsHomeBucket() => (_overflow & HomeBucketFlag) != 0;
-
-
-
-    /// <summary>
-
-    /// Sets or clears the HomeBucket flag.
-
-    /// </summary>
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-
-    public void SetHomeBucket()
-
+    public uint Next
     {
-
-        _overflow |= HomeBucketFlag;  // Set MSB
-
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _next; // Extract only the first 31 bits
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        set => _next = value; // Preserve bit 31, set lower 31 bits
     }
 
+    /// <summary>
+    /// Retrieves the original index from the signature and mask.
+    /// </summary>
+    //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+    //public readonly uint RetrieveIndex(uint mask)
+    //{
+    //    return _signature & mask; // Extracts only the lower bits that represent the index
+    //}
 }

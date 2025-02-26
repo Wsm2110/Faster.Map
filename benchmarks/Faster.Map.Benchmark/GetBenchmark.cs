@@ -47,7 +47,7 @@ namespace Faster.Map.Benchmark
         [GlobalSetup]
         public void Setup()
         {
-            var rnd = new Random(3);
+            var rnd = new Random(6);
 
             var uni = new HashSet<uint>();
 
@@ -90,26 +90,26 @@ namespace Faster.Map.Benchmark
             }
         }
 
-        [Benchmark]
-        public void DenseMap()
-        {
-            for (int i = 0; i < keys.Length; i++)
-            {
-                var key = keys[i];
-                _denseMap_Default.Get(key, out var _);
-            }
-        }
+        //[Benchmark]
+        //public void DenseMap()
+        //{
+        //    for (int i = 0; i < keys.Length; i++)
+        //    {
+        //        var key = keys[i];
+        //        _denseMap_Default.Get(key, out var _);
+        //    }
+        //}
 
 
-        [Benchmark(Baseline = true)]
-        public void Dictionary()
-        {
-            for (int i = 0; i < keys.Length; i++)
-            {
-                var key = keys[i];
-                _dictionary.TryGetValue(key, out var _);
-            }
-        }
+        //[Benchmark(Baseline = true)]
+        //public void Dictionary()
+        //{
+        //    for (int i = 0; i < keys.Length; i++)
+        //    {
+        //        var key = keys[i];
+        //        _dictionary.TryGetValue(key, out var _);
+        //    }
+        //}
 
 
         //[Benchmark]

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using BenchmarkDotNet.Attributes;
 using System.Linq;
 using System.Numerics;
-
 using System.Collections;
 using BenchmarkDotNet.Engines;
 
@@ -43,7 +42,7 @@ namespace Faster.Map.Benchmark
         [GlobalSetup]
         public void Add()
         {
-            var rnd = new Random(3);
+            var rnd = new Random(6);
 
             var uni = new HashSet<uint>();
 
@@ -59,8 +58,8 @@ namespace Faster.Map.Benchmark
         public void Setup()
         {
             // round of length to power of 2 prevent resizing
-            uint length = BitOperations.RoundUpToPowerOf2(Length);
-            int dicLength = HashHelpers.GetPrime((int)Length);
+            uint length = BitOperations.RoundUpToPowerOf2((uint)(Length * LoadFactor));
+            int dicLength = HashHelpers.GetPrime((int)(Length  * LoadFactor));
 
             blitzMap = new BlitzMap<uint, uint>((int)length, 0.9);
             _dense = new DenseMap<uint, uint>(length);
@@ -69,8 +68,6 @@ namespace Faster.Map.Benchmark
         }
 
         #region Benchmarks
-
-
 
         [Benchmark]
         public void BlitzMap()
@@ -82,16 +79,15 @@ namespace Faster.Map.Benchmark
             }
         }
 
-
-        [Benchmark]
-        public void DenseMap()
-        {
-            for (int i = 0; i < keys.Length; i++)
-            {
-                var key = keys[i];
-                _dense.Emplace(key, key);
-            }
-        }
+        //[Benchmark]
+        //public void DenseMap()
+        //{
+        //    for (int i = 0; i < keys.Length; i++)
+        //    {
+        //        var key = keys[i];
+        //        _dense.Emplace(key, key);
+        //    }
+        //}
 
 
         //[Benchmark]
@@ -104,15 +100,15 @@ namespace Faster.Map.Benchmark
         //    }
         //}
 
-        [Benchmark]
-        public void Dictionary()
-        {
-            for (int i = 0; i < keys.Length; i++)
-            {
-                var key = keys[i];
-                dic.Add(key, key);
-            }
-        }
+        //[Benchmark]
+        //public void Dictionary()
+        //{
+        //    for (int i = 0; i < keys.Length; i++)
+        //    {
+        //        var key = keys[i];
+        //        dic.Add(key, key);
+        //    }
+        //}
 
         #endregion
     }
