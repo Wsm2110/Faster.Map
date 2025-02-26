@@ -13,7 +13,7 @@ namespace Faster.Map.Benchmark
     [MarkdownExporterAttribute.GitHub]
     [DisassemblyDiagnoser]
     [MemoryDiagnoser]
-    //[SimpleJob(RunStrategy.Monitoring, launchCount: 1, iterationCount: 5, warmupCount: 5)]
+    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, iterationCount: 5, warmupCount: 5)]
     //[GcServer(true)]
     //[GcForce(true)]
     public class GetBenchmark
@@ -31,8 +31,13 @@ namespace Faster.Map.Benchmark
 
         #region Properties
 
-        [Params(107_374_182)]
-        public uint Length { get; set; }
+
+        [Params(0.5, 0.6, 0.7, 0.8)]
+        public static double LoadFactor { get; set; }
+
+        [Params(134_217_728)]
+        public static uint Length { get; set; }
+
 
         #endregion
 
@@ -41,12 +46,12 @@ namespace Faster.Map.Benchmark
         /// </summary>
         [GlobalSetup]
         public void Setup()
-        {          
+        {
             var rnd = new Random(3);
-           
+
             var uni = new HashSet<uint>();
 
-            while (uni.Count < Length)
+            while (uni.Count < (uint)(Length * LoadFactor))
             {
                 uni.Add((uint)rnd.NextInt64());
             }
@@ -65,7 +70,7 @@ namespace Faster.Map.Benchmark
 
             foreach (var key in keys)
             {
-               // _dictionary.Add(key, key);
+                _dictionary.Add(key, key);
                 _denseMap_Default.Emplace(key, key);
                 _blitz.Insert(key, key);
                 //_denseMap_Xxhash3.Emplace(key, key);
@@ -78,7 +83,7 @@ namespace Faster.Map.Benchmark
         [Benchmark]
         public void BlitzMap()
         {
-            for (int i = 0; i < Length; ++i)
+            for (int i = 0; i < keys.Length; i++)
             {
                 var key = keys[i];
                 _blitz.Get(key, out var _);
@@ -88,7 +93,7 @@ namespace Faster.Map.Benchmark
         [Benchmark]
         public void DenseMap()
         {
-            for (int i = 0; i < Length; ++i)
+            for (int i = 0; i < keys.Length; i++)
             {
                 var key = keys[i];
                 _denseMap_Default.Get(key, out var _);
@@ -96,15 +101,15 @@ namespace Faster.Map.Benchmark
         }
 
 
-        //[Benchmark(Baseline = true)]
-        //public void Dictionary()
-        //{
-        //    for (int i = 0; i < Length; ++i)
-        //    {
-        //        var key = keys[i];
-        //        _dictionary.TryGetValue(key, out var _);
-        //    }
-        //}
+        [Benchmark(Baseline = true)]
+        public void Dictionary()
+        {
+            for (int i = 0; i < keys.Length; i++)
+            {
+                var key = keys[i];
+                _dictionary.TryGetValue(key, out var _);
+            }
+        }
 
 
         //[Benchmark]
@@ -147,6 +152,6 @@ namespace Faster.Map.Benchmark
         //    }
         //}
 
- 
+
     }
 }

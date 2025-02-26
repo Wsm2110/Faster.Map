@@ -19,7 +19,7 @@ public class BlitzMap<TKey, TValue>
     private uint _count;
     private uint _mask;
     private uint _last;
-    private const byte quadraticProbeLength = 6;
+    private const byte quadraticProbeLength = 12;
 
     private static readonly ushort INACTIVE = ushort.MaxValue;
     private int _length;
@@ -98,11 +98,6 @@ public class BlitzMap<TKey, TValue>
         var index = hashcode & _mask;
         var signature = hashcode & ~_mask;
 
-        if (index == 53767476) 
-        {
-        
-        }
-
         ref var bucketBase = ref MemoryMarshal.GetArrayDataReference(_buckets);
         ref var entryBase = ref MemoryMarshal.GetArrayDataReference(_entries);
         ref var bucket = ref Unsafe.Add(ref bucketBase, index);
@@ -117,20 +112,26 @@ public class BlitzMap<TKey, TValue>
         }
 
         if (signature == (bucket.Signature & ~_mask) && _eq.Equals(key, Unsafe.Add(ref entryBase, bucket.Signature & _mask).Key))
-            return false;
-
-        var homebucket = bucket.IsHomeBucket();
-        if (!homebucket && bucket.Overflow == 0)
         {
+            return false;
+        }
+        
+        var homebucket = bucket.IsHomeBucket();
+
+        // Select the initial link direction: if the bucket is a home bucket, use 'Next';
+        // otherwise, use 'Overflow'.
+        // Note: Using 'overflow' will start a new chain
+        if (!homebucket && bucket.Overflow == 0)
+        {    
             var h = FindEmptyBucket(ref bucketBase, index, 1);
             bucket.Overflow = h.Distance;
             Unsafe.Add(ref bucketBase, h.Index).Signature = _count | signature;
             Unsafe.Add(ref entryBase, _count++) = new Entry(key, value);
             return true;
-        }      
+        }
 
         var direction = homebucket ? bucket.Next : bucket.Overflow;
-        if (direction == INACTIVE) 
+        if (direction == INACTIVE)
         {
             var h = FindEmptyBucket(ref bucketBase, index, 1);
             bucket.Next = h.Distance;
@@ -139,62 +140,62 @@ public class BlitzMap<TKey, TValue>
             return true;
         }
 
-
         byte cint = 1;
 
+        // Traverse the chain to search for duplicates and to find the last bucket.
         while (true)
         {
             bucket = ref Unsafe.Add(ref bucketBase, (index + direction) & _mask);
             if (signature == (bucket.Signature & ~_mask) && _eq.Equals(key, _entries[bucket.Signature & _mask].Key))
-                return false;
+            {
+                return false;  // Duplicate found.
+            }
 
+            // If this is the end of the chain, break out.
             if (bucket.Next == INACTIVE)
+            {
                 break;
+            }
 
+            // Continue traversing the chain.
             direction = bucket.Next;
             ++cint;
         }
 
-        var i = FindEmptyBucket(ref bucketBase, index, cint);
-        bucket.Next = i.Distance;
-        Unsafe.Add(ref bucketBase, i.Index).Signature = _count | signature;
+        // Find an empty bucket using the accumulated chain length as a parameter.
+        var emptySlot = FindEmptyBucket(ref bucketBase, index, cint);
+        // Attach the new bucket to the chain.
+        bucket.Next = emptySlot.Distance;
+        Unsafe.Add(ref bucketBase, emptySlot.Index).Signature = _count | signature;
         Unsafe.Add(ref entryBase, _count++) = new Entry(key, value);
         return true;
     }
     #endregion
 
     #region Private Methods
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private IndexedDistance FindEmptyBucket(ref Bucket bucketBase, uint index, byte csize)
     {
         var bucket = index;
         if (Unsafe.Add(ref bucketBase, ++bucket).Signature == INACTIVE)
+        {
             return new IndexedDistance(bucket, 1);
+        }
 
-        var offset = (ushort)(1 + csize);
+        ushort offset = csize;
         byte step = 3;
 
         while (true)
         {
             bucket = (index + offset) & _mask;
             if (Unsafe.Add(ref bucketBase, bucket).Signature == INACTIVE)
+            {
                 return new IndexedDistance(bucket, offset);
+            }
 
             offset += step++;
-        }
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private uint FindPreviousBucket(ref Bucket bucketBase, uint homeBucket, uint targetBucket)
-    {
-        while (true)
-        {
-            var bucket = Unsafe.Add(ref bucketBase, homeBucket);
-            if (bucket.Overflow == targetBucket)
-                return homeBucket;
-
-            homeBucket = bucket.Overflow;
-        }
+        }     
     }
 
     [StructLayout(LayoutKind.Sequential)]
