@@ -3,7 +3,6 @@ using System;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using Faster.Map.Contracts;
 
 namespace Faster.Map;
 
@@ -24,10 +23,12 @@ public class BlitzMap<TKey, TValue>
     private uint _mask;
     private uint _last;
     private const byte quadraticProbeLength = 6;
-
     private static readonly uint INACTIVE = int.MaxValue;
     private int _length;
     private double _loadFactor;
+
+    // Last inserted entry
+    private uint _lastInsertedBucket = INACTIVE;
 
     // Interfaces
     private IEqualityComparer<TKey> _eq;
@@ -50,120 +51,231 @@ public class BlitzMap<TKey, TValue>
         _buckets = GC.AllocateUninitializedArray<Bucket>(_length, true);
         // fill array with inactive marker
         _buckets.AsSpan().Fill(new Bucket { Signature = INACTIVE, Next = INACTIVE });
-        _entries = GC.AllocateArray<Entry>((int)(_length * loadFactor));
+        _entries = GC.AllocateUninitializedArray<Entry>((int)(_length * loadFactor));
         _numBuckets = (uint)_length >> 1;
-
     }
 
     #region Public Methods
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    /// <summary>
+    /// Retrieves the value associated with the specified key in the hash table. 
+    /// </summary>
+    /// <param name="key">The key to search for.</param>
+    /// <param name="value">The value associated with the key if found; otherwise, the default value.</param>
+    /// <returns>True if the key exists in the hash table; false otherwise.</returns>
     public bool Get(TKey key, out TValue value)
     {
+        // Compute the hash code and determine the primary index in the bucket array
         uint hashcode = (uint)key.GetHashCode();
-        uint index = hashcode & _mask; // Primary index
+        uint index = hashcode & _mask; // Primary index within the array
         var signature = hashcode & ~_mask; // Secondary mask for collision handling
 
+        // Obtain references to the start of the bucket and entry arrays
         ref var bucketBase = ref MemoryMarshal.GetArrayDataReference(_buckets);
         ref var entryBase = ref MemoryMarshal.GetArrayDataReference(_entries);
 
+        // Start with the initial bucket determined by the hash index
         Bucket bucket = Unsafe.Add(ref bucketBase, index);
 
-        // Traverse the chain
+        // Traverse the linked list of buckets to find the matching key
         while (true)
         {
+            // Check if the signature matches the desired key's signature
             if (signature == (bucket.Signature & ~_mask))
             {
+                // Retrieve the entry associated with the current bucket
                 var entry = Unsafe.Add(ref entryBase, bucket.Signature & _mask);
+
+                // Verify that the key matches using the equality comparer
                 if (_eq.Equals(key, entry.Key))
                 {
-                    value = entry.Value;
-                    return true; // Key already exists
+                    value = entry.Value; // Set the output value
+                    return true; // Key found, return success
                 }
             }
 
-            // Exit the chain if the next bucket is inactive
+            // If the next bucket index is inactive, the search is exhausted
             if (bucket.Next == INACTIVE)
             {
-                value = default;
-                return false;
+                value = default; // Set default value if not found
+                return false; // Key not found, return failure
             }
 
+            // Move to the next bucket in the chain
             bucket = Unsafe.Add(ref bucketBase, bucket.Next);
         }
     }
 
-
     /// <summary>
-    ///
+    /// Inserts a key-value pair into the hash table with high performance.
     /// </summary>
-    /// <param name="key"></param>
-    /// <param name="value"></param>
-    /// <returns></returns>
+    /// <param name="key">The key to insert.</param>
+    /// <param name="value">The value associated with the key.</param>
+    /// <returns>True if the insertion is successful; false if the key already exists.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Insert(TKey key, TValue value)
     {
-        var hashcode = Compute((uint)key.GetHashCode());
-        var index = hashcode & _mask; // Primary index
-        var signature = hashcode & ~_mask; // Secondary mask for collision handling
+        // Generate a hash code for the provided key
+        var hashcode = (uint)key.GetHashCode();
 
+        // Calculate the primary index using the bitwise AND with the mask
+        // This constrains the index within the array bounds (_mask is typically array length - 1)
+        var index = hashcode & _mask;
+
+        // Calculate the secondary signature for collision detection
+        // The signature is the remaining bits of the hash not used by the index
+        var signature = hashcode & ~_mask;
+
+        // Obtain references to the start of the bucket and entry arrays
         ref var bucketBase = ref MemoryMarshal.GetArrayDataReference(_buckets);
         ref var entryBase = ref MemoryMarshal.GetArrayDataReference(_entries);
 
+        // Reference to the target bucket using the computed index
         ref var bucket = ref Unsafe.Add(ref bucketBase, index);
 
-        // Fast path: Insert directly if the bucket is empty
+        // Fast path: If the target bucket is empty, insert the key-value pair directly
         if (bucket.Signature == INACTIVE)
         {
+            // Set the bucket's signature with the count and the signature mask
             bucket.Signature = _count | signature;
+
+            // Store the new entry in the entries array and increment the count
             Unsafe.Add(ref entryBase, _count++) = new Entry(key, value);
-            return true;
+
+            _lastInsertedBucket = index;
+            return true; // Indicate successful insertion
         }
 
-        // Check if the bucket contains the key
-        if (signature == (bucket.Signature & ~_mask) && _eq.Equals(key, Unsafe.Add(ref entryBase, bucket.Signature & _mask).Key))
+        // Check if the current bucket already contains the key
+        if (signature == (bucket.Signature & ~_mask) &&
+            _eq.Equals(key, Unsafe.Add(ref entryBase, bucket.Signature & _mask).Key))
         {
-            return false; // Key already exists
+            return false; // Key already exists, insertion fails
         }
 
-        // If there's an empty next slot, insert directly
+        // If the next slot is empty, find a new bucket and insert directly
         if (bucket.Next == INACTIVE)
         {
+            // Locate an empty bucket starting from the next index
             uint nBucket = FindEmptyBucket(ref bucketBase, index, 1);
+
+            // Link the current bucket to the newly found empty bucket
             bucket.Next = nBucket;
 
+            // Store the entry in the new bucket and update the signature
             Unsafe.Add(ref bucketBase, nBucket).Signature = _count | signature;
             Unsafe.Add(ref entryBase, _count++) = new Entry(key, value);
-            return true;
+
+            _lastInsertedBucket = nBucket;
+
+            return true; // Successful insertion
         }
 
-        uint cint = 1;
+        // Collision resolution: Traverse the linked list of buckets
+        byte cint = 1; // Chain length counter
 
-        // Traverse the chain efficiently
         while (true)
         {
-            index = bucket.Next;
-            bucket = Unsafe.Add(ref bucketBase, index);
+            // Move to the next bucket in the chain
+            bucket = ref Unsafe.Add(ref bucketBase, bucket.Next);
 
-            if (signature == (bucket.Signature & ~_mask) && _eq.Equals(key, Unsafe.Add(ref entryBase, bucket.Signature & _mask).Key))
+            // Check for an existing key in the chain
+            if (signature == (bucket.Signature & ~_mask) &&
+                _eq.Equals(key, _entries[bucket.Signature & _mask].Key))
             {
-                return false; // Key already exists
+                return false; // Key already exists, insertion fails
             }
 
+            // If we reach the end of the chain, exit the loop to add the new entry
             if (bucket.Next == INACTIVE)
             {
                 break;
             }
 
-            ++cint;
+            ++cint; // Increment the chain length counter
         }
 
+        // Locate a new empty bucket to extend the chain
         uint newBucketIndex = FindEmptyBucket(ref bucketBase, index, cint);
-        Unsafe.Add(ref bucketBase, index).Next = newBucketIndex;
+
+        // Link the end of the chain to the new bucket
+        bucket.Next = newBucketIndex;
+
+        // Set the signature and insert the entry into the new bucket
         Unsafe.Add(ref bucketBase, newBucketIndex).Signature = _count | signature;
         Unsafe.Add(ref entryBase, _count++) = new Entry(key, value);
-        return true;
 
+        _lastInsertedBucket = newBucketIndex;
+        return true; // Insertion successful
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool Remove(TKey key)
+    {
+        // Generate a hash code for the provided key
+        var hashcode = (uint)key.GetHashCode();
+
+        // Calculate the primary index using the bitwise AND with the mask
+        // This constrains the index within the array bounds (_mask is typically array length - 1)
+        var index = hashcode & _mask;
+
+        // Calculate the secondary signature for collision detection
+        // The signature is the remaining bits of the hash not used by the index
+        var signature = hashcode & ~_mask;
+
+        // Obtain references to the start of the bucket and entry arrays
+        ref var bucketBase = ref MemoryMarshal.GetArrayDataReference(_buckets);
+        ref var entryBase = ref MemoryMarshal.GetArrayDataReference(_entries);
+
+        // Start with the initial bucket determined by the hash index
+        Bucket bucket = Unsafe.Add(ref bucketBase, index);
+
+        // Traverse the linked list of buckets to find the matching key
+        while (true)
+        {
+            // Check if the signature matches the desired key's signature
+            if (signature == (bucket.Signature & ~_mask))
+            {
+                // Retrieve the entry associated with the current bucket
+
+                var eIndex = bucket.Signature & _mask;
+                ref var entry = ref Unsafe.Add(ref entryBase, eIndex);
+
+                // Verify that the key matches using the equality comparer
+                if (_eq.Equals(key, entry.Key))
+                {
+                    if (_lastInsertedBucket != INACTIVE)
+                    {
+                      // Swap(entry, );
+                    }
+
+                    bucket.Signature = INACTIVE;
+
+                    // 1 reuse this entry index by swapping the last inserted entry
+
+                    --_count;
+                    //TODO Start removal
+                    return true; // Key found, return success
+                }
+            }
+
+            // If the next bucket index is inactive, the search is exhausted
+            if (bucket.Next == INACTIVE)
+            {
+                return false; // Key not found, return failure
+            }
+
+            // Move to the next bucket in the chain
+            bucket = Unsafe.Add(ref bucketBase, bucket.Next);
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void Swap(ref Bucket bucketbase, ref Entry entry, uint bucketIndex)
+    {
+        ref var eBucket = ref Unsafe.Add(ref bucketbase, _lastInsertedBucket);
+        eBucket.Signature = 1;
+        
     }
 
     #endregion
@@ -176,23 +288,14 @@ public class BlitzMap<TKey, TValue>
     /// <param name="index"></param>
     /// /// <returns></returns>  
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private uint FindEmptyBucket(ref Bucket bucketBase, uint index, uint csize)
+    private uint FindEmptyBucket(ref Bucket bucketBase, uint index, uint cint)
     {
-        var bucket = index;
-        // Check if the bucket is empty
-        if (Unsafe.Add(ref bucketBase, bucket).Signature == INACTIVE ||
-            Unsafe.Add(ref bucketBase, ++bucket).Signature == INACTIVE)
-        {
-            return bucket;
-        }
-
-        uint offset = 1 + csize;
         byte step = 3;
-
+        uint offset = 1 + cint;
         //// Quadratic probing: Expand search range
         while (step < quadraticProbeLength)
         {
-             bucket = (index + offset) & _mask;
+            var bucket = (index + offset) & _mask;
 
             // Check if the bucket is empty
             if (Unsafe.Add(ref bucketBase, bucket).Signature == INACTIVE ||
@@ -215,39 +318,12 @@ public class BlitzMap<TKey, TValue>
 
             // Try a medium offset (reduces clustering by jumping further)
             uint medium = (_numBuckets + _last) & _mask;
-            if (Unsafe.Add(ref bucketBase, ++medium).Signature == INACTIVE ||
-                Unsafe.Add(ref bucketBase, ++medium).Signature == INACTIVE)
+
+            if (Unsafe.Add(ref bucketBase, medium).Signature == INACTIVE)
             {
                 return medium;
-            }           
+            }
         }
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static uint Compute(uint x)
-    {
-        x ^= x >> 15;
-        x *= 0x2c1b3c6dU;
-        x ^= x >> 12;
-        x *= 0x297a2d39U;
-        x ^= x >> 15;
-        return x;         
-    }
-
-    public static ulong Xmx(ulong x)
-    {
-        x ^= x >> 32;
-        x *= 0x94d049bb133111ebUL;
-        x ^= x >> 47;
-        return x;
-    }
-
-    public static ulong Compute(ulong h)
-    {
-        h ^= h >> 23;
-        h *= 0x2127599BF4325C37UL;
-        h ^= h >> 47;
-        return h;
     }
 
     [StructLayout(LayoutKind.Sequential)]

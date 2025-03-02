@@ -1,4 +1,5 @@
 ﻿using System.Numerics;
+using System.Runtime.CompilerServices;
 using Xunit;
 
 namespace Faster.Map.BlitzMap.Tests;
@@ -78,43 +79,56 @@ public class InsertTests
         Assert.Equal(5, map.Count);
     }
 
+    private static ulong g_lehmer64_state = 3;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static ulong Lehmer64()
+    {
+        g_lehmer64_state *= 0xda942042e4dd58b5UL;
+        return g_lehmer64_state >> 64;
+    }
+
     [Theory]
-    [InlineData(79_000_000)]
+    [InlineData(134217728)]
 
     public void Insert_Entries_And_Retrieve_Same_Buckets(uint length)
     {
         var rnd = new Random(3);
 
-        var uni = new HashSet<uint>();
+        var uni = new HashSet<uint>((int)length * 2);
 
-        while (uni.Count < (uint)(134217728 * 0.6))
+        while (uni.Count < (uint)(length * 0.5))
         {
-            uni.Add((uint)rnd.NextInt64());
+            uni.Add((uint)Lehmer64());
         }
 
        var keys = uni.ToArray();
 
 
         // Arrange
-        var map = new BlitzMap<uint, uint>((int)BitOperations.RoundUpToPowerOf2(length), 0.8);
+        var map = new BlitzMap<uint, uint>((int)BitOperations.RoundUpToPowerOf2(length), 0.5);
            
         // Act - Insert all keys
-        for (int i = 0; i < length; i++)
+        for (int i = 0; i < keys.Length; i++)
         {
             bool inserted = map.Insert(keys[i], 1);
-            Assert.True(inserted, $"Insert failed for key {keys[i]:X}");
+            Assert.True(inserted, $"Insert failed for key {keys[i]}");
         }
 
         // Assert - Ensure all keys are retrievable with correct values
-        for (int i = 0; i < length; i++)
+        for (int i = 0; i < keys.Length; i++)
         {
             bool found = map.Get(keys[i], out var retrievedValue);
+            if (found == false) 
+            {
+            
+            }
 
-            Assert.True(found, $"Key {keys[i]:X} was not found.");
+            Assert.True(found, $"Key {keys[i]} was not found.");
             Assert.Equal(1u, retrievedValue);
         }
 
         // Verify total count
-        Assert.Equal(length, (uint)map.Count);
+        Assert.Equal(keys.Length, map.Count);
     }
 }

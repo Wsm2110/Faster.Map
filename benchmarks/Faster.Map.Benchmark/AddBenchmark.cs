@@ -9,9 +9,9 @@ using BenchmarkDotNet.Engines;
 namespace Faster.Map.Benchmark
 {
     [MarkdownExporterAttribute.GitHub]
-    [DisassemblyDiagnoser]
-    [MemoryDiagnoser]
-    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, iterationCount: 5, warmupCount: 5)]
+   // [DisassemblyDiagnoser]
+   // [MemoryDiagnoser]
+    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, iterationCount: 100, warmupCount: 5)]
     public class AddBenchmark
     {
         #region Fields
@@ -28,7 +28,7 @@ namespace Faster.Map.Benchmark
 
         #region Properties
 
-        [Params(0.5, 0.6, 0.7, 0.8)]
+        [Params(/*0.4, 0.5,*/ 0.6 /*0.7, 0.8*/)]
         public static double LoadFactor { get; set; }
 
         [Params(134_217_728)]
@@ -42,7 +42,7 @@ namespace Faster.Map.Benchmark
         [GlobalSetup]
         public void Add()
         {
-            var rnd = new Random(6);
+            var rnd = new Random(3);
 
             var uni = new HashSet<uint>();
 
@@ -61,10 +61,10 @@ namespace Faster.Map.Benchmark
             uint length = BitOperations.RoundUpToPowerOf2((uint)(Length * LoadFactor));
             int dicLength = HashHelpers.GetPrime((int)(Length  * LoadFactor));
 
-            blitzMap = new BlitzMap<uint, uint>((int)length, 0.9);
-            _dense = new DenseMap<uint, uint>(length);
-            dic = new Dictionary<uint, uint>(dicLength);
-           _robinhoodMap = new RobinhoodMap<uint, uint>(length, LoadFactor);
+            blitzMap = new BlitzMap<uint, uint>((int)length, LoadFactor);
+          //  _dense = new DenseMap<uint, uint>(length);
+           // dic = new Dictionary<uint, uint>(dicLength);
+         //  _robinhoodMap = new RobinhoodMap<uint, uint>(length, LoadFactor);
         }
 
         #region Benchmarks
