@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -9,6 +11,8 @@ public class BlitzMap<TKey, TValue>
     #region Properties
 
     public int Count => (int)_count;
+
+    public int Size => _length;
 
     #endregion
 
@@ -33,6 +37,10 @@ public class BlitzMap<TKey, TValue>
     private IEqualityComparer<TKey> _eq;
 
     #endregion
+
+    public BlitzMap() : this(2, 0.8) { }
+
+    public BlitzMap(int length) : this(length, 0.8) { }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="BlitzMap{TKey, TValue}"/> class.
@@ -98,6 +106,52 @@ public class BlitzMap<TKey, TValue>
             if (bucket.Next == INACTIVE)
             {
                 value = default; // Set default value if not found
+                return false; // Key not found, return failure
+            }
+
+            // Move to the next bucket in the chain
+            bucket = Unsafe.Add(ref bucketBase, bucket.Next);
+        }
+    }
+
+    /// <summary>
+    /// Retrieves the value associated with the specified key in the hash table. 
+    /// </summary>
+    /// <param name="key">The key to search for.</param>
+    /// <param name="value">The value associated with the key if found; otherwise, the default value.</param>
+    /// <returns>True if the key exists in the hash table; false otherwise.</returns>
+    public bool Contains(TKey key)
+    {
+        // Compute the hash code and determine the primary index in the bucket array
+        uint hashcode = (uint)key.GetHashCode();
+        uint index = hashcode & _mask; // Primary index within the array
+        var signature = hashcode & ~_mask; // Secondary mask for collision handling
+
+        // Obtain references to the start of the bucket and entry arrays
+        ref var bucketBase = ref MemoryMarshal.GetArrayDataReference(_buckets);
+        ref var entryBase = ref MemoryMarshal.GetArrayDataReference(_entries);
+
+        // Start with the initial bucket determined by the hash index
+        Bucket bucket = Unsafe.Add(ref bucketBase, index);
+
+        // Traverse the linked list of buckets to find the matching key
+        while (true)
+        {
+            // Check if the signature matches the desired key's signature
+            if (signature == (bucket.Signature & ~_mask))
+            {
+                // Retrieve the entry associated with the current bucket
+                var entry = Unsafe.Add(ref entryBase, bucket.Signature & _mask);
+                // Verify that the key matches using the equality comparer
+                if (_eq.Equals(key, entry.Key))
+                {
+                    return true; // Key found, return success
+                }
+            }
+
+            // If the next bucket index is inactive, the search is exhausted
+            if (bucket.Next == INACTIVE)
+            {
                 return false; // Key not found, return failure
             }
 
@@ -391,9 +445,6 @@ public class BlitzMap<TKey, TValue>
 
         while (true)
         {
-            // Move to the next bucket in the chain
-            bucket = ref Unsafe.Add(ref bucketBase, bucket.Next);
-
             // Check for an existing key in the chain
             if (signature == (bucket.Signature & ~_mask))
             {
@@ -412,6 +463,8 @@ public class BlitzMap<TKey, TValue>
             }
 
             ++cint; // Increment the chain length counter
+            bucket = ref Unsafe.Add(ref bucketBase, bucket.Next);
+
         }
 
         // Locate a new empty bucket to extend the chain
@@ -470,7 +523,6 @@ public class BlitzMap<TKey, TValue>
                 {
                     // Erase the bucket and get the index of the next bucket
                     var ebucket = EraseBucket(ref bucketBase, bucket.Next, previous, index);
-
                     // Update the last slot by decrementing the total filled count
                     var lastSlot = --_count;
 
@@ -481,7 +533,7 @@ public class BlitzMap<TKey, TValue>
                     {
                         // Determine the last bucket to update
                         var lastBucket = (_lastBucket == INACTIVE || ebucket == _lastBucket)
-                            ? 0 : _lastBucket;
+                            ? FindLastBucket(ref bucketBase, ref entryBase, lastSlot) : _lastBucket;
 
                         // Move the last pair to the current slot
                         entry = swap;
@@ -514,9 +566,55 @@ public class BlitzMap<TKey, TValue>
         }
     }
 
+    public TValue this[TKey key]
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get
+        {
+            if (Get(key, out var result))
+            {
+                return result;
+            }
+
+            throw new KeyNotFoundException($"Unable to find entry - {key.GetType().FullName} key - {key.GetHashCode()}");
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        set
+        {
+            if (!InsertOrUpdate(key, value))
+            {
+                throw new KeyNotFoundException($"Unable to find entry - {key.GetType().FullName} key - {key.GetHashCode()}");
+            }
+        }
+    }
+
     #endregion
 
     #region Private Methods
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private uint FindLastBucket(ref Bucket bucketBase, ref Entry entryBase, uint slot)
+    {
+        // Compute the hash of the key stored in the specified slot
+        var hashcode = (uint)Unsafe.Add(ref entryBase, slot).Key.GetHashCode();
+
+        // Calculate the primary bucket index using the mask
+        var index = hashcode & _mask;
+
+        var bucket = Unsafe.Add(ref bucketBase, index);
+
+        // Traverse the linked list of buckets to find the correct slot    
+        while (true)
+        {
+            if (slot == (bucket.Signature & _mask))
+            {
+                return index;
+            }
+
+            index = bucket.Next;
+            bucket = Unsafe.Add(ref bucketBase, index);
+        }
+    }
 
     /// <summary>
     /// Resizes the hash table by doubling its capacity and rehashing existing entries.
@@ -749,6 +847,13 @@ public class BlitzMap<TKey, TValue>
                 return medium;
             }
         }
+    }
+
+    public void Clear()
+    {
+        Array.Clear(_entries);
+        _buckets.AsSpan().Fill(new Bucket { Signature = INACTIVE, Next = INACTIVE });
+        _count = 0;
     }
 
     /// <summary>
