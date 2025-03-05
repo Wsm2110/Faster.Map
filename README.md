@@ -22,10 +22,6 @@ Install-Package Faster.Map
 
 ## Basic Usage
 
-### Default Hasher
-
-By default, `DenseMap` uses the `DefaultHasher<TKey>`, which computes hashes based on the .NET `GetHashCode` method and uses Knuth's Multiplicative Hashing
-
 ```csharp
 var map = new DenseMap<int, string>();
 map.Emplace(1, "Value One");
@@ -55,7 +51,7 @@ BenchmarkDotNet v0.13.12, Windows 11 (10.0.22631.3880/23H2/2023Update/SunValley3
   DefaultJob : .NET 9.0.0 (9.0.24.12805), X64 RyuJIT AVX2
 ```
 
-# **Get Benchmark Analysis**
+# **Get uint32 Benchmark Analysis**
 
 The **"Get Benchmark"** evaluates the performance of four data structures—**BlitzMap**, **DenseMap**, **RobinhoodMap**, and **Dictionary**—under varying load factors. The benchmark measures the time required to retrieve elements in a collection of **134,217,728** entries, focusing on how each method handles increased data density.
 
@@ -93,7 +89,7 @@ The **"Get Benchmark"** evaluates the performance of four data structures—**Bl
 - **RobinhoodMap** is best suited for low load factors, as its performance degrades significantly with increased data density.
 - **Dictionary** provides consistent performance but may not be the optimal choice when high load factors are expected, due to the overhead of its chaining mechanism.
 
-# **Insert uint Benchmark**
+# **Insert uint32 Benchmark**
 
 The **"Insert Benchmark"** evaluates the performance of four data structures—**BlitzMap**, **DenseMap**, **RobinhoodMap**, and **Dictionary**—under varying load factors. The benchmark measures the time required to insert elements into a collection of **134,217,728** entries, focusing on how each method handles increased data density.
 
@@ -132,7 +128,7 @@ The **"Insert Benchmark"** evaluates the performance of four data structures—*
 - **Dictionary** provides stable but slower performance, with its chaining method becoming a bottleneck under heavy load conditions.
 
 
-# **Update uing Benchmark **
+# **Update uint32 Benchmark**
 
 The **"Update Benchmark"** evaluates the performance of four data structures—**BlitzMap**, **DenseMap**, **RobinhoodMap**, and **Dictionary**—under varying load factors. The benchmark measures the time required to update elements in a collection of **134,217,728** entries, focusing on how each method handles increased data density.
 
