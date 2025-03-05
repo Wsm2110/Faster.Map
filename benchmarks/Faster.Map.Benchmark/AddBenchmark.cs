@@ -5,13 +5,13 @@ using System.Linq;
 using System.Numerics;
 using System.Collections;
 using BenchmarkDotNet.Engines;
+using Faster.Map.Benchmark.Utilities;
 
 namespace Faster.Map.Benchmark
 {
     [MarkdownExporterAttribute.GitHub]
-   // [DisassemblyDiagnoser]
-   // [MemoryDiagnoser]
-    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, iterationCount: 100, warmupCount: 5)]
+    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, iterationCount: 5, warmupCount: 3)]
+
     public class AddBenchmark
     {
         #region Fields
@@ -28,7 +28,7 @@ namespace Faster.Map.Benchmark
 
         #region Properties
 
-        [Params(/*0.4, 0.5,*/ 0.6 /*0.7, 0.8*/)]
+        [Params(0.1, 0.2, 0.3, 0.4, 0.5, 0.6 ,0.7, 0.8)]
         public static double LoadFactor { get; set; }
 
         [Params(134_217_728)]
@@ -42,13 +42,11 @@ namespace Faster.Map.Benchmark
         [GlobalSetup]
         public void Add()
         {
-            var rnd = new Random(3);
-
-            var uni = new HashSet<uint>();
-
+            var rnd = new FastRandom(3);
+            var uni = new HashSet<uint>((int)Length * 2);
             while (uni.Count < (uint)(Length * LoadFactor))
             {
-                uni.Add((uint)rnd.NextInt64());
+                uni.Add((uint)rnd.Next());
             }
 
             keys = uni.ToArray();
@@ -58,13 +56,13 @@ namespace Faster.Map.Benchmark
         public void Setup()
         {
             // round of length to power of 2 prevent resizing
-            uint length = BitOperations.RoundUpToPowerOf2((uint)(Length * LoadFactor));
-            int dicLength = HashHelpers.GetPrime((int)(Length  * LoadFactor));
+            uint length = BitOperations.RoundUpToPowerOf2(Length);
+            int dicLength = HashHelpers.GetPrime((int)(Length));
 
-            blitzMap = new BlitzMap<uint, uint>((int)length, LoadFactor);
-          //  _dense = new DenseMap<uint, uint>(length);
-           // dic = new Dictionary<uint, uint>(dicLength);
-         //  _robinhoodMap = new RobinhoodMap<uint, uint>(length, LoadFactor);
+            blitzMap = new BlitzMap<uint, uint>((int)length, 0.81);
+            _dense = new DenseMap<uint, uint>(length);
+            dic = new Dictionary<uint, uint>(dicLength);
+            _robinhoodMap = new RobinhoodMap<uint, uint>(length, 0.81);
         }
 
         #region Benchmarks
@@ -79,36 +77,36 @@ namespace Faster.Map.Benchmark
             }
         }
 
-        //[Benchmark]
-        //public void DenseMap()
-        //{
-        //    for (int i = 0; i < keys.Length; i++)
-        //    {
-        //        var key = keys[i];
-        //        _dense.Emplace(key, key);
-        //    }
-        //}
+        [Benchmark]
+        public void DenseMap()
+        {
+            for (int i = 0; i < keys.Length; i++)
+            {
+                var key = keys[i];
+                _dense.Emplace(key, key);
+            }
+        }
 
 
-        //[Benchmark]
-        //public void RobinhoodMap()
-        //{
-        //    for (int i = 0; i < keys.Length; i++)
-        //    {
-        //        var key = keys[i];
-        //        _robinhoodMap.Emplace(key, key);
-        //    }
-        //}
+        [Benchmark]
+        public void RobinhoodMap()
+        {
+            for (int i = 0; i < keys.Length; i++)
+            {
+                var key = keys[i];
+                _robinhoodMap.Emplace(key, key);
+            }
+        }
 
-        //[Benchmark]
-        //public void Dictionary()
-        //{
-        //    for (int i = 0; i < keys.Length; i++)
-        //    {
-        //        var key = keys[i];
-        //        dic.Add(key, key);
-        //    }
-        //}
+        [Benchmark]
+        public void Dictionary()
+        {
+            for (int i = 0; i < keys.Length; i++)
+            {
+                var key = keys[i];
+                dic.Add(key, key);
+            }
+        }
 
         #endregion
     }

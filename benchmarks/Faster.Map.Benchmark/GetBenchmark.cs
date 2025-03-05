@@ -1,26 +1,23 @@
 ﻿using BenchmarkDotNet.Attributes;
 using System.Collections.Generic;
-using System.IO;
-using System;
 using System.Collections;
 using System.Numerics;
-using Faster.Map.Hasher;
 using System.Linq;
 using BenchmarkDotNet.Engines;
+using Faster.Map.Benchmark.Utilities;
 
 namespace Faster.Map.Benchmark
 {
     [MarkdownExporterAttribute.GitHub]
-    [DisassemblyDiagnoser]
-    [MemoryDiagnoser]
-    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, iterationCount: 5, warmupCount: 5)]
-    //[GcServer(true)]
-    //[GcForce(true)]
+    //[DisassemblyDiagnoser]
+    //[MemoryDiagnoser]
+    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, iterationCount: 5, warmupCount: 3)]
+
     public class GetBenchmark
     {
         #region Fields
 
-        private DenseMap<uint, uint> _denseMap_Default;
+        private DenseMap<uint, uint> _denseMap;
         private BlitzMap<uint, uint> _blitz;
         private Dictionary<uint, uint> _dictionary;
         private RobinhoodMap<uint, uint> _robinHoodMap;
@@ -31,13 +28,11 @@ namespace Faster.Map.Benchmark
 
         #region Properties
 
-
-        [Params(0.5, 0.6, 0.7, 0.8)]
+        [Params(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8)]
         public static double LoadFactor { get; set; }
 
         [Params(134_217_728)]
         public static uint Length { get; set; }
-
 
         #endregion
 
@@ -47,13 +42,11 @@ namespace Faster.Map.Benchmark
         [GlobalSetup]
         public void Setup()
         {
-            var rnd = new Random(6);
-
-            var uni = new HashSet<uint>();
-
+            var rnd = new FastRandom(3);
+            var uni = new HashSet<uint>((int)Length * 2);
             while (uni.Count < (uint)(Length * LoadFactor))
             {
-                uni.Add((uint)rnd.NextInt64());
+                uni.Add((uint)rnd.Next());
             }
 
             keys = uni.ToArray();
@@ -62,21 +55,18 @@ namespace Faster.Map.Benchmark
             uint length = BitOperations.RoundUpToPowerOf2(Length);
             int dicLength = HashHelpers.GetPrime((int)Length);
 
-            _denseMap_Default = new DenseMap<uint, uint>(length);
+            _denseMap = new DenseMap<uint, uint>(length);
             _blitz = new BlitzMap<uint, uint>((int)length, 0.9);
 
             _dictionary = new Dictionary<uint, uint>(dicLength);
-            _robinHoodMap = new RobinhoodMap<uint, uint>(length * 2);
+            _robinHoodMap = new RobinhoodMap<uint, uint>(length, 0.9);
 
             foreach (var key in keys)
             {
                 _dictionary.Add(key, key);
-                _denseMap_Default.Emplace(key, key);
-                _blitz.Insert(key, key);
-                //_denseMap_Xxhash3.Emplace(key, key);
-                //_denseMap_fastHash.Emplace(key, key);
-                //_denseMap_GxHash.Emplace(key, key);
-                //_robinHoodMap.Emplace(key, key);
+                _denseMap.Emplace(key, key);
+                _blitz.Insert(key, key);           
+                _robinHoodMap.Emplace(key, key);
             }
         }
 
@@ -90,68 +80,34 @@ namespace Faster.Map.Benchmark
             }
         }
 
-        //[Benchmark]
-        //public void DenseMap()
-        //{
-        //    for (int i = 0; i < keys.Length; i++)
-        //    {
-        //        var key = keys[i];
-        //        _denseMap_Default.Get(key, out var _);
-        //    }
-        //}
+        [Benchmark]
+        public void DenseMap()
+        {
+            for (int i = 0; i < keys.Length; i++)
+            {
+                var key = keys[i];
+                _denseMap.Get(key, out var _);
+            }
+        }
 
+        [Benchmark]
+        public void Dictionary()
+        {
+            for (int i = 0; i < keys.Length; i++)
+            {
+                var key = keys[i];
+                _dictionary.TryGetValue(key, out var _);
+            }
+        }
 
-        //[Benchmark(Baseline = true)]
-        //public void Dictionary()
-        //{
-        //    for (int i = 0; i < keys.Length; i++)
-        //    {
-        //        var key = keys[i];
-        //        _dictionary.TryGetValue(key, out var _);
-        //    }
-        //}
-
-
-        //[Benchmark]
-        //public void DenseMap_XXhash3()
-        //{
-        //    for (int i = 0; i < Length; ++i)
-        //    {
-        //        var key = keys[i];
-        //        _denseMap_Xxhash3.Get(key, out var _);
-        //    }
-        //}
-
-        //[Benchmark]
-        //public void DenseMap_FastHash()
-        //{
-        //    for (int i = 0; i < Length; ++i)
-        //    {
-        //        var key = keys[i];
-        //        _denseMap_fastHash.Get(key, out var _);              
-        //    }
-        //}
-
-        //[Benchmark]
-        //public void DenseMap_GxHash()
-        //{
-        //    for (int i = 0; i < Length; ++i)
-        //    {
-        //        var key = keys[i];
-        //        _denseMap_GxHash.Get(key, out var _);
-        //    }
-        //}
-
-        //[Benchmark]
-        //public void RobinhoodMap()
-        //{
-        //    for (int i = 0; i < Length; ++i)
-        //    {
-        //        var key = keys[i];
-        //        _robinHoodMap.Get(key, out var _);
-        //    }
-        //}
-
-
+        [Benchmark]
+        public void RobinhoodMap()
+        {
+            for (int i = 0; i < keys.Length; i++)
+            {
+                var key = keys[i];
+                _robinHoodMap.Get(key, out var _);
+            }
+        }
     }
 }

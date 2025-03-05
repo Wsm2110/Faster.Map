@@ -830,4 +830,34 @@ public class RemoveTests
         Assert.False(map.Contains(6));
         Assert.False(map.Contains(9));
     }
+
+    [Fact]
+    public void RemoveLargeDateset() 
+    {
+        var Length = 134_217_728;
+        var rnd = new FastRandom(3);
+        var uni = new HashSet<uint>((int)Length * 2);
+        while (uni.Count < (uint)(Length * 0.5))
+        {
+            uni.Add((uint)rnd.Next());
+        }
+
+        var map = new BlitzMap<uint, uint>(Length);
+
+        var keys = uni.ToArray();
+
+        for (int i = 0; i < keys.Length; i++)
+        {
+            var key = keys[i];
+            map.Insert(key, key);
+        }
+
+        for (int i = 0; i < keys.Length; i++)
+        {
+            var key = keys[i];
+            map.Remove(key);
+        }
+
+    }
+
 }

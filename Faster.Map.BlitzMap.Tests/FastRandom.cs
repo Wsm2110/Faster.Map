@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Faster.Map.Benchmark.Utilities;
+namespace Faster.Map.BlitzMap.Tests;
 
 public class FastRandom
 {
@@ -26,7 +26,7 @@ public class FastRandom
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public int Next(int minValue, int maxValue)
-    {  
+    {
         ulong range = (ulong)(maxValue - minValue);
         return minValue + (int)((Next() * range) >> 64);
     }
@@ -37,4 +37,5 @@ public class FastRandom
         return (Next() >> 11) * (1.0 / (1UL << 53));
     }
 }
+
 
