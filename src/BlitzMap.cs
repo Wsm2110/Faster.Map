@@ -229,6 +229,11 @@ public class BlitzMap<TKey, TValue>
         // This constrains the index within the array bounds (_mask is typically array length - 1)
         var index = hashcode & _mask;
 
+        if (index == 27 || index == 29)
+        {
+
+        }
+
         // Calculate the secondary signature for collision detection
         // The signature is the remaining bits of the hash not used by the index
         var signature = hashcode & ~_mask;
@@ -516,40 +521,40 @@ public class BlitzMap<TKey, TValue>
             {
                 // Retrieve the entry associated with the current bucket
                 var entryIndex = bucket.Signature & _mask;
+
+                if (entryIndex > _count)
+                {
+                    bucket = ref Unsafe.Add(ref bucketBase, bucket.Next);
+                    continue;
+                }
+
                 ref var entry = ref Unsafe.Add(ref entryBase, entryIndex);
 
                 // Verify that the key matches using the equality comparer
                 if (_eq.Equals(key, entry.Key))
                 {
-                    // Erase the bucket and get the index of the next bucket
-                    var ebucket = EraseBucket(ref bucketBase, bucket.Next, previous, index);
                     // Update the last slot by decrementing the total filled count
                     var lastSlot = --_count;
 
                     ref var swap = ref Unsafe.Add(ref entryBase, lastSlot);
 
-                    // If the current slot is not the last filled slot
-                    if (entryIndex != lastSlot)
-                    {
-                        // Determine the last bucket to update
-                        var lastBucket = (_lastBucket == INACTIVE || ebucket == _lastBucket)
-                            ? FindLastBucket(ref bucketBase, ref entryBase, lastSlot) : _lastBucket;
+                    // Determine the last bucket to update
+                    var lastBucket = (_lastBucket == INACTIVE) ? FindLastBucket(ref bucketBase, ref entryBase, lastSlot) : _lastBucket;
 
-                        // Move the last pair to the current slot
-                        entry = swap;
+                    // Move the last pair to the current slot
+                    entry = swap;
 
-                        // Update the index of the last bucket to point to the new slot
-                        Unsafe.Add(ref bucketBase, lastBucket).Signature = entryIndex | (Unsafe.Add(ref bucketBase, lastBucket).Signature & ~_mask);
-                    }
+                    // Update the index of the last bucket to point to the new slot
+                    Unsafe.Add(ref bucketBase, lastBucket).Signature = entryIndex | (Unsafe.Add(ref bucketBase, lastBucket).Signature & ~_mask);
 
-                    // Clear the last entry, as it has been moved
+                    //// Clear the last entry, as it has been moved
                     swap = default;
 
-                    // Mark the end of the list as inactive
+                    //// Mark the end of the list as inactive
                     _lastBucket = INACTIVE;
 
                     // Set the erased bucket to inactive
-                    _buckets[ebucket] = new Bucket { Signature = INACTIVE, Next = INACTIVE };
+                    _buckets[previous].Signature = INACTIVE;
                     return true; // Key found, return success
                 }
             }
@@ -679,9 +684,11 @@ public class BlitzMap<TKey, TValue>
                 // Update the main bucket to point to the new successor or itself if circular
                 Unsafe.Add(ref bucketBase, homeBucket) = new Bucket
                 {
-                    Next = nbucket == INACTIVE ? INACTIVE : nbucket,
+                    Next = nbucket,
                     Signature = _buckets[nextBucket].Signature
                 };
+
+                return nextBucket;
             }
 
             // Return the index of the next bucket
@@ -689,47 +696,22 @@ public class BlitzMap<TKey, TValue>
         }
 
         // Find the previous bucket in the linked list
-        var prevBucket = FindPrevBucket(ref bucketBase, homeBucket, index);
-
-        // Update the previous bucket to bypass the erased bucket
-        Unsafe.Add(ref bucketBase, prevBucket).Next = index == nextBucket ? prevBucket : nextBucket;
-
-        return index;
-    }
-
-    /// <summary>
-    /// Finds the previous bucket in the linked list before the specified bucket.
-    /// This method is used during bucket removal to correctly link the preceding bucket to the next bucket.
-    /// </summary>
-    /// <param name="bucketBase">A reference to the base of the bucket array.</param>
-    /// <param name="homeBucket">The main bucket index where the search begins.</param>
-    /// <param name="target">The target bucket whose predecessor is being searched.</param>
-    /// <returns>The index of the previous bucket that points to the specified target bucket.</returns>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private uint FindPrevBucket(ref Bucket bucketBase, uint homeBucket, uint target)
-    {
-        // Start from the home bucket to find the predecessor of the target bucket
         var bucket = Unsafe.Add(ref bucketBase, homeBucket);
-
-        // If the home bucket does not link to another bucket, return it as the predecessor
-        if (bucket.Next == INACTIVE)
-        {
-            return homeBucket;
-        }
-
         // Traverse the linked list to find the bucket that points to the target bucket
         while (true)
         {
             // If the next bucket points to the target bucket, return the current bucket index
-            if (bucket.Next == target)
+            if (bucket.Next == index)
             {
-                return homeBucket;
+                break;
             }
 
             // Keep track of the previous index, reusing the homeBucket variable
             homeBucket = bucket.Next;
             bucket = Unsafe.Add(ref bucketBase, homeBucket);
         }
+
+        return homeBucket;
     }
 
     /// <summary>
@@ -859,8 +841,6 @@ public class BlitzMap<TKey, TValue>
     /// <summary>
     /// Represents an entry in the hash table, storing a key-value pair.
     /// </summary>
-    /// <typeparam name="TKey">The type of the key in the entry.</typeparam>
-    /// <typeparam name="TValue">The type of the value in the entry.</typeparam>
     [StructLayout(LayoutKind.Sequential)]
     internal struct Entry(TKey key, TValue value)
     {
