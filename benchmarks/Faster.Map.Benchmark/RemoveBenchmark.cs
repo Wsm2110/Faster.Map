@@ -11,9 +11,9 @@ using Faster.Map.Benchmark.Utilities;
 namespace Faster.Map.Benchmark
 {
     [MarkdownExporterAttribute.GitHub]
-    [MemoryDiagnoser]
+    //[MemoryDiagnoser]
     //[SimpleJob(RunStrategy.Monitoring, 1, 10, 50)]
-    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, iterationCount: 5, warmupCount: 3)]
+    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, iterationCount: 3, warmupCount: 2)]
 
     public class RemoveBenchmark
     {
@@ -31,10 +31,10 @@ namespace Faster.Map.Benchmark
         #region Properties
 
         [Params(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8)]
-        public static double LoadFactor { get; set; }
+        public double LoadFactor { get; set; }
 
         [Params(134_217_728)]
-        public static uint Length { get; set; }
+        public uint Length { get; set; }
 
         #endregion
 
@@ -58,7 +58,7 @@ namespace Faster.Map.Benchmark
             int dicLength = HashHelpers.GetPrime((int)Length);
 
             _denseMap = new DenseMap<uint, uint>(length);
-            _blitz = new BlitzMap<uint, uint>((int)length, 0.9);
+            _blitz = new BlitzMap<uint, uint>((int)length);
 
             _dictionary = new Dictionary<uint, uint>(dicLength);
             _robinHoodMap = new RobinhoodMap<uint, uint>(length, 0.9);

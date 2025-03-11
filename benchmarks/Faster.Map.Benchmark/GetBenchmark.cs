@@ -42,7 +42,7 @@ namespace Faster.Map.Benchmark
         [GlobalSetup]
         public void Setup()
         {
-            var rnd = new FastRandom(3);
+            var rnd = new FastRandom(6);
             var uni = new HashSet<uint>((int)Length * 2);
             while (uni.Count < (uint)(Length * LoadFactor))
             {
@@ -63,8 +63,8 @@ namespace Faster.Map.Benchmark
 
             foreach (var key in keys)
             {
-                _dictionary.Add(key, key);
-                _denseMap.Emplace(key, key);
+                //_dictionary.Add(key, key);
+                //_denseMap.Emplace(key, key);
                 _blitz.Insert(key, key);           
                 _robinHoodMap.Emplace(key, key);
             }
@@ -80,25 +80,25 @@ namespace Faster.Map.Benchmark
             }
         }
 
-        [Benchmark]
-        public void DenseMap()
-        {
-            for (int i = 0; i < keys.Length; i++)
-            {
-                var key = keys[i];
-                _denseMap.Get(key, out var _);
-            }
-        }
+        //[Benchmark]
+        //public void DenseMap()
+        //{
+        //    for (int i = 0; i < keys.Length; i++)
+        //    {
+        //        var key = keys[i];
+        //        _denseMap.Get(key, out var _);
+        //    }
+        //}
 
-        [Benchmark]
-        public void Dictionary()
-        {
-            for (int i = 0; i < keys.Length; i++)
-            {
-                var key = keys[i];
-                _dictionary.TryGetValue(key, out var _);
-            }
-        }
+        //[Benchmark]
+        //public void Dictionary()
+        //{
+        //    for (int i = 0; i < keys.Length; i++)
+        //    {
+        //        var key = keys[i];
+        //        _dictionary.TryGetValue(key, out var _);
+        //    }
+        //}
 
         [Benchmark]
         public void RobinhoodMap()

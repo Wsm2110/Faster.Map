@@ -5,7 +5,7 @@ namespace Faster.Map.BlitzMap.Tests;
 public class RemoveTests
 {
     private readonly BlitzMap<int, string> _map;
-     
+
     public RemoveTests()
     {
         _map = new BlitzMap<int, string>(16, 0.75);
@@ -679,7 +679,7 @@ public class RemoveTests
         // Insert and then remove all entries
         for (int i = 0; i < 20; i++)
         {
-            if (!_map.Insert(i, $"value{i}")) 
+            if (!_map.Insert(i, $"value{i}"))
             {
                 Assert.Fail();
             }
@@ -690,7 +690,7 @@ public class RemoveTests
 
         for (int i = 0; i < 20; i++)
         {
-            if (!_map.Remove(i)) 
+            if (!_map.Remove(i))
             {
                 Assert.Fail();
             };
@@ -832,18 +832,17 @@ public class RemoveTests
     }
 
     [Fact]
-    public void RemoveLargeDateset() 
+    public void RemoveLargeDateset()
     {
         var Length = 134_217_728;
         var rnd = new FastRandom(3);
         var uni = new HashSet<uint>((int)Length * 2);
-        while (uni.Count < (uint)(Length * 0.5))
+        while (uni.Count < (uint)(Length * 0.9))
         {
             uni.Add((uint)rnd.Next());
         }
 
         var map = new BlitzMap<uint, uint>(Length);
-
         var keys = uni.ToArray();
 
         for (int i = 0; i < keys.Length; i++)
@@ -851,6 +850,7 @@ public class RemoveTests
             var key = keys[i];
             map.Insert(key, key);
         }
+        
 
         for (int i = 0; i < keys.Length; i++)
         {

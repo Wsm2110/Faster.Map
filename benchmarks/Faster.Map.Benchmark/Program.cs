@@ -9,11 +9,11 @@ namespace Faster.Map.Benchmark
     class Program
     {
         static void Main(string[] args)
-        {        
+        {
             //BenchmarkRunner.Run<AddBenchmark>();
-            //BenchmarkRunner.Run<GetBenchmark>();
+            BenchmarkRunner.Run<GetBenchmark>();
             //BenchmarkRunner.Run<UpdateBenchmark>();
-            BenchmarkRunner.Run<RemoveBenchmark>();
+            //BenchmarkRunner.Run<RemoveBenchmark>();
         }
     }
 }

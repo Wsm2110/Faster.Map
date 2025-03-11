@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -25,15 +26,13 @@ public class BlitzMap<TKey, TValue>
     private uint _mask;
     private uint _last;
     private const byte quadraticProbeLength = 6;
-    private static readonly uint INACTIVE = int.MaxValue;
+    private static readonly uint INACTIVE = 0xAAAAAAAA;
     private int _length;
     private double _loadFactor;
     private uint _maxCountBeforeResize;
 
     // Last inserted entry
     private uint _lastBucket = INACTIVE;
-
-    // Interfaces
     private IEqualityComparer<TKey> _eq;
 
     #endregion
@@ -58,7 +57,7 @@ public class BlitzMap<TKey, TValue>
         _buckets = GC.AllocateUninitializedArray<Bucket>(_length, true);
         // fill array with inactive marker
         _buckets.AsSpan().Fill(new Bucket { Signature = INACTIVE, Next = INACTIVE });
-        _entries = GC.AllocateUninitializedArray<Entry>((int)(_length * loadFactor));
+        _entries = GC.AllocateArray<Entry>((int)(_length * loadFactor), true);
         _numBuckets = (uint)_length >> 1;
         _maxCountBeforeResize = (uint)(_loadFactor * _length);
     }
@@ -71,10 +70,11 @@ public class BlitzMap<TKey, TValue>
     /// <param name="key">The key to search for.</param>
     /// <param name="value">The value associated with the key if found; otherwise, the default value.</param>
     /// <returns>True if the key exists in the hash table; false otherwise.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Get(TKey key, out TValue value)
     {
         // Compute the hash code and determine the primary index in the bucket array
-        uint hashcode = (uint)key.GetHashCode();
+        uint hashcode = Compute((uint)key.GetHashCode());
         uint index = hashcode & _mask; // Primary index within the array
         var signature = hashcode & ~_mask; // Secondary mask for collision handling
 
@@ -120,6 +120,7 @@ public class BlitzMap<TKey, TValue>
     /// <param name="key">The key to search for.</param>
     /// <param name="value">The value associated with the key if found; otherwise, the default value.</param>
     /// <returns>True if the key exists in the hash table; false otherwise.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Contains(TKey key)
     {
         // Compute the hash code and determine the primary index in the bucket array
@@ -166,6 +167,7 @@ public class BlitzMap<TKey, TValue>
     /// <param name="key">The key to search for.</param>
     /// <param name="value">The value associated with the key if found; otherwise, the default value.</param>
     /// <returns>True if the key exists in the hash table; false otherwise.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Update(TKey key, TValue value)
     {
         // Compute the hash code and determine the primary index in the bucket array
@@ -223,16 +225,11 @@ public class BlitzMap<TKey, TValue>
         }
 
         // Generate a hash code for the provided key
-        var hashcode = (uint)key.GetHashCode();
+        var hashcode = Compute((uint)key.GetHashCode());
 
         // Calculate the primary index using the bitwise AND with the mask
         // This constrains the index within the array bounds (_mask is typically array length - 1)
         var index = hashcode & _mask;
-
-        if (index == 27 || index == 29)
-        {
-
-        }
 
         // Calculate the secondary signature for collision detection
         // The signature is the remaining bits of the hash not used by the index
@@ -250,10 +247,8 @@ public class BlitzMap<TKey, TValue>
         {
             // Set the bucket's signature with the count and the signature mask
             bucket.Signature = _count | signature;
-
             // Store the new entry in the entries array and increment the count
             Unsafe.Add(ref entryBase, _count++) = new Entry(key, value);
-
             _lastBucket = index;
             return true; // Indicate successful insertion
         }
@@ -265,7 +260,7 @@ public class BlitzMap<TKey, TValue>
             return false; // Key already exists, insertion fails
         }
 
-        // If the next slot is empty, find a new bucket and insert directly
+        // If the next target is empty, find a new bucket and insert directly
         if (bucket.Next == INACTIVE)
         {
             // Locate an empty bucket starting from the next index
@@ -366,7 +361,7 @@ public class BlitzMap<TKey, TValue>
             return true; // Indicate successful insertion
         }
 
-        // If the next slot is empty, find a new bucket and insert directly
+        // If the next target is empty, find a new bucket and insert directly
         if (bucket.Next == INACTIVE)
         {
             // Locate an empty bucket starting from the next index
@@ -511,7 +506,6 @@ public class BlitzMap<TKey, TValue>
 
         // Start with the initial bucket determined by the hash index
         ref Bucket bucket = ref Unsafe.Add(ref bucketBase, index);
-        uint previous = index;
 
         // Traverse the linked list of buckets to find the matching key
         while (true)
@@ -521,40 +515,39 @@ public class BlitzMap<TKey, TValue>
             {
                 // Retrieve the entry associated with the current bucket
                 var entryIndex = bucket.Signature & _mask;
-
-                if (entryIndex > _count)
-                {
-                    bucket = ref Unsafe.Add(ref bucketBase, bucket.Next);
-                    continue;
-                }
-
                 ref var entry = ref Unsafe.Add(ref entryBase, entryIndex);
 
                 // Verify that the key matches using the equality comparer
                 if (_eq.Equals(key, entry.Key))
                 {
+                    // Erase the bucket and get the index of the next bucket
                     // Update the last slot by decrementing the total filled count
                     var lastSlot = --_count;
 
                     ref var swap = ref Unsafe.Add(ref entryBase, lastSlot);
 
-                    // Determine the last bucket to update
-                    var lastBucket = (_lastBucket == INACTIVE) ? FindLastBucket(ref bucketBase, ref entryBase, lastSlot) : _lastBucket;
+                    // If the current slot is not the last filled slot
+                    if (entryIndex != lastSlot)
+                    {
+                        // Determine the last bucket to update
+                        var lastBucket = (_lastBucket == INACTIVE || index == _lastBucket)
+                            ? FindLastBucket(ref bucketBase, ref entryBase, lastSlot) : _lastBucket;
 
-                    // Move the last pair to the current slot
-                    entry = swap;
+                        // Move the last pair to the current slot
+                        entry = swap;
 
-                    // Update the index of the last bucket to point to the new slot
-                    Unsafe.Add(ref bucketBase, lastBucket).Signature = entryIndex | (Unsafe.Add(ref bucketBase, lastBucket).Signature & ~_mask);
+                        // Update the index of the last bucket to point to the new slot
+                        Unsafe.Add(ref bucketBase, lastBucket).Signature = entryIndex | (Unsafe.Add(ref bucketBase, lastBucket).Signature & ~_mask);
+                    }
 
-                    //// Clear the last entry, as it has been moved
+                    // Clear the last entry, as it has been moved
                     swap = default;
 
-                    //// Mark the end of the list as inactive
+                    // Mark the end of the list as inactive
                     _lastBucket = INACTIVE;
 
                     // Set the erased bucket to inactive
-                    _buckets[previous].Signature = INACTIVE;
+                    _buckets[index].Signature = INACTIVE;
                     return true; // Key found, return success
                 }
             }
@@ -565,9 +558,9 @@ public class BlitzMap<TKey, TValue>
                 return false; // Key not found, return failure
             }
 
-            previous = bucket.Next;
+            index = bucket.Next;
             // Move to the next bucket in the chain
-            bucket = ref Unsafe.Add(ref bucketBase, previous);
+            bucket = ref Unsafe.Add(ref bucketBase, index);
         }
     }
 
@@ -597,27 +590,33 @@ public class BlitzMap<TKey, TValue>
 
     #region Private Methods
 
+    /// <summary>
+    /// Finds the index of the last bucket in the linked list that matches the specified target.
+    /// This method is highly optimized for performance, leveraging unsafe code and aggressive inlining.
+    /// </summary>
+    /// <param name="bucketBase">A reference to the first bucket in the bucket array.</param>
+    /// <param name="entryBase">A reference to the first entry in the entry array.</param>
+    /// <param name="target">The target index for which to find the corresponding bucket.</param>
+    /// <returns>The index of the last bucket in the linked list with a matching target.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private uint FindLastBucket(ref Bucket bucketBase, ref Entry entryBase, uint slot)
+    private uint FindLastBucket(ref Bucket bucketBase, ref Entry entryBase, uint target)
     {
-        // Compute the hash of the key stored in the specified slot
-        var hashcode = (uint)Unsafe.Add(ref entryBase, slot).Key.GetHashCode();
+        // Directly calculate the hash code and index without intermediate variables
+        var index = (uint)Unsafe.Add(ref entryBase, target).Key.GetHashCode() & _mask;
 
-        // Calculate the primary bucket index using the mask
-        var index = hashcode & _mask;
+        // Pointer to the initial bucket
+        ref var bucket = ref Unsafe.Add(ref bucketBase, index);
 
-        var bucket = Unsafe.Add(ref bucketBase, index);
-
-        // Traverse the linked list of buckets to find the correct slot    
+        // Loop through the linked list of buckets
         while (true)
         {
-            if (slot == (bucket.Signature & _mask))
-            {
+            // Unrolled the comparison and assignment in a single statement
+            if (target == (bucket.Signature & _mask))
                 return index;
-            }
 
+            // Advance to the next bucket without a method call or extra variable
             index = bucket.Next;
-            bucket = Unsafe.Add(ref bucketBase, index);
+            bucket = ref Unsafe.Add(ref bucketBase, index);
         }
     }
 
@@ -641,7 +640,7 @@ public class BlitzMap<TKey, TValue>
 
         // Initialize new entry and bucket arrays with default values
         _entries = GC.AllocateUninitializedArray<Entry>((int)(size * _loadFactor), true);
-        _buckets = GC.AllocateUninitializedArray<Bucket>(size, true);
+        _buckets = GC.AllocateArray<Bucket>(size, true);
         _buckets.AsSpan().Fill(new Bucket { Signature = INACTIVE, Next = INACTIVE });
 
         // Get direct references to the array data for performance
@@ -657,61 +656,6 @@ public class BlitzMap<TKey, TValue>
             var entry = oldEntries[i];
             InsertInternal(ref bucketBase, ref entryBase, entry.Key, entry.Value);
         }
-    }
-
-    /// <summary>
-    /// Erases the bucket and updates the main bucket's linked list.
-    /// </summary>
-    /// <param name="next"></param>
-    /// <param name="index">The bucket index to erase.</param>
-    /// <param name="homeBucket">The main bucket associated with the bucket to erase.</param>
-    /// <param name="bucketBase"></param>
-    /// <returns>The index of the next bucket.</returns>
-    private uint EraseBucket(ref Bucket bucketBase, uint next, uint index, uint homeBucket)
-    {
-        // Get the next bucket in the chain
-        var nextBucket = next;
-
-        // If the bucket to erase is the main bucket
-        if (index == homeBucket)
-        {
-            // If the main bucket is not the last bucket
-            if (nextBucket != INACTIVE)
-            {
-                // Get the next bucket's successor
-                var nbucket = Unsafe.Add(ref bucketBase, nextBucket).Next;
-
-                // Update the main bucket to point to the new successor or itself if circular
-                Unsafe.Add(ref bucketBase, homeBucket) = new Bucket
-                {
-                    Next = nbucket,
-                    Signature = _buckets[nextBucket].Signature
-                };
-
-                return nextBucket;
-            }
-
-            // Return the index of the next bucket
-            return index;
-        }
-
-        // Find the previous bucket in the linked list
-        var bucket = Unsafe.Add(ref bucketBase, homeBucket);
-        // Traverse the linked list to find the bucket that points to the target bucket
-        while (true)
-        {
-            // If the next bucket points to the target bucket, return the current bucket index
-            if (bucket.Next == index)
-            {
-                break;
-            }
-
-            // Keep track of the previous index, reusing the homeBucket variable
-            homeBucket = bucket.Next;
-            bucket = Unsafe.Add(ref bucketBase, homeBucket);
-        }
-
-        return homeBucket;
     }
 
     /// <summary>
@@ -747,7 +691,7 @@ public class BlitzMap<TKey, TValue>
             return;
         }
 
-        // If the next slot is empty, find a new bucket and insert directly
+        // If the next target is empty, find a new bucket and insert directly
         if (bucket.Next == INACTIVE)
         {
             uint nBucket = FindEmptyBucket(ref bucketBase, index, 1);
@@ -793,13 +737,22 @@ public class BlitzMap<TKey, TValue>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private uint FindEmptyBucket(ref Bucket bucketBase, uint index, uint cint)
     {
+        var bucket = index;
+
+        // Check if the bucket is empty
+        if (Unsafe.Add(ref bucketBase, bucket).Signature == INACTIVE ||
+            Unsafe.Add(ref bucketBase, ++bucket).Signature == INACTIVE)
+        {
+            return bucket;
+        }
+
         byte step = 3;
         uint offset = 1 + cint;
 
         // Quadratic probing: Expand search range to reduce clustering
         while (step < quadraticProbeLength)
         {
-            var bucket = (index + offset) & _mask;
+            bucket = (index + offset) & _mask;
 
             // Check if the bucket is empty
             if (Unsafe.Add(ref bucketBase, bucket).Signature == INACTIVE ||
@@ -821,7 +774,7 @@ public class BlitzMap<TKey, TValue>
                 return _last;
             }
 
-            // Apply medium offset probing to reduce clustering
+            //// Apply medium offset probing to reduce clustering
             uint medium = (_numBuckets + _last) & _mask;
 
             if (Unsafe.Add(ref bucketBase, medium).Signature == INACTIVE)
@@ -830,12 +783,32 @@ public class BlitzMap<TKey, TValue>
             }
         }
     }
-
     public void Clear()
     {
         Array.Clear(_entries);
         _buckets.AsSpan().Fill(new Bucket { Signature = INACTIVE, Next = INACTIVE });
         _count = 0;
+    }
+
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static uint Compute(uint x)
+    {
+        x ^= x >> 15;
+        x *= 0x2c1b3c6d;  // High-entropy constant
+        x ^= x >> 13;
+        x *= 0x297a2d39;  // Another high-entropy constant
+        x ^= x >> 15;
+        return x;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static ulong Compute(ulong h)
+    {
+        h ^= h >> 23;
+        h *= 0x2127599BF4325C37UL;
+        h ^= h >> 47;
+        return h;
     }
 
     /// <summary>
@@ -862,28 +835,9 @@ public class BlitzMap<TKey, TValue>
     [StructLayout(LayoutKind.Sequential, Pack = 4)]
     public struct Bucket
     {
-        /// <summary>
-        /// Gets or sets the signature (secondary part of the hash).
-        /// The signature is used to match entries during collision resolution.
-        /// </summary>
-        public uint Signature
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get;
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            set;
-        }
+        public uint Signature;
+        public uint Next;
 
-        /// <summary>
-        /// Gets or sets the Next value, representing the index of the next bucket in the chain.
-        /// </summary>
-        public uint Next
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get;
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            set;
-        }
     }
 
     #endregion

@@ -4,7 +4,6 @@ using System.Runtime.CompilerServices;
 using Xunit;
 
 namespace Faster.Map.BlitzMap.Tests;
-
 public class InsertTests
 {
 
@@ -25,6 +24,9 @@ public class InsertTests
         map.Insert(0xABCD0035, 0);
 
         Assert.True(map.Count == 4);
+
+        // will perform a kickout, atleast it should
+        map.Insert(0b01110111, 0);
     }
 
 
