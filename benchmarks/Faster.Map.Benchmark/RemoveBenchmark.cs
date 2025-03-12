@@ -11,8 +11,7 @@ using Faster.Map.Benchmark.Utilities;
 namespace Faster.Map.Benchmark
 {
     [MarkdownExporterAttribute.GitHub]
-    //[MemoryDiagnoser]
-    //[SimpleJob(RunStrategy.Monitoring, 1, 10, 50)]
+    [MemoryDiagnoser]
     [SimpleJob(RunStrategy.Monitoring, launchCount: 1, iterationCount: 3, warmupCount: 2)]
 
     public class RemoveBenchmark

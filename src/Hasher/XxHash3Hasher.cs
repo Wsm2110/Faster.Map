@@ -6,7 +6,7 @@ using Faster.Map.Contracts;
 
 namespace Faster.Map.Hasher
 {
-    internal readonly struct XxHash3Hasher<T> : IHasher<T> where T : unmanaged
+    public readonly struct XxHash3Hasher<T> : IHasher<T> where T : unmanaged
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public uint ComputeHash(T key)

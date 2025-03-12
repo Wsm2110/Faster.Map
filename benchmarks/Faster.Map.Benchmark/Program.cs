@@ -8,9 +8,9 @@ namespace Faster.Map.Benchmark
         static void Main(string[] args)
         {
             //BenchmarkRunner.Run<AddBenchmark>();
-            BenchmarkRunner.Run<EnumerableBenchmark>();
+           // BenchmarkRunner.Run<EnumerableBenchmark>();
             //BenchmarkRunner.Run<UpdateBenchmark>();
-            //BenchmarkRunner.Run<RemoveBenchmark>();
+            BenchmarkRunner.Run<RemoveBenchmark>(/*new DebugInProcessConfig()*/);
         }
     }
 }

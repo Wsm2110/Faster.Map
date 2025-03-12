@@ -478,7 +478,10 @@ namespace Faster.Map.DenseMap.Tests
 
             for (int i = 0; i < 5; i++)
             {
-                _map.Remove(i);
+                if (!_map.Remove(i)) 
+                {
+
+                }
             }
 
             Assert.Equal(initialCount - 5, _map.Count); // Ensure count is updated accurately
