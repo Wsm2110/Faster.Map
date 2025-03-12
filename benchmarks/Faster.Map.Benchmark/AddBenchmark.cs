@@ -43,7 +43,7 @@ namespace Faster.Map.Benchmark
         public void Add()
         {
             var rnd = new FastRandom(3);
-            var uni = new HashSet<uint>((int)Length * 2);
+            var uni = new HashSet<uint>((int)Length);
             while (uni.Count < (uint)(Length * LoadFactor))
             {
                 uni.Add((uint)rnd.Next());

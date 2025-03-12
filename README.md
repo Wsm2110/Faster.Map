@@ -137,3 +137,34 @@ The **"Remove Benchmark"** evaluates the performance of four hash maps—**Blitz
 - **For high load factors (0.4 - 0.8), RobinhoodMap is the best choice**, as its **probing strategy minimizes performance degradation**.
 - **DenseMap suffers from major performance losses**, making it **the worst for large-scale removals**.
 - **BlitzMap remains a solid alternative**, though it doesn't outperform RobinhoodMap in any category.
+
+# 📊 **Enumerable Benchmark**
+
+The **"Enumerable Benchmark"** evaluates the iteration performance of four hash maps—**BlitzMap**, **DenseMap**, **RobinhoodMap**, and **Dictionary**—under varying load factors. This benchmark measures the time required to iterate over a dataset of **134,217,728** entries, highlighting which implementations provide the most efficient enumeration as table density increases.
+
+## **Chart: Enumerable Benchmark**
+
+![Enumerable Benchmark by Load Factor](Assets/Charts/enumerable_benchmark.png)
+
+## 🔍 **Key Findings**
+
+- **⚡ Fastest Overall:** **BlitzMap is the fastest at all load factors**, achieving **8.375 ms** at **0.1**, making it the best choice for iteration performance.
+- **🏆 Best Scalability:** **BlitzMap maintains efficiency across increasing load factors**, reaching only **66.122 ms** at **0.8**, while other methods degrade significantly.
+- **🚨 Worst Scaling:** **RobinhoodMap deteriorates at higher load factors**, increasing to **442.7 ms** at **0.8**, making it the least efficient for iteration.
+- **❌ Slowest Overall:** **RobinhoodMap at 0.8 (442.7 ms)**, showing severe inefficiencies in traversal due to high lookup overhead.
+- **🟢 Dictionary offers stable but slower performance**, remaining predictable but never outperforming BlitzMap.
+
+## **🧐 Why is BlitzMap the Fastest at All Load Factors?**
+
+- **BlitzMap is highly cache-efficient**, minimizing memory access latency and ensuring smooth iteration.
+- **BlitzMap uses an ordered list of entries, meaning it only iterates over added entries rather than the entire list**, making enumeration significantly faster.
+
+## 📌 **Conclusion**
+
+- **BlitzMap is the best choice for enumeration** across all load factors, maintaining high efficiency.
+- **Dictionary remains stable but slower**, making it a reasonable alternative when performance is not the highest priority.
+- **RobinhoodMap is the worst for enumeration at high load factors**, as its lookup method causes severe slowdowns.
+- **DenseMap, while SIMD-optimized, does not offer iteration advantages**, making it suboptimal for enumeration-heavy tasks.
+
+🚀 **For workloads requiring frequent iteration, BlitzMap is the optimal solution.**
+

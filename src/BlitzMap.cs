@@ -1,6 +1,8 @@
+using Faster.Map.Contracts;
+using Faster.Map.Hasher;
 using System;
+using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -14,6 +16,54 @@ public class BlitzMap<TKey, TValue>
     public int Count => (int)_count;
 
     public int Size => _length;
+
+    public IEnumerable<TValue> Values
+    {
+        get
+        {
+            for (var i = Count - 1; i >= 0; --i)
+            {
+                yield return _entries[i].Value;
+            }
+        }
+    }
+
+    public IEnumerable<TKey> Keys
+    {
+        get
+        {
+            for (var i = Count - 1; i >= 0; --i)
+            {
+                yield return _entries[i].Key;
+            }
+        }
+    }
+
+    public IEnumerable<Entry> Entries
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get
+        {
+            var m = new Span<Entry>(_entries, 0, (int)_count);
+            for (uint i = 0; i < _count; ++i)
+            {
+                yield return _entries[i];
+            }
+        }
+    }
+
+    #endregion
+
+    #region Enumerable
+
+    /// <summary>
+    /// Fallback for `foreach` compatibility.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public IEnumerator<Entry> GetEnumerator()
+    {
+        return new FastEnumerator(_entries, (int)_count);
+    }
 
     #endregion
 
@@ -30,36 +80,37 @@ public class BlitzMap<TKey, TValue>
     private int _length;
     private double _loadFactor;
     private uint _maxCountBeforeResize;
-
-    // Last inserted entry
+    private IHasher<TKey> _hasher;
     private uint _lastBucket = INACTIVE;
-    private IEqualityComparer<TKey> _eq;
+    private EqualityComparer<TKey> _eq = EqualityComparer<TKey>.Default;
 
     #endregion
 
-    public BlitzMap() : this(2, 0.8) { }
+    public BlitzMap() : this(2, 0.8, new DefaultHasher<TKey>()) { }
 
-    public BlitzMap(int length) : this(length, 0.8) { }
+    public BlitzMap(int length) : this(length, 0.8, new DefaultHasher<TKey>()) { }
+
+    public BlitzMap(IHasher<TKey> hasher) : this(2, 0.8, hasher) { }
+
+    public BlitzMap(int length, double loadFactor) : this(length, loadFactor, new DefaultHasher<TKey>()) { }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="BlitzMap{TKey, TValue}"/> class.
     /// </summary>
     /// <param name="length">The initial size of the hash table.</param>
     /// <param name="loadFactor">The load factor to control resizing behavior.</param>
-    public BlitzMap(int length, double loadFactor)
+    public BlitzMap(int length, double loadFactor, IHasher<TKey> hasher)
     {
         _length = (int)BitOperations.RoundUpToPowerOf2((uint)length);
         _mask = (uint)_length - 1;
         _loadFactor = loadFactor;
-
-        _eq = EqualityComparer<TKey>.Default;
-
         _buckets = GC.AllocateUninitializedArray<Bucket>(_length, true);
         // fill array with inactive marker
         _buckets.AsSpan().Fill(new Bucket { Signature = INACTIVE, Next = INACTIVE });
-        _entries = GC.AllocateArray<Entry>((int)(_length * loadFactor), true);
+        _entries = GC.AllocateUninitializedArray<Entry>((int)Math.Ceiling(_length * loadFactor), true);
         _numBuckets = (uint)_length >> 1;
         _maxCountBeforeResize = (uint)(_loadFactor * _length);
+        _hasher = hasher;
     }
 
     #region Public Methods
@@ -74,7 +125,7 @@ public class BlitzMap<TKey, TValue>
     public bool Get(TKey key, out TValue value)
     {
         // Compute the hash code and determine the primary index in the bucket array
-        uint hashcode = Compute((uint)key.GetHashCode());
+        var hashcode = _hasher.ComputeHash(key);
         uint index = hashcode & _mask; // Primary index within the array
         var signature = hashcode & ~_mask; // Secondary mask for collision handling
 
@@ -124,7 +175,7 @@ public class BlitzMap<TKey, TValue>
     public bool Contains(TKey key)
     {
         // Compute the hash code and determine the primary index in the bucket array
-        uint hashcode = (uint)key.GetHashCode();
+        var hashcode = _hasher.ComputeHash(key);
         uint index = hashcode & _mask; // Primary index within the array
         var signature = hashcode & ~_mask; // Secondary mask for collision handling
 
@@ -171,7 +222,7 @@ public class BlitzMap<TKey, TValue>
     public bool Update(TKey key, TValue value)
     {
         // Compute the hash code and determine the primary index in the bucket array
-        uint hashcode = (uint)key.GetHashCode();
+        var hashcode = _hasher.ComputeHash(key);
         uint index = hashcode & _mask; // Primary index within the array
         var signature = hashcode & ~_mask; // Secondary mask for collision handling
 
@@ -225,7 +276,12 @@ public class BlitzMap<TKey, TValue>
         }
 
         // Generate a hash code for the provided key
-        var hashcode = Compute((uint)key.GetHashCode());
+        var hashcode = _hasher.ComputeHash(key);
+
+        if (hashcode == 1465042988)
+        {
+
+        }
 
         // Calculate the primary index using the bitwise AND with the mask
         // This constrains the index within the array bounds (_mask is typically array length - 1)
@@ -331,7 +387,7 @@ public class BlitzMap<TKey, TValue>
         }
 
         // Generate a hash code for the provided key
-        var hashcode = (uint)key.GetHashCode();
+        var hashcode = _hasher.ComputeHash(key);
 
         // Calculate the primary index using the bitwise AND with the mask
         // This constrains the index within the array bounds (_mask is typically array length - 1)
@@ -425,7 +481,7 @@ public class BlitzMap<TKey, TValue>
         }
 
         // Generate a hash code for the provided key
-        var hashcode = (uint)key.GetHashCode();
+        var hashcode = _hasher.ComputeHash(key);
 
         // Calculate the primary index using the bitwise AND with the mask
         var index = hashcode & _mask;
@@ -490,7 +546,7 @@ public class BlitzMap<TKey, TValue>
     public bool Remove(TKey key)
     {
         // Generate a hash code for the provided key
-        var hashcode = (uint)key.GetHashCode();
+        var hashcode = _hasher.ComputeHash(key);
 
         // Calculate the primary index using the bitwise AND with the mask
         // This constrains the index within the array bounds (_mask is typically array length - 1)
@@ -640,7 +696,7 @@ public class BlitzMap<TKey, TValue>
 
         // Initialize new entry and bucket arrays with default values
         _entries = GC.AllocateUninitializedArray<Entry>((int)(size * _loadFactor), true);
-        _buckets = GC.AllocateArray<Bucket>(size, true);
+        _buckets = GC.AllocateUninitializedArray<Bucket>(size, true);
         _buckets.AsSpan().Fill(new Bucket { Signature = INACTIVE, Next = INACTIVE });
 
         // Get direct references to the array data for performance
@@ -670,7 +726,7 @@ public class BlitzMap<TKey, TValue>
     private void InsertInternal(ref Bucket bucketBase, ref Entry entryBase, TKey key, TValue value)
     {
         // Generate a hash code for the provided key
-        var hashcode = (uint)key.GetHashCode();
+        var hashcode = _hasher.ComputeHash(key);
 
         // Calculate the primary index using the bitwise AND with the mask
         // This constrains the index within the array bounds (_mask is typically array length - 1)
@@ -790,32 +846,11 @@ public class BlitzMap<TKey, TValue>
         _count = 0;
     }
 
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static uint Compute(uint x)
-    {
-        x ^= x >> 15;
-        x *= 0x2c1b3c6d;  // High-entropy constant
-        x ^= x >> 13;
-        x *= 0x297a2d39;  // Another high-entropy constant
-        x ^= x >> 15;
-        return x;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static ulong Compute(ulong h)
-    {
-        h ^= h >> 23;
-        h *= 0x2127599BF4325C37UL;
-        h ^= h >> 47;
-        return h;
-    }
-
     /// <summary>
     /// Represents an entry in the hash table, storing a key-value pair.
     /// </summary>
     [StructLayout(LayoutKind.Sequential)]
-    internal struct Entry(TKey key, TValue value)
+    public struct Entry(TKey key, TValue value)
     {
         /// <summary>
         /// The key associated with the entry.
@@ -832,13 +867,69 @@ public class BlitzMap<TKey, TValue>
     /// Represents a bucket in the hash table, which holds the signature and the index of the next bucket.
     /// The bucket structure is used to manage collisions through linked lists within the hash table.
     /// </summary>
-    [StructLayout(LayoutKind.Sequential, Pack = 4)]
+    [StructLayout(LayoutKind.Sequential)]
     public struct Bucket
     {
         public uint Signature;
         public uint Next;
-
     }
 
+    public unsafe struct FastEnumerator : IEnumerator<Entry>
+    {
+        private readonly Entry* _start;
+        private readonly Entry* _end;
+        private Entry* _current;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="FastEnumerator"/> struct.
+        /// Uses unsafe pointer-based iteration for extreme performance.
+        /// </summary>
+        /// <param name="entries">The array of entries to enumerate.</param>
+        /// <param name="length">The number of elements in the array.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public FastEnumerator(Entry[] entries, int length)
+        {
+            // Convert array reference to a raw pointer (avoiding fixed blocks)
+            _start = (Entry*)Unsafe.AsPointer(ref MemoryMarshal.GetArrayDataReference(entries));
+            _end = _start + length;  // Pointer to the end of the array
+            _current = _start - 1;    // Start before the first element (MoveNext() advances it)
+        }
+
+        /// <summary>
+        /// Moves to the next element in the collection.
+        /// </summary>
+        /// <returns>True if the enumerator successfully moved to the next element, false if at the end.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool MoveNext()
+        {
+            _current++; // Move pointer to the next entry
+            return _current < _end; // Check if within bounds
+        }
+
+        /// <summary>
+        /// Gets the current entry in the enumeration.
+        /// </summary>
+        public readonly Entry Current
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => *_current; // Dereference pointer to get the current element
+        }
+
+        /// <summary>
+        /// Gets the current element of the collection (explicit interface implementation).
+        /// </summary>
+        object IEnumerator.Current => Current;
+
+        /// <summary>
+        /// Resets the enumerator to its initial position before the first element.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Reset() => _current = _start - 1;
+
+        /// <summary>
+        /// Releases resources used by the enumerator (not needed for structs).
+        /// </summary>
+        public void Dispose() { }
+    }
     #endregion
 }

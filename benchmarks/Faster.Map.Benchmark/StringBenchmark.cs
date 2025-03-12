@@ -56,9 +56,7 @@ namespace Faster.Map.Benchmark
 
             _denseMap = new DenseMap<string, string>(length, 0.875);
 
-            _denseMapxxHash = new DenseMap<string, string>(length, 0.875, new XxHash3StringHasher());
-            _denseMapFastHash = new DenseMap<string, string>(length, 0.875, new FastHasher());
-            _dictionary = new Dictionary<string, string>(dicLength);
+              _dictionary = new Dictionary<string, string>(dicLength);
             _robinhoodMap = new RobinhoodMap<string, string>(length * 2);
 
             foreach (var key in keys)

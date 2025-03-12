@@ -3,14 +3,14 @@ using Faster.Map.Contracts;
 
 namespace Faster.Map.Hasher
 {
-    public class GoldenRatioHasher<TKey> : IHasher<TKey>
+    internal readonly struct GoldenRatioHasher<TKey> : IHasher<TKey>
     {
-        ulong _goldenRatio = 11400714819323198485;
+        const uint _goldenRatio = 0x9E3779B9;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ulong ComputeHash(TKey key)
+        public uint ComputeHash(TKey key)
         {
-            return ((uint)key.GetHashCode()) * _goldenRatio;
-        }     
+            return (uint)key.GetHashCode() * _goldenRatio;
+        }
     }
 }

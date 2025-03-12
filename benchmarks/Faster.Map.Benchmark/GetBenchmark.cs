@@ -11,7 +11,7 @@ namespace Faster.Map.Benchmark
     [MarkdownExporterAttribute.GitHub]
     //[DisassemblyDiagnoser]
     //[MemoryDiagnoser]
-    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, iterationCount: 5, warmupCount: 3)]
+    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, iterationCount: 50, warmupCount: 3)]
 
     public class GetBenchmark
     {
@@ -28,7 +28,7 @@ namespace Faster.Map.Benchmark
 
         #region Properties
 
-        [Params(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8)]
+        [Params(/*0.1, 0.2, 0.3, 0.4, 0.5,*/ 0.6 /*, 0.7, 0.8*/)]
         public static double LoadFactor { get; set; }
 
         [Params(134_217_728)]
@@ -100,14 +100,14 @@ namespace Faster.Map.Benchmark
         //    }
         //}
 
-        [Benchmark]
-        public void RobinhoodMap()
-        {
-            for (int i = 0; i < keys.Length; i++)
-            {
-                var key = keys[i];
-                _robinHoodMap.Get(key, out var _);
-            }
-        }
+        //[Benchmark]
+        //public void RobinhoodMap()
+        //{
+        //    for (int i = 0; i < keys.Length; i++)
+        //    {
+        //        var key = keys[i];
+        //        _robinHoodMap.Get(key, out var _);
+        //    }
+        //}
     }
 }
