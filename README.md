@@ -118,7 +118,7 @@ The **"Remove Benchmark"** evaluates the performance of four hash maps—**Blitz
 
 ## **Chart: Remove Benchmark**
 
-![Remove Benchmark by Load Factor](Assets/Charts/remove.png)
+![Remove Benchmark by Load Factor](Assets/Charts/remove_benchmark.png)
 
 ## 🔍 **Key Findings**
 - **⚡ Fastest Overall:** **Dictionary is the fastest at low load factors (0.1), achieving 374.1 ms** due to minimal overhead in identity hashing.
