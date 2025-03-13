@@ -2,7 +2,7 @@
 
 namespace Faster.Map.Contracts
 {
-    public interface IHasher<in TKey>
+    public interface IHasher<TKey>
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         uint ComputeHash(TKey key);            

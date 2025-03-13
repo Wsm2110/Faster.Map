@@ -7,7 +7,7 @@ namespace Faster.Map.DenseMap.Tests
 {
     public class IntegerHasherTests
     {    
-        private DenseMap<int, string> CreateMap() => new DenseMap<int, string>(16, 0.875, new XxHash3Hasher<int>());
+        private DenseMap<int, string, XxHash3Hasher<int>> CreateMap() => new DenseMap<int, string, XxHash3Hasher<int>>(16, 0.875);
 
         [Fact]
         public void Emplace_AddsNewKeyValuePairs()
@@ -54,7 +54,7 @@ namespace Faster.Map.DenseMap.Tests
         [Fact]
         public void GetValueRefOrAddDefault_ReturnsReferenceToNewOrExistingValue()
         {
-            var map = new DenseMap<int, int>(16, 0.875, new XxHash3Hasher<int>());
+            var map = new DenseMap<int, int, XxHash3Hasher<int>>(16, 0.875);
 
             ref var refValue = ref map.GetValueRefOrAddDefault(1);
             refValue = 10;
@@ -191,7 +191,7 @@ namespace Faster.Map.DenseMap.Tests
         [Fact]
         public void LoadFactorLimit_DoesNotExceed()
         {
-            var map = new DenseMap<int, string>(4, 0.75, new XxHash3Hasher<int>());
+            var map = new DenseMap<int, string, XxHash3Hasher<int>>(4, 0.75);
 
             map.Emplace(1, "One");
             map.Emplace(2, "Two");

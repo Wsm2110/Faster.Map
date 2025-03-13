@@ -5,11 +5,12 @@ using System.Numerics;
 using System.Linq;
 using BenchmarkDotNet.Engines;
 using Faster.Map.Benchmark.Utilities;
+using Faster.Map.Hasher;
 
 namespace Faster.Map.Benchmark
 {
     [MarkdownExporterAttribute.GitHub]
-    //[DisassemblyDiagnoser]
+    [DisassemblyDiagnoser]
     //[MemoryDiagnoser]
     [SimpleJob(RunStrategy.Monitoring, launchCount: 1, iterationCount: 50, warmupCount: 3)]
 
@@ -56,7 +57,7 @@ namespace Faster.Map.Benchmark
             int dicLength = HashHelpers.GetPrime((int)Length);
 
             _denseMap = new DenseMap<uint, uint>(length);
-            _blitz = new BlitzMap<uint, uint>((int)length, 0.9);
+            _blitz = new BlitzMap<uint, uint>((int)length, LoadFactor);
 
             _dictionary = new Dictionary<uint, uint>(dicLength);
             _robinHoodMap = new RobinhoodMap<uint, uint>(length, 0.9);

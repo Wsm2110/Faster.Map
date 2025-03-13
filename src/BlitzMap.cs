@@ -1,4 +1,3 @@
-using Faster.Map.Contracts;
 using Faster.Map.Hasher;
 using System;
 using System.Collections;
@@ -9,49 +8,70 @@ using System.Runtime.InteropServices;
 
 namespace Faster.Map;
 
-public class BlitzMap<TKey, TValue>
+/// <summary>
+/// A specialized implementation of <see cref="BlitzMap{TKey, TValue, THasher}"/> that
+/// simplifies usage by defaulting the hasher to <see cref="DefaultHasher{TKey}"/>.
+/// This avoids requiring three generic type parameters when the user doesn't need 
+/// a custom hashing function.
+/// </summary>
+/// <typeparam name="TKey">The type of the keys in the map.</typeparam>
+/// <typeparam name="TValue">The type of the values in the map.</typeparam>
+public class BlitzMap<TKey, TValue> : BlitzMap<TKey, TValue, DefaultHasher<TKey>>
+{
+    /// <summary>
+    /// Initializes a new instance of the <see cref="BlitzMap{TKey, TValue}"/> class
+    /// with a default initial capacity of 2 and a load factor of 0.8.
+    /// </summary>
+    public BlitzMap() : base(2, 0.8) { }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="BlitzMap{TKey, TValue}"/> class
+    /// with the specified initial capacity and a default load factor of 0.8.
+    /// </summary>
+    /// <param name="length">The initial capacity of the map.</param>
+    public BlitzMap(int length) : base(length, 0.8) { }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="BlitzMap{TKey, TValue}"/> class
+    /// with the specified initial capacity and load factor.
+    /// </summary>
+    /// <param name="length">The initial capacity of the map.</param>
+    /// <param name="loadfactor">The maximum allowed load factor before resizing.</param>
+    public BlitzMap(int length, double loadfactor) : base(length, loadfactor) { }
+}
+
+/// <summary>
+/// A high-performance hash map implementation using a customizable hashing strategy.
+/// By utilizing a struct-based hasher, this avoids interface dispatching and enables inlining,
+/// resulting in reduced virtual call overhead and better CPU efficiency.
+/// </summary>
+/// <typeparam name="TKey">The type of the keys stored in the map.</typeparam>
+/// <typeparam name="TValue">The type of the values stored in the map.</typeparam>
+/// <typeparam name="THasher">
+/// A struct implementing <see cref="IHasherStrategy{TKey}"/> to provide an optimized hashing function.
+/// Using a struct-based hasher avoids virtual method calls and allows aggressive inlining.
+/// </typeparam>
+public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasherStrategy<TKey>
 {
     #region Properties
-
+    /// <summary>
+    /// Gets the number of key-value pairs currently stored in the map.
+    /// </summary>
+    /// <remarks>
+    /// This returns the count as an <see cref="int"/> but internally stores
+    /// it as a <see cref="uint"/> to optimize for performance.
+    /// </remarks>
     public int Count => (int)_count;
 
+    /// <summary>
+    /// Gets the current capacity (number of buckets) allocated in the map.
+    /// </summary>
+    /// <remarks>
+    /// The size represents the total number of slots available for key-value storage.
+    /// This can be larger than <see cref="Count"/> due to empty or removed entries.
+    /// </remarks>
     public int Size => _length;
-
-    public IEnumerable<TValue> Values
-    {
-        get
-        {
-            for (var i = Count - 1; i >= 0; --i)
-            {
-                yield return _entries[i].Value;
-            }
-        }
-    }
-
-    public IEnumerable<TKey> Keys
-    {
-        get
-        {
-            for (var i = Count - 1; i >= 0; --i)
-            {
-                yield return _entries[i].Key;
-            }
-        }
-    }
-
-    public IEnumerable<Entry> Entries
-    {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get
-        {
-            var m = new Span<Entry>(_entries, 0, (int)_count);
-            for (uint i = 0; i < _count; ++i)
-            {
-                yield return _entries[i];
-            }
-        }
-    }
-
+      
     #endregion
 
     #region Enumerable
@@ -80,26 +100,40 @@ public class BlitzMap<TKey, TValue>
     private int _length;
     private double _loadFactor;
     private uint _maxCountBeforeResize;
-    private IHasher<TKey> _hasher;
+    private THasher _hasher;
     private uint _lastBucket = INACTIVE;
     private EqualityComparer<TKey> _eq = EqualityComparer<TKey>.Default;
 
     #endregion
+    /// <summary>
+    /// Initializes a new instance of the <see cref="BlitzMap{TKey, TValue, THasher}"/> class
+    /// with a default initial capacity and load factor.
+    /// </summary>
+    /// <remarks>
+    /// Uses a small initial capacity (2) to minimize memory usage while still being able
+    /// to grow dynamically. The default load factor (0.8) balances memory efficiency
+    /// and performance.
+    /// </remarks>
+    public BlitzMap() : this(2, 0.8) { }
 
-    public BlitzMap() : this(2, 0.8, new DefaultHasher<TKey>()) { }
-
-    public BlitzMap(int length) : this(length, 0.8, new DefaultHasher<TKey>()) { }
-
-    public BlitzMap(IHasher<TKey> hasher) : this(2, 0.8, hasher) { }
-
-    public BlitzMap(int length, double loadFactor) : this(length, loadFactor, new DefaultHasher<TKey>()) { }
+    /// <summary>
+    /// Initializes a new instance of the <see cref="BlitzMap{TKey, TValue, THasher}"/> class
+    /// with the specified initial capacity and a default load factor of 0.8.
+    /// </summary>
+    /// <param name="length">The initial capacity of the map.</param>
+    /// <remarks>
+    /// The capacity determines the number of buckets allocated initially.
+    /// A sensible default load factor of 0.8 ensures a balance between memory usage
+    /// and performance before resizing is required.
+    /// </remarks>
+    public BlitzMap(int length) : this(length, 0.8) { }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="BlitzMap{TKey, TValue}"/> class.
     /// </summary>
     /// <param name="length">The initial size of the hash table.</param>
     /// <param name="loadFactor">The load factor to control resizing behavior.</param>
-    public BlitzMap(int length, double loadFactor, IHasher<TKey> hasher)
+    public BlitzMap(int length, double loadFactor)
     {
         _length = (int)BitOperations.RoundUpToPowerOf2((uint)length);
         _mask = (uint)_length - 1;
@@ -110,7 +144,7 @@ public class BlitzMap<TKey, TValue>
         _entries = GC.AllocateUninitializedArray<Entry>((int)Math.Ceiling(_length * loadFactor), true);
         _numBuckets = (uint)_length >> 1;
         _maxCountBeforeResize = (uint)(_loadFactor * _length);
-        _hasher = hasher;
+        _hasher = default;
     }
 
     #region Public Methods
@@ -277,11 +311,6 @@ public class BlitzMap<TKey, TValue>
 
         // Generate a hash code for the provided key
         var hashcode = _hasher.ComputeHash(key);
-
-        if (hashcode == 1465042988)
-        {
-
-        }
 
         // Calculate the primary index using the bitwise AND with the mask
         // This constrains the index within the array bounds (_mask is typically array length - 1)

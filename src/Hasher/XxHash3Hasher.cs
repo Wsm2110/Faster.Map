@@ -6,7 +6,7 @@ using Faster.Map.Contracts;
 
 namespace Faster.Map.Hasher
 {
-    public readonly struct XxHash3Hasher<T> : IHasher<T> where T : unmanaged
+    public readonly struct XxHash3Hasher<T> : IHasherStrategy<T> where T : unmanaged
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public uint ComputeHash(T key)
@@ -15,7 +15,7 @@ namespace Faster.Map.Hasher
             return (uint)XxHash3.HashToUInt64(span);
         }
     }
-    public readonly struct XxHash3StringHasher : IHasher<string>
+    public readonly struct XxHash3StringHasher : IHasherStrategy<string>
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public uint ComputeHash(string key)

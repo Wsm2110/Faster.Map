@@ -746,7 +746,7 @@ public class RemoveTests
     [Fact]
     public void Remove_ShouldRemainConsistentUnderFrequentAddRemoveCycles()
     {
-        var map = new BlitzMap<int, string>(16, loadFactor: 0.9);
+        var map = new BlitzMap<int, string>(16, 0.9);
 
         // Perform multiple cycles of add/remove
         for (int cycle = 0; cycle < 100; cycle++)

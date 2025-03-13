@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -10,38 +11,8 @@ namespace Faster.Map.BlitzMap.Tests;
 public class EnumerableTests
 {
 
-    [Fact]
-    public void Entries_ShouldReturnEmpty_WhenMapIsEmpty()
-    {
-        var map = new BlitzMap<int, string>();
-        Assert.Empty(map.Entries);
-    }
 
-    [Fact]
-    public void Entries_ShouldReturnSingleEntry_WhenOneEntryExists()
-    {
-        var map = new BlitzMap<int, string>();
-        map.Insert(1, "One");
 
-        var result = Assert.Single(map.Entries);
-        Assert.Equal(1, result.Key);
-        Assert.Equal("One", result.Value);
-    }
-
-    [Fact]
-    public void Entries_ShouldNotIncludeDeletedEntries()
-    {
-        var map = new BlitzMap<int, string>();
-        map.Insert(1, "One");
-        map.Insert(2, "Two");
-        map.Insert(3, "Three");
-
-        map.Remove(2);
-
-        var result = map.Entries;
-
-        Assert.Equal(2, result.Count());
-    }
 
 
     [Fact]
@@ -61,13 +32,17 @@ public class EnumerableTests
             map.Insert(item, item);
         }
 
+        var count = 0;
+
         foreach (var item in map)
         {
             Assert.True(item.Key != default);
             Assert.True(item.Value != default);
+            ++count;
         }
+        
 
-        Assert.True(map.Count == map.Entries.Count()); 
+        Assert.True(map.Count == count); 
     }
 
     [Fact]
@@ -77,7 +52,7 @@ public class EnumerableTests
         map.Insert(1, "One");
         map.Insert(2, "Two");
 
-        var enumerator = map.Entries.GetEnumerator();
+        var enumerator = map.GetEnumerator();
         enumerator.MoveNext();
         enumerator.MoveNext();
 

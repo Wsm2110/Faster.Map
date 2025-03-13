@@ -12,6 +12,52 @@ using System.Runtime.Intrinsics;
 
 namespace Faster.Map;
 
+
+/// <summary>
+/// A specialized implementation of <see cref="DenseMap{TKey, TValue, THasher}"/> that
+/// defaults to using the <see cref="GoldenRatioHasher{TKey}"/> for efficient hashing.
+/// This avoids requiring three generic parameters when a custom hasher is not needed.
+/// </summary>
+/// <typeparam name="TKey">The type of the keys stored in the map.</typeparam>
+/// <typeparam name="TValue">The type of the values stored in the map.</typeparam>
+/// <remarks>
+/// The default hasher, <see cref="GoldenRatioHasher{TKey}"/>, is chosen for its strong 
+/// distribution properties, ensuring minimal collisions and improved lookup performance.
+/// </remarks>
+public class DenseMap<TKey, TValue> : DenseMap<TKey, TValue, GoldenRatioHasher<TKey>>
+{
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DenseMap{TKey, TValue}"/> class 
+    /// with the specified initial capacity and a default load factor of 0.875.
+    /// </summary>
+    /// <param name="length">The initial capacity (number of buckets) in the map.</param>
+    /// <remarks>
+    /// The default load factor (0.875) is chosen to balance memory usage and performance.
+    /// Higher load factors reduce memory overhead while still maintaining efficient lookups.
+    /// </remarks>
+    public DenseMap(uint length) : base(length, 0.875) { }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DenseMap{TKey, TValue}"/> class 
+    /// with the specified initial capacity and load factor.
+    /// </summary>
+    /// <param name="length">The initial capacity (number of buckets) in the map.</param>
+    /// <param name="loadFactor">
+    /// The maximum allowed load factor before resizing occurs. A higher load factor
+    /// reduces memory usage at the cost of increased collision probability.
+    /// </param>
+    /// <remarks>
+    /// This constructor allows fine-tuned control over performance trade-offs:
+    /// - **Higher load factors (e.g., 0.9 - 0.95):** More memory-efficient but may cause more collisions.
+    /// - **Lower load factors (e.g., 0.5 - 0.7):** Faster lookups but higher memory usage.
+    /// </remarks>
+    public DenseMap(uint length, double loadFactor) : base(length, loadFactor) { }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    public DenseMap() : base(16, 0.875) { }
+}
 /// <summary>
 /// DenseMap is a high-performance hashmap implementation that uses open-addressing with quadratic probing and SIMD (Single Instruction, Multiple Data) for parallel searches.
 /// This map is designed for scenarios requiring efficient key-value storage with fast lookups, inserts, and deletions.
@@ -40,7 +86,10 @@ namespace Faster.Map;
 /// </summary>
 /// <typeparam name="TKey">The type of keys in the map. Must be non-nullable.</typeparam>
 /// <typeparam name="TValue">The type of values in the map.</typeparam>
-public class DenseMap<TKey, TValue>
+/// <typeparam name="THasher">
+/// A struct implementing <see cref="IHasherStrategy{TKey}"/> to provide an optimized hashing function.
+/// Using a struct-based hasher avoids virtual method calls and allows aggressive inlining.</typeparam>
+public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasherStrategy<TKey>
 {
     #region Properties
 
@@ -148,7 +197,6 @@ public class DenseMap<TKey, TValue>
     #endregion
 
     #region Fields
-    private ulong _groupMask;
     private const uint ElementsInGroupMinusOne = 15;
     private const sbyte _emptyBucket = -127;
     private const sbyte _tombstone = -126;
@@ -162,30 +210,12 @@ public class DenseMap<TKey, TValue>
     private double _maxLookupsBeforeResize;
     private uint _lengthMinusOne;
     private readonly double _loadFactor;
-    private readonly IHasher<TKey> _hasher;
+    private readonly THasher _hasher;
     private readonly IEqualityComparer<TKey> _comparer;
 
     #endregion
 
     #region Constructor
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class with default parameters.
-    /// Example:
-    /// <code>
-    /// var map = new DenseMap<int, string>();
-    /// </code>
-    /// </summary>
-    public DenseMap(IHasher<TKey> hasher) : this(16, 0.875, hasher) { }
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class with default parameters.
-    /// Example:
-    /// <code>
-    /// var map = new DenseMap<int, string>();
-    /// </code>
-    /// </summary>
-    public DenseMap() : this(16, 0.875, new GoldenRatioHasher<TKey>()) { }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class with the specified length and default load factor.
@@ -195,7 +225,16 @@ public class DenseMap<TKey, TValue>
     /// </code>
     /// </summary>
     /// <param name="length">The length of the hashmap. Will always take the closest power of two.</param>
-    public DenseMap(uint length) : this(length, 0.875, new GoldenRatioHasher<TKey>()) { }
+    public DenseMap(uint length) : this(length, 0.875) { }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class with the specified length and default load factor.
+    /// Example:
+    /// <code>
+    /// var map = new DenseMap<int, string>(32);
+    /// </code>
+    /// </summary>
+    public DenseMap() : this(16, 0.875) { }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class with the specified parameters.
@@ -207,7 +246,7 @@ public class DenseMap<TKey, TValue>
     /// <param name="length">The length of the hashmap. Will always take the closest power of two.</param>
     /// <param name="loadFactor">The load factor determines when the hashmap will resize.</param>
     /// <param name="keyComparer">Used to compare keys to resolve hash collisions.</param>
-    public DenseMap(uint length, double loadFactor, IHasher<TKey> hasher = null)
+    public DenseMap(uint length, double loadFactor)
     {
         if (!Vector128.IsHardwareAccelerated)
         {
@@ -216,7 +255,7 @@ public class DenseMap<TKey, TValue>
 
         _length = length;
         _loadFactor = loadFactor;
-        _hasher = hasher ?? new GoldenRatioHasher<TKey>();
+        _hasher = default;
 
         if (loadFactor > 0.875)
         {
@@ -246,7 +285,6 @@ public class DenseMap<TKey, TValue>
 
         _maxTombstoneBeforeRehash = _length * 0.125;
         _lengthMinusOne = _length - 1;
-        _groupMask = _lengthMinusOne & ~ElementsInGroupMinusOne;
     }
 
     #endregion
@@ -887,7 +925,7 @@ public class DenseMap<TKey, TValue>
         _maxLookupsBeforeResize = (int)(_length * _loadFactor);
 
         _tombstoneCounter = 0;
-        _maxTombstoneBeforeRehash = (int)(_length * 0.125);      
+        _maxTombstoneBeforeRehash = (int)(_length * 0.125);
         // Allocate new arrays
         var size = (int)_length + 16; // Safely cast _length to int for array allocation
 

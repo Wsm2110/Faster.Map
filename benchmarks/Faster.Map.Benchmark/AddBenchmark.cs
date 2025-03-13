@@ -6,6 +6,7 @@ using System.Numerics;
 using System.Collections;
 using BenchmarkDotNet.Engines;
 using Faster.Map.Benchmark.Utilities;
+using Faster.Map.Hasher;
 
 namespace Faster.Map.Benchmark
 {
