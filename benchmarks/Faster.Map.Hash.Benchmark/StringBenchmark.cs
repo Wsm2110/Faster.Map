@@ -1,7 +1,6 @@
 ﻿using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Engines;
 using Faster.Map.Benchmark.Utilities;
-using Faster.Map.Hash;
 using Faster.Map.Hasher;
 using System.Collections;
 using System.Collections.Generic;
@@ -13,7 +12,7 @@ namespace Faster.Map.Benchmark
 {
     [MarkdownExporterAttribute.GitHub]
     [MemoryDiagnoser]
-    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, iterationCount: 5, warmupCount: 3)]
+    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, iterationCount: 50, warmupCount: 3)]
 
     public class StringBenchmark
     {
@@ -23,7 +22,7 @@ namespace Faster.Map.Benchmark
         private DenseMap<string, string> _dense;
         private Dictionary<string, string> _dictionary;
         private RobinhoodMap<string, string> _robinhoodMap;
-        private BlitzMap<string, string> _blitzMap;
+        private BlitzMap<string, string, XxHash3StringHasher> _blitzMap;
 
         private string[] keys;
 
@@ -34,7 +33,7 @@ namespace Faster.Map.Benchmark
         [Params(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8)]
         public double LoadFactor { get; set; }
 
-        [Params(16_777_216)]
+        [Params(1000000)]
         public uint Length { get; set; }
 
         #endregion
@@ -59,7 +58,7 @@ namespace Faster.Map.Benchmark
             int dicLength = HashHelpers.GetPrime((int)Length);
 
             _dense = new DenseMap<string, string>(length, 0.875);
-            _blitzMap = new BlitzMap<string, string>((int)length, 0.8);
+            _blitzMap = new BlitzMap<string, string, XxHash3StringHasher>((int)length, 0.8);
             _dictionary = new Dictionary<string, string>(dicLength);
             _robinhoodMap = new RobinhoodMap<string, string>(length * 2);
 

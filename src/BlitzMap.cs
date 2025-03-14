@@ -48,10 +48,10 @@ public class BlitzMap<TKey, TValue> : BlitzMap<TKey, TValue, DefaultHasher<TKey>
 /// <typeparam name="TKey">The type of the keys stored in the map.</typeparam>
 /// <typeparam name="TValue">The type of the values stored in the map.</typeparam>
 /// <typeparam name="THasher">
-/// A struct implementing <see cref="IHasherStrategy{TKey}"/> to provide an optimized hashing function.
+/// A struct implementing <see cref="IHasher{TKey}"/> to provide an optimized hashing function.
 /// Using a struct-based hasher avoids virtual method calls and allows aggressive inlining.
 /// </typeparam>
-public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasherStrategy<TKey>
+public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKey>
 {
     #region Properties
     /// <summary>
@@ -868,6 +868,7 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasherStra
             }
         }
     }
+
     public void Clear()
     {
         Array.Clear(_entries);
@@ -960,5 +961,6 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasherStra
         /// </summary>
         public void Dispose() { }
     }
+  
     #endregion
 }

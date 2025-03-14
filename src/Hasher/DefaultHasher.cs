@@ -9,7 +9,7 @@ namespace Faster.Map.Hasher;
 /// Implementations should provide an optimized hashing function for specific key types.
 /// </summary>
 /// <typeparam name="T">The type of the key to be hashed.</typeparam>
-public interface IHasherStrategy<T>
+public interface IHasher<T>
 {
     /// <summary>
     /// Computes a 32-bit hash value for the given key.
@@ -24,7 +24,7 @@ public interface IHasherStrategy<T>
 /// Provides a generic fallback for types without a specialized hasher.
 /// </summary>
 /// <typeparam name="T">The type of the key to be hashed.</typeparam>
-public readonly struct DefaultHasher<T> : IHasherStrategy<T>
+public readonly struct DefaultHasher<T> : IHasher<T>
 {
     /// <summary>
     /// Computes a hash for the given key using its <see cref="object.GetHashCode"/> method.
@@ -43,7 +43,7 @@ public readonly struct DefaultHasher<T> : IHasherStrategy<T>
 /// A fast default hashing strategy for <see cref="ulong"/> values.
 /// Utilizes strong mixing operations to produce high-entropy hash values.
 /// </summary>
-internal readonly struct DefaultUlongHasher : IHasherStrategy<ulong>
+internal readonly struct DefaultUlongHasher : IHasher<ulong>
 {
     /// <summary>
     /// Computes a high-quality hash for a given <see cref="ulong"/> value.
@@ -72,7 +72,7 @@ internal readonly struct DefaultUlongHasher : IHasherStrategy<ulong>
 /// Uses bit shifts and multiplications with high-entropy constants
 /// to produce a well-distributed hash.
 /// </summary>
-internal readonly struct DefaultUintHasher : IHasherStrategy<uint>
+internal readonly struct DefaultUintHasher : IHasher<uint>
 {
     /// <summary>
     /// Computes a high-quality hash for a given <see cref="uint"/> value.

@@ -6,6 +6,7 @@ using System.Linq;
 using System.Numerics;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Engines;
+using BenchmarkDotNet.Running;
 using Faster.Map.Benchmark.Utilities;
 using Faster.Map.Hasher;
 
@@ -33,7 +34,7 @@ namespace Faster.Map.Benchmark
         [Params(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8)]
         public double LoadFactor { get; set; }
 
-        [Params(134_217_728)]
+        [Params(16_777_216)]
         public uint Length { get; set; }
 
         #endregion
@@ -62,34 +63,44 @@ namespace Faster.Map.Benchmark
 
             _dictionary = new Dictionary<uint, uint>(dicLength);
             _robinHoodMap = new RobinhoodMap<uint, uint>(length, 0.9);
-
-            foreach (var key in keys)
-            {
-                _dictionary.Add(key, key);
-                _denseMap.Emplace(key, key);
-                _blitz.Insert(key, key);
-                _robinHoodMap.Emplace(key, key);
-            }
+      
         }
 
         [IterationSetup]
-        public void IterationSetupX()
+        public void IterationSetupX(BenchmarkCase benchmarkCase)
         {
             // round of length to power of 2 prevent resizing
             uint length = BitOperations.RoundUpToPowerOf2(Length);
             int dicLength = HashHelpers.GetPrime((int)Length);
+
+            string benchmarkName = benchmarkCase.Descriptor.WorkloadMethod.Name; // Use Name instead of DisplayInfo
+
 
             _denseMap = new DenseMap<uint, uint>(length);
             _dictionary = new Dictionary<uint, uint>(dicLength);
             _robinHoodMap = new RobinhoodMap<uint, uint>(length * 2);
             _blitz = new BlitzMap<uint, uint>((int)length);
 
+            // Use a switch statement instead of multiple if-else
             foreach (var key in keys)
             {
-                _dictionary.Add(key, key);
-                _denseMap.Emplace(key, key);
-                _robinHoodMap.Emplace(key, key);
-                _blitz.Insert(key, key);
+                switch (benchmarkName)
+                {
+                    case nameof(BlitzMap):
+                        _blitz.Insert(key, key);
+                        break;
+                    case nameof(DenseMap):
+                        _denseMap.Emplace(key, key);
+                        break;
+                    case nameof(RobinhoodMap):
+                        _robinHoodMap.Emplace(key, key);
+                        break;
+                    case nameof(Dictionary):
+                        _dictionary.Add(key, key);
+                        break;
+                    default:
+                        throw new InvalidOperationException($"Unexpected benchmark: {benchmarkName}");
+                }
             }
         }
 

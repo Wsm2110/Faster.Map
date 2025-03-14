@@ -87,9 +87,9 @@ public class DenseMap<TKey, TValue> : DenseMap<TKey, TValue, GoldenRatioHasher<T
 /// <typeparam name="TKey">The type of keys in the map. Must be non-nullable.</typeparam>
 /// <typeparam name="TValue">The type of values in the map.</typeparam>
 /// <typeparam name="THasher">
-/// A struct implementing <see cref="IHasherStrategy{TKey}"/> to provide an optimized hashing function.
+/// A struct implementing <see cref="Hasher.IHasher{TKey}"/> to provide an optimized hashing function.
 /// Using a struct-based hasher avoids virtual method calls and allows aggressive inlining.</typeparam>
-public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasherStrategy<TKey>
+public class DenseMap<TKey, TValue, THasher> where THasher : struct, Hasher.IHasher<TKey>
 {
     #region Properties
 

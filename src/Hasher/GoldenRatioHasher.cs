@@ -3,7 +3,7 @@ using Faster.Map.Contracts;
 
 namespace Faster.Map.Hasher
 {
-    public readonly struct GoldenRatioHasher<TKey> : IHasherStrategy<TKey>
+    public readonly struct GoldenRatioHasher<TKey> : IHasher<TKey>
     {
         const uint _goldenRatio = 0x9E3779B9;
 

@@ -168,3 +168,61 @@ The **"Enumerable Benchmark"** evaluates the iteration performance of four hash 
 
 🚀 **For workloads requiring frequent iteration, BlitzMap is the optimal solution.**
 
+# 📊 **Get String Benchmark**
+
+The **"Get String Benchmark"** evaluates the performance of four hash maps—**BlitzMap**, **DenseMap**, **RobinhoodMap**, and **Dictionary**—under varying load factors. This benchmark measures the time required to retrieve string elements from a dataset of **16,777,216** entries, highlighting how each data structure handles lookup efficiency as table density increases.
+
+## **Chart: Get String Benchmark**
+
+![Get String Benchmark by Load Factor](Assets/Charts/get_string_benchmark.png.png)
+
+## 🔍 **Key Findings**
+- **⚡ Fastest Overall:** **Dictionary is the fastest at low load factors (0.1), achieving 84.00 ms**, benefiting from optimized lookup mechanisms.
+- **🏆 Best Scalability:** **BlitzMap scales the best**, with only a **789% increase** from **0.1 to 0.8**, making it **the most efficient for large-scale string retrievals**.
+- **🚨 Worst Scaling:** **DenseMap degrades the most**, increasing by **764%**, indicating that SIMD optimizations offer minimal benefit in string-based lookups.
+- **❌ Slowest Overall:** **DenseMap at 0.8 (1,761.15 ms)**, as its SIMD-based lookups struggle with high collision rates.
+- **🟢 RobinhoodMap remains a balanced choice**, increasing by **1078%**, performing **better than DenseMap but worse than BlitzMap**.
+
+## **🧐 Why is BlitzMap the Fastest at High Load Factors?**
+- **BlitzMap maintains an ordered list of entries**, ensuring it only loops through stored values rather than scanning empty slots.
+- **RobinhoodMap suffers from probe sequence inefficiencies** at high densities, leading to higher retrieval times.
+- **DenseMap, while SIMD-optimized, does not gain significant advantages in this workload**, making it less effective for string retrievals.
+
+## 📌 **Conclusion**
+- **For low load factors (0.1 - 0.2), Dictionary is the fastest**, offering the quickest lookups due to its efficient hashing scheme.
+- **For high load factors (0.4 - 0.8), BlitzMap is the best choice**, as its **ordered list approach minimizes performance degradation**.
+- **DenseMap suffers from major performance losses**, making it **the worst for string-based retrievals**.
+- **RobinhoodMap remains a viable alternative**, though it does not outperform BlitzMap in any scenario.
+
+🚀 **For workloads requiring frequent string lookups, BlitzMap is the optimal solution.**
+
+# 📊 **Get String Custom Hash Benchmark**
+
+The **"Get String Custom Hash Benchmark"** evaluates the performance of different hash functions applied to **BlitzMap** and compares them against **Dictionary**. This benchmark measures the time required to retrieve string elements from a dataset of **16,777,216** entries, highlighting how different hashing strategies impact lookup efficiency as table density increases.
+
+## **Chart: Get String Custom Hash Benchmark**
+
+![Get String Custom Hash Benchmark by Load Factor](Assets/Charts/get_string_custom_hash_benchmark.png)
+
+## 🔍 **Key Findings**
+- **⚡ Fastest Overall:** **BlitzMap with FastHash is the fastest at low load factors (0.1), achieving 41.46 ms**, benefiting from its optimized hash function.
+- **🏆 Best Scalability:** **BlitzMap with FastHash scales the best**, with only a **1007% increase** from **0.1 to 0.8**, making it **the most efficient for large-scale string retrievals**.
+- **🚨 Worst Scaling:** **BlitzMap without custom hashing degrades the most**, increasing by **807%**, indicating that its default hash function struggles with high load factors.
+- **❌ Slowest Overall:** **BlitzMap without a custom hash function at 0.8 (1,038.79 ms)**, as its generic hashing method struggles under high collisions.
+- **🟢 WyHash and XX3 perform better than the default hashing strategy**, making them good alternatives for high-performance lookups.
+
+## **🧐 Why is FastHash the Fastest?**
+- **FastHash reduces hash collisions significantly**, making lookups faster by distributing values more evenly.
+- **BlitzMap with WyHash and XX3 performs well**, indicating that well-designed hashing functions provide major benefits in retrieval-heavy workloads.
+- **Dictionary remains competitive but is outperformed at high load factors**, suggesting that built-in hashing strategies are not always optimal.
+
+## 📌 **Conclusion**
+- **For low load factors (0.1 - 0.2), FastHash is the fastest**, offering the quickest lookups due to its optimized hash function.
+- **For high load factors (0.4 - 0.8), FastHash remains the best choice**, as its **collision resistance minimizes performance degradation**.
+- **BlitzMap without custom hashing struggles significantly**, making it **the worst for string-based retrievals**.
+- **WyHash and XX3 remain viable alternatives**, outperforming the default BlitzMap hashing strategy while being slightly slower than FastHash.
+
+🚀 **For workloads requiring frequent string lookups, BlitzMap with FastHash is the optimal solution.**
+
+
+

@@ -21,7 +21,7 @@
 
 //    //fixed size, dont want to measure resize()
 //    private DenseMap<string, string> _dense;
-//    private Dictionary<string, string> dic;
+//    private Dictionary<string, string> _dictionary;
 //    private RobinhoodMap<string, string> _robinhoodMap;
 //    private DenseMap<string, string> _denseMapxxHash;
 //    private DenseMap<string, string> _denseMapGxHash;
@@ -71,7 +71,7 @@
 
 //        _blitzMap = new BlitzMap<string, string, DefaultHasher>((int)length, 0.8, new DefaultHasher());
 
-//        dic = new Dictionary<string, string>(dicLength);
+//        _dictionary = new Dictionary<string, string>(dicLength);
 //        //   _robinhoodMap = new RobinhoodMap<string, string>(length * 2);
 //    }
 
@@ -102,7 +102,7 @@
 //        for (int i = 0; i < keys.Length; i++)
 //        {
 //            var key = keys[i];
-//            dic.Add(key, key);
+//            _dictionary.Add(key, key);
 //        }
 //    }
 //}
