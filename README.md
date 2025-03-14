@@ -174,7 +174,7 @@ The **"Get String Benchmark"** evaluates the performance of four hash maps—**B
 
 ## **Chart: Get String Benchmark**
 
-![Get String Benchmark by Load Factor](Assets/Charts/get_string_benchmark.png.png)
+![Get String Benchmark by Load Factor](Assets/Charts/get_string_benchmark.png)
 
 ## 🔍 **Key Findings**
 - **⚡ Fastest Overall:** **Dictionary is the fastest at low load factors (0.1), achieving 84.00 ms**, benefiting from optimized lookup mechanisms.
