@@ -3,9 +3,6 @@ using BenchmarkDotNet.Engines;
 using Faster.Map.Benchmark.Utilities;
 using Faster.Map.Hasher;
 using System.Collections;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 
 namespace Faster.Map.Benchmark
