@@ -1,4 +1,5 @@
-﻿using Xunit;
+﻿using Faster.Map.Concurrent;
+using Xunit;
 
 namespace Faster.Map.BlitzMap.Tests;
 
@@ -97,7 +98,7 @@ public class Clear
 
     [Fact]
     public void Clear_ShouldAllowInsertOrUpdate_AfterClearing()
-    {
+    {  
         _map.InsertOrUpdate(1, "value1");
         _map.Clear();
 

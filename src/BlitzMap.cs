@@ -71,7 +71,7 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
     /// This can be larger than <see cref="Count"/> due to empty or removed entries.
     /// </remarks>
     public int Size => _length;
-      
+
     #endregion
 
     #region Enumerable
@@ -525,6 +525,28 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
         // Reference to the target bucket using the computed index
         ref var bucket = ref Unsafe.Add(ref bucketBase, index);
 
+        // Fast path: If the target bucket is empty, insert the key-value pair directly
+        if (bucket.Signature == INACTIVE)
+        {
+            // Set the bucket's signature with the count and the signature mask
+            bucket.Signature = _count | signature;
+
+            // Store the new entry in the entries array and increment the count
+            Unsafe.Add(ref entryBase, _count++) = new Entry(key, value);
+
+            _lastBucket = index;
+            return true; // Indicate successful insertion
+        }
+        else if (signature == (bucket.Signature & ~_mask))
+        {
+            ref var entry = ref Unsafe.Add(ref entryBase, bucket.Signature & _mask);
+            if (_eq.Equals(key, entry.Key))
+            {
+                entry.Value = value;
+                return true; // Key already exists, update value
+            }
+        }
+
         // Collision resolution: Traverse the linked list of buckets
         byte cint = 1; // Chain length counter
 
@@ -668,6 +690,15 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
             {
                 throw new KeyNotFoundException($"Unable to find entry - {key.GetType().FullName} key - {key.GetHashCode()}");
             }
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void Copy(BlitzMap<TKey, TValue> other)
+    {
+        foreach (var item in other)
+        {
+            Insert(item.Key, item.Value);
         }
     }
 
@@ -961,6 +992,6 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
         /// </summary>
         public void Dispose() { }
     }
-  
+
     #endregion
 }

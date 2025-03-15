@@ -18,6 +18,23 @@ These standard collections are widely used for key-value pair storage in .NET ap
         management. This prevents severe slowdowns caused by primary and secondary clustering, ensuring stable and consistent performance even under high load 
         factors.
 
+## 📜 **Table of Contents**
+
+- [Available Implementations](#available-implementations)
+- [Installation](#installation)
+- [Basic Usage](#basic-usage)
+- [Advanced Usage](#Advanced-usage)
+- [Tested Platforms](#tested-on-platforms)
+- [Benchmarks](#benchmarks)
+  - [📊 Get Benchmark](#-get-benchmark)
+  - [📊 Insert Benchmark](#-insert-benchmark)
+  - [📊 Update Benchmark](#-update-benchmark)
+  - [📊 Remove Benchmark](#-remove-benchmark)
+  - [📊 Enumerable Benchmark](#-enumerable-benchmark)
+  - [📊 Get String Benchmark](#-get-string-benchmark)
+  - [📊 Get String Custom Hash Benchmark](#-get-string-custom-hash-benchmark)
+  - [📊 Get Large String Benchmark](#-get-large-string-benchmark)
+  - [📊 Large String Custom Hash Benchmark](#-large-string-custom-hash-benchmark)
 
 # Installation:
 
@@ -29,6 +46,32 @@ Install-Package Faster.Map
 ## Basic Usage
 
 ```csharp
+
+var map = new BlitzMap<int, string>();
+map.Insert(1, "Value One");
+map.Insert(2, "Value Two");
+
+map.InsertUnique(3, "Value4");
+
+map.InsertOrUpdate(2, "updated")
+
+if (map.Get(1, out var value))
+{
+    Console.WriteLine($"Key 1 has value: {value}");
+}
+
+map.Update(1, "Updated value one");
+
+map.Remove(1);
+
+var n = new BlitzMap<uint, uint>();
+n.Insert(1,1)
+map.Copy(n);
+
+```
+
+```csharp
+
 var map = new DenseMap<int, string>();
 map.Emplace(1, "Value One");
 map.Emplace(2, "Value Two");
@@ -40,6 +83,30 @@ if (map.Get(1, out var value))
 
 map.Remove(1);
 ```
+
+## Advanced Usage
+
+### 🔑 Choosing the Right Hashing Algorithm
+
+Faster.Map allows for **custom hashing algorithms** to optimize performance based on your workload. Some options include:
+
+- **Default Hashing**: Identity hash. 
+- **WyHash**: A high-speed hashing function with strong mixing properties, reducing clustering and improving lookup speed.
+- **XXHash3**: Optimized for speed and low latency, making it ideal for performance-critical applications.
+- **FastHash**: A lightweight, efficient hash function designed for quick key lookups with minimal overhead. Note this will only work when X86Aes is supported. 
+
+### ⚡ Using Custom Hashing in Faster.Map
+
+To specify a custom hash function, you can use **BlitzMap** or **DenseMap** with an explicitly defined hash:
+
+```csharp
+var map = new BlitzMap<int, string, XXHash3>();
+map.Insert(1, "Value One");
+map.Insert(2, "Value Two");
+```
+
+Using **custom hashing** can significantly reduce collisions and improve lookup times, especially for large datasets.
+
 
  ## Tested on platforms:
 * x86
