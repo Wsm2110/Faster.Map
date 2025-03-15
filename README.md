@@ -45,6 +45,8 @@ Install-Package Faster.Map
 
 ## Basic Usage
 
+Basic usage of BlitzMap:
+
 ```csharp
 
 var map = new BlitzMap<int, string>();
@@ -69,6 +71,8 @@ n.Insert(1,1)
 map.Copy(n);
 
 ```
+
+Basic usage of DenseMap
 
 ```csharp
 
@@ -106,7 +110,6 @@ map.Insert(2, "Value Two");
 ```
 
 Using **custom hashing** can significantly reduce collisions and improve lookup times, especially for large datasets.
-
 
  ## Tested on platforms:
 * x86
