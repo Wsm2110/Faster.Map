@@ -224,5 +224,56 @@ The **"Get String Custom Hash Benchmark"** evaluates the performance of differen
 
 🚀 **For workloads requiring frequent string lookups, BlitzMap with FastHash is the optimal solution.**
 
+# 📊 **Get Large String Benchmark**
 
+The **"Get Large String Benchmark"** evaluates the performance of four hash maps—**BlitzMap**, **DenseMap**, **RobinhoodMap**, and **Dictionary**—under varying load factors. This benchmark measures the time required to retrieve large string entries from a dataset of **16,777,216** entries, highlighting the performance impact of increasing load factors.
+
+## **Chart: Get Large String Benchmark**
+
+![Get Large String Benchmark by Load Factor](Assets/Charts/largestringBenchmark.png)
+
+## 🔍 **Key Findings**
+- **⚡ Fastest Overall:** **Dictionary at low load factors (0.1)** with **227.4 ms**, benefiting from its optimized hashing and quick lookup of large strings.
+- **🏆 Best Scalability:** **BlitzMap** scales very well, showing only an **765% increase** from **0.1 to 0.8**, significantly outperforming DenseMap and RobinhoodMap.
+- **🚨 Worst Scaling:** **DenseMap** sees the most severe performance degradation, with a **701% increase**, due to inefficiencies in handling large string lookups.
+- **❌ Slowest Overall:** **DenseMap at high load factor (0.8, 3,881 ms)**, impacted by high collision resolution overhead.
+- **🟢 BlitzMap** maintains a balanced performance, scaling steadily, but falling behind Dictionary at lower densities.
+
+## **🧐 Why is Dictionary the Fastest for Large String Lookups at Low Load Factors?**
+- **Dictionary** excels with large strings at low densities due to optimized identity hashing and efficient lookup strategies.
+- **BlitzMap and RobinhoodMap** perform moderately, balancing insertion efficiency with lookup speed, outperforming DenseMap significantly at higher densities.
+- **DenseMap's SIMD operations are less effective with large string keys**, significantly impacting performance negatively at higher load factors.
+
+## 📌 **Conclusion**
+- **Dictionary excels for large string retrieval at low densities**, demonstrating its strength in quick identity-based key lookups.
+- **BlitzMap and RobinhoodMap remain strong contenders**, especially for moderate to high load factors, maintaining better performance compared to DenseMap.
+- **DenseMap is least effective** when handling large string lookups due to SIMD limitations.
+
+🚀 **For frequent large string lookups, Dictionary and BlitzMap offer the most reliable and balanced performance.**
+
+# 📊 **Large String Custom Hash Benchmark**
+
+The **"Large String Custom Hash Benchmark"** evaluates the performance of five hashing methods—**BlitzMap**, **BlitzMapXX3**, **BlitzMapFastHash**, **BlitzMapWyHash**, and **Dictionary**—under varying load factors. This benchmark measures the execution time required to retrieve large string keys from a dataset of **16,777,216** entries, illustrating performance across hash methods and densities.
+
+## **Chart: Large String Custom Hash Benchmark**
+
+![Large String Custom Hash Benchmark by Load Factor](Assets/Charts/largestringcustomhash.png)
+
+## 🔍 **Key Findings**
+- **⚡ Fastest Overall:** **BlitzMapFastHash consistently delivers the fastest performance**, especially at lower load factors, achieving an impressive **74.45 ms at 0.1**.
+- **🏆 Best Scalability:** **BlitzMapFastHash scales remarkably well**, maintaining lower mean execution times across all load factors (0.1–0.8) compared to other hashing methods.
+- **🚨 Poor Performance:** **Dictionary** and **BlitzMap** exhibit significantly slower performance**, particularly at higher load factors (0.6–0.8), with Dictionary being the slowest at **2,546.30 ms at 0.8**.
+- **🟢 Balanced Choices:** **BlitzMapXX3** and **BlitzMapWyHash** provide a good balance between performance and scaling, though neither match BlitzMapFastHash’s speed.
+
+## **🧐 Why is BlitzMapFastHash the Fastest?**
+- **Optimized Hash Function:** BlitzMapFastHash's specialized algorithm is highly optimized for speed, significantly reducing hashing overhead compared to more generic algorithms.
+- **Minimal Collision Rate:** Efficient handling of hash collisions ensures consistent lookup speeds even at increased load factors.
+- **Consistent Scaling:** Unlike traditional methods, BlitzMapFastHash maintains stable performance even with large-scale, densely populated hash tables.
+
+## 📌 **Conclusion**
+- **BlitzMapFastHash is the clear winner across all load factors**, ideal for performance-critical applications dealing with large strings.
+- **BlitzMapXX3 and BlitzMapWyHash offer acceptable performance** but don't match BlitzMapFastHash's efficiency.
+- **Dictionary and traditional BlitzMap methods fall short in performance and scalability**, especially in large-scale, high-density scenarios.
+
+🚀 **For high-performance string key lookups, BlitzMapFastHash emerges as the optimal hashing solution.**
 
