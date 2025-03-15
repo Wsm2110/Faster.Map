@@ -7,13 +7,10 @@ namespace Faster.Map.Benchmark
     {
         static void Main(string[] args)
         {
-            BenchmarkRunner.Run<AddBenchmark>();
-            //BenchmarkRunner.Run<AddAndResizeBenchmark>();
+            //BenchmarkRunner.Run<AddBenchmark>();
+           // BenchmarkRunner.Run<EnumerableBenchmark>();
             //BenchmarkRunner.Run<UpdateBenchmark>();
-            //BenchmarkRunner.Run<RemoveBenchmark>();
-            //  BenchmarkRunner.Run<GetBenchmark>();
-            //BenchmarkRunner.Run<StringBenchmark>();
-            // BenchmarkRunner.Run<StringWrapperBenchmark>();
+            BenchmarkRunner.Run<LargeStringCustomHasherBenchmark>(/*new DebugInProcessConfig()*/);
         }
     }
 }

@@ -5,22 +5,25 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Engines;
+using BenchmarkDotNet.Running;
+using Faster.Map.Benchmark.Utilities;
+using Faster.Map.Hasher;
 
 namespace Faster.Map.Benchmark
 {
     [MarkdownExporterAttribute.GitHub]
     [MemoryDiagnoser]
-    //[SimpleJob(RunStrategy.Monitoring, 1, 10, 50)]
+    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, iterationCount: 3, warmupCount: 2)]
+
     public class RemoveBenchmark
     {
         #region Fields
 
         private DenseMap<uint, uint> _denseMap;
+        private BlitzMap<uint, uint> _blitz;
         private Dictionary<uint, uint> _dictionary;
-        private RobinhoodMap<uint, uint> _robinhoodMap;
-        private DenseMap<uint, uint> _denseMapxxHash;
-        private DenseMap<uint, uint> _denseMapGxHash;
-        private DenseMap<uint, uint> _denseMapFastHash;
+        private RobinhoodMap<uint, uint> _robinHoodMap;
 
         private uint[] keys;
 
@@ -28,10 +31,13 @@ namespace Faster.Map.Benchmark
 
         #region Properties
 
-        [Params(100, 10000, 100000, 400000, 900000, 1000000)]
+        [Params(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8)]
+        public double LoadFactor { get; set; }
+
+        [Params(16_777_216)]
         public uint Length { get; set; }
 
-        #endregion    
+        #endregion
 
         /// <summary>
         /// Generate a million Keys and shuffle them afterwards
@@ -39,96 +45,103 @@ namespace Faster.Map.Benchmark
         [GlobalSetup]
         public void Setup()
         {
-            var output = File.ReadAllText("Numbers.txt");
-            var splittedOutput = output.Split(',');
-
-            keys = new uint[Length];
-
-            for (var index = 0; index < Length; index++)
+            var rnd = new FastRandom(3);
+            var uni = new HashSet<uint>((int)Length * 2);
+            while (uni.Count < (uint)(Length * LoadFactor))
             {
-                keys[index] = uint.Parse(splittedOutput[index]);
-            }          
-        }
+                uni.Add((uint)rnd.Next());
+            }
 
-        [IterationSetup]
-        public void IterationSetupX()
-        {
+            keys = uni.ToArray();
+
             // round of length to power of 2 prevent resizing
             uint length = BitOperations.RoundUpToPowerOf2(Length);
             int dicLength = HashHelpers.GetPrime((int)Length);
 
             _denseMap = new DenseMap<uint, uint>(length);
-            _denseMapFastHash = new DenseMap<uint, uint>(length);
-            _denseMapGxHash = new DenseMap<uint, uint>(length);
-           
+            _blitz = new BlitzMap<uint, uint>((int)length);
 
             _dictionary = new Dictionary<uint, uint>(dicLength);
-            _robinhoodMap = new RobinhoodMap<uint, uint>(length * 2);
+            _robinHoodMap = new RobinhoodMap<uint, uint>(length, 0.9);
+      
+        }
+
+        [IterationSetup]
+        public void IterationSetupX(BenchmarkCase benchmarkCase)
+        {
+            // round of length to power of 2 prevent resizing
+            uint length = BitOperations.RoundUpToPowerOf2(Length);
+            int dicLength = HashHelpers.GetPrime((int)Length);
+
+            string benchmarkName = benchmarkCase.Descriptor.WorkloadMethod.Name; // Use Name instead of DisplayInfo
 
 
+            _denseMap = new DenseMap<uint, uint>(length);
+            _dictionary = new Dictionary<uint, uint>(dicLength);
+            _robinHoodMap = new RobinhoodMap<uint, uint>(length * 2);
+            _blitz = new BlitzMap<uint, uint>((int)length);
+
+            // Use a switch statement instead of multiple if-else
             foreach (var key in keys)
             {
-                _dictionary.Add(key, key);
-                _denseMap.Emplace(key, key);
-                _denseMapxxHash.Emplace(key, key);
-                _denseMapGxHash.Emplace(key, key);
-                _denseMapFastHash.Emplace(key, key);
-                _robinhoodMap.Emplace(key, key);
+                switch (benchmarkName)
+                {
+                    case nameof(BlitzMap):
+                        _blitz.Insert(key, key);
+                        break;
+                    case nameof(DenseMap):
+                        _denseMap.Emplace(key, key);
+                        break;
+                    case nameof(RobinhoodMap):
+                        _robinHoodMap.Emplace(key, key);
+                        break;
+                    case nameof(Dictionary):
+                        _dictionary.Add(key, key);
+                        break;
+                    default:
+                        throw new InvalidOperationException($"Unexpected benchmark: {benchmarkName}");
+                }
             }
         }
 
         #region Benchmarks
 
         [Benchmark]
+        public void BlitzMap()
+        {
+            for (int i = 0; i < keys.Length; i++)
+            {
+                var key = keys[i];
+                _blitz.Remove(key);
+            }
+        }
+
+        [Benchmark]
         public void DenseMap()
         {
-            foreach (var key in keys)
+            for (int i = 0; i < keys.Length; i++)
             {
+                var key = keys[i];
                 _denseMap.Remove(key);
-            }
-        }
-
-        [Benchmark]
-        public void DenseMap_Xxhash3()
-        {
-            foreach (var key in keys)
-            {
-                _denseMapxxHash.Remove(key);
-            }
-        }
-
-        [Benchmark]
-        public void DenseMap_GxHash()
-        {
-            foreach (var key in keys)
-            {
-                _denseMapGxHash.Remove(key);
-            }
-        }
-
-        [Benchmark]
-        public void DenseMap_FastHash()
-        {
-            foreach (var key in keys)
-            {
-                _denseMapFastHash.Remove(key);
             }
         }
 
         [Benchmark]
         public void RobinhoodMap()
         {
-            foreach (var key in keys)
+            for (int i = 0; i < keys.Length; i++)
             {
-                _robinhoodMap.Remove(key);
+                var key = keys[i];
+                _robinHoodMap.Remove(key);
             }
         }
 
         [Benchmark]
         public void Dictionary()
         {
-            foreach (var key in keys)
+            for (int i = 0; i < keys.Length; i++)
             {
+                var key = keys[i];
                 _dictionary.Remove(key, out var result);
             }
         }

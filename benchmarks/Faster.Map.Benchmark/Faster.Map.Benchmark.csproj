@@ -37,7 +37,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Hash\Faster.Map.Hash.csproj" />
     <ProjectReference Include="..\..\src\Faster.Map.csproj" />
   </ItemGroup>
 

@@ -6,21 +6,21 @@ using Faster.Map.Contracts;
 
 namespace Faster.Map.Hasher
 {
-    public class XxHash3Hasher<T> : IHasher<T> where T : unmanaged
+    public readonly struct XxHash3Hasher<T> : IHasher<T> where T : unmanaged
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ulong ComputeHash(T key)
+        public uint ComputeHash(T key)
         {
             var span = MemoryMarshal.AsBytes(MemoryMarshal.CreateReadOnlySpan(ref Unsafe.AsRef(in key), 1));
-            return XxHash3.HashToUInt64(span);
+            return (uint)XxHash3.HashToUInt64(span);
         }
     }
-    public class XxHash3StringHasher : IHasher<string>
+    public readonly struct XxHash3StringHasher : IHasher<string>
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ulong ComputeHash(string key)
+        public uint ComputeHash(string key)
         {
-            return XxHash3.HashToUInt64(MemoryMarshal.AsBytes(key.AsSpan()));
+            return (uint)XxHash3.HashToUInt64(MemoryMarshal.AsBytes(key.AsSpan()));
         }
     }
 }

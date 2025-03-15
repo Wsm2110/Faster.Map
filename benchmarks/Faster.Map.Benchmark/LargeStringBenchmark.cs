@@ -3,6 +3,7 @@ using BenchmarkDotNet.Engines;
 using Faster.Map.Benchmark.Utilities;
 using Faster.Map.Hash;
 using Faster.Map.Hasher;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -15,7 +16,7 @@ namespace Faster.Map.Benchmark
     [MemoryDiagnoser]
     [SimpleJob(RunStrategy.Monitoring, launchCount: 1, iterationCount: 5, warmupCount: 3)]
 
-    public class StringBenchmark
+    public class largeStringBenchmark
     {
         #region Fields
 
@@ -45,11 +46,17 @@ namespace Faster.Map.Benchmark
         [GlobalSetup]
         public void Setup()
         {
+            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+";
+
+            Random random = new Random();
+
             var rnd = new FastRandom(3);
             var uni = new HashSet<string>((int)Length);
             while (uni.Count < (uint)(Length * LoadFactor))
             {
-                uni.Add(rnd.Next().ToString());
+                string s = new string(Enumerable.Repeat(chars, 100)
+               .Select(s => s[random.Next(s.Length)]).ToArray());
+                uni.Add(s + rnd.Next().ToString());
             }
 
             keys = uni.ToArray();

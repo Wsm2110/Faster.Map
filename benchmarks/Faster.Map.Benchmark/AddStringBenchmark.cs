@@ -1,136 +1,108 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using BenchmarkDotNet.Attributes;
-using System.Linq;
-using System.Numerics;
+﻿//using System;
+//using System.Collections.Generic;
+//using System.IO;
+//using BenchmarkDotNet.Attributes;
+//using System.Linq;
+//using System.Numerics;
 
-using System.Collections;
-using Faster.Map.Hasher;
+//using System.Collections;
+//using Faster.Map.Hasher;
+//using BenchmarkDotNet.Engines;
 
-namespace Faster.Map.Benchmark
-{
-    [MarkdownExporterAttribute.GitHub]
-    [MemoryDiagnoser]
-    public class AddStringBenchmark
-    {
-        #region Fields
+//namespace Faster.Map.Benchmark;
 
-        //fixed size, dont want to measure resize()
-        private DenseMap<string, string> _dense;
-        private Dictionary<string, string> dic;
-        private RobinhoodMap<string, string> _robinhoodMap;
-        private DenseMap<string, string> _denseMapxxHash;
-        private DenseMap<string, string> _denseMapGxHash;
-        private DenseMap<string, string> _denseMapFastHash;
+//[MarkdownExporterAttribute.GitHub]
+//[MemoryDiagnoser]
+//[SimpleJob(RunStrategy.Monitoring, launchCount: 1, iterationCount: 5, warmupCount: 5)]
 
-        private string[] keys;
+//public class AddStringBenchmark
+//{
+//    #region Fields
 
-        #endregion
+//    //fixed size, dont want to measure resize()
+//    private DenseMap<string, string> _dense;
+//    private Dictionary<string, string> _dictionary;
+//    private RobinhoodMap<string, string> _robinhoodMap;
+//    private DenseMap<string, string> _denseMapxxHash;
+//    private DenseMap<string, string> _denseMapGxHash;
+//    private DenseMap<string, string> _denseMapFastHash;
+//    private BlitzMap<string, string, DefaultHasher> _blitzMap;
 
-        #region Properties
+//    private string[] keys;
 
-        [Params(800, 10000, 100000, 200000, 400000, 800000)]
+//    #endregion
 
-        public uint Length { get; set; }
+//    #region Properties
+ 
+//    [Params(0.5, 0.6, 0.7, 0.8)]
+//    public static double LoadFactor { get; set; }
 
-        #endregion
+//    [Params(134_217_728)]
+//    public static uint Length { get; set; }
 
-        /// <summary>
-        /// Generate a million Keys and shuffle them afterwards
-        /// </summary>
-        [GlobalSetup]
-        public void Add()
-        {
-            var output = File.ReadAllText("Numbers.txt");
-            var splittedOutput = output.Split(',');
+//    #endregion
 
-            keys = new string[1000000];
+//    /// <summary>
+//    /// Generate a million Keys and shuffle them afterwards
+//    /// </summary>
+//    [GlobalSetup]
+//    public void Add()
+//    {
+//        var rnd = new Random(3);
 
-            for (var index = 0; index < Length; index++)
-            {
-                keys[index] = splittedOutput[index];
-            }
-        }
+//        var uni = new HashSet<string>();
 
-        [IterationSetup]
-        public void Setup()
-        {
-            // round of length to power of 2 prevent resizing
-            uint length = BitOperations.RoundUpToPowerOf2(Length);
-            int dicLength = HashHelpers.GetPrime((int)Length);
+//        while (uni.Count < (uint)(Length * LoadFactor))
+//        {
+//            bool v = uni.Add(rnd.NextInt64().ToString());
+//        }
 
-            _dense = new DenseMap<string, string>(length, 0.875, new XxHash3StringHasher());
-            _denseMapxxHash = new DenseMap<string, string>(length, 0.875, new XxHash3StringHasher());
-             _denseMapFastHash = new DenseMap<string, string>(length, 0.875, new FastHasher());
+//        keys = uni.ToArray();
+//    }
 
-            dic = new Dictionary<string, string>(dicLength);
-            _robinhoodMap = new RobinhoodMap<string, string>(length * 2);
-        }
+//    [IterationSetup]
+//    public void Setup()
+//    {
+//        // round of length to power of 2 prevent resizing
+//        uint length = BitOperations.RoundUpToPowerOf2(Length);
+//        int dicLength = HashHelpers.GetPrime((int)Length);
 
-        #region Benchmarks
+//        _dense = new DenseMap<string, string>(length, 0.875, new XxHash3StringHasher());
 
-        [Benchmark]
-        public void DenseMap()
-        {
-            for (int i = 0; i < Length; i++)
-            {
-                var key = keys[i];
-                _dense.Emplace(key, key);
-            }
-        }
+//        _blitzMap = new BlitzMap<string, string, DefaultHasher>((int)length, 0.8, new DefaultHasher());
+
+//        _dictionary = new Dictionary<string, string>(dicLength);
+//        //   _robinhoodMap = new RobinhoodMap<string, string>(length * 2);
+//    }
+
+//    [Benchmark]
+//    public void BlitzMap()
+//    {
+//        for (int i = 0; i < keys.Length; i++)
+//        {
+//            var key = keys[i];
+//            _blitzMap.Insert(key, key);
+//        }
+//    }
+
+//    [Benchmark]
+//    public void DenseMap()
+//    {
+//        for (int i = 0; i < keys.Length; i++)
+//        {
+//            var key = keys[i];
+//            _dense.Emplace(key, key);
+//        }
+//    }
 
 
-        [Benchmark]
-        public void DenseMap_Xxhash3()
-        {
-            for (int i = 0; i < Length; i++)
-            {
-                var key = keys[i];
-                _denseMapxxHash.Emplace(key, key);
-            }
-        }
-
-        [Benchmark]
-        public void DenseMap_GxHash()
-        {
-            for (int i = 0; i < Length; i++)
-            {
-                var key = keys[i];
-                _denseMapGxHash.Emplace(key, key);
-            }
-        }
-
-        [Benchmark]
-        public void DenseMap_FastHash()
-        {
-            for (int i = 0; i < Length; i++)
-            {
-                var key = keys[i];
-                _denseMapFastHash.Emplace(key, key);
-            }
-        }
-
-        [Benchmark]
-        public void RobinhoodMap()
-        {
-            for (int i = 0; i < Length; i++)
-            {
-                var key = keys[i];
-                _robinhoodMap.Emplace(key, key);
-            }
-        }
-
-        [Benchmark]
-        public void Dictionary()
-        {
-            for (int i = 0; i < Length; i++)
-            {
-                var key = keys[i];
-                dic.Add(key, key);
-            }
-        }
-
-        #endregion
-    }
-}
+//    [Benchmark]
+//    public void Dictionary()
+//    {
+//        for (int i = 0; i < keys.Length; i++)
+//        {
+//            var key = keys[i];
+//            _dictionary.Add(key, key);
+//        }
+//    }
+//}

@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using Xunit;
 
 namespace Faster.Map.DenseMap.Tests
@@ -476,7 +478,10 @@ namespace Faster.Map.DenseMap.Tests
 
             for (int i = 0; i < 5; i++)
             {
-                _map.Remove(i);
+                if (!_map.Remove(i)) 
+                {
+
+                }
             }
 
             Assert.Equal(initialCount - 5, _map.Count); // Ensure count is updated accurately
@@ -665,7 +670,7 @@ namespace Faster.Map.DenseMap.Tests
 
         [Fact]
         public void Rehash_ShouldMaintainMapIntegrity_WithMultipleTombstonesAndResize()
-        {  
+        {
             var map = new DenseMap<int, string>(16, 0.9);
 
             // Insert entries to almost full capacity
@@ -699,6 +704,35 @@ namespace Faster.Map.DenseMap.Tests
                     Assert.Equal($"value{i}", map[i]);
                 }
             }
-        }      
+        }
+
+
+        [Fact]
+        public void RemoveLargeDateset()
+        {
+            var Length = 134_217_728;
+
+            var rnd = new Random(3);
+            var uni = new HashSet<uint>((int)Length * 2);
+            while (uni.Count < (uint)(Length * 0.8))
+            {
+                uni.Add((uint)rnd.Next());
+            }
+
+            var map = new DenseMap<uint, uint>((uint)Length);
+            var keys = uni.ToArray();
+
+            for (int i = 0; i < keys.Length; i++)
+            {
+                var key = keys[i];
+                map.Emplace(key, key);
+            }
+
+            for (int i = 0; i < keys.Length; i++)
+            {
+                var key = keys[i];
+                map.Remove(key);
+            }
+        }
     }
 }

@@ -12,6 +12,52 @@ using System.Runtime.Intrinsics;
 
 namespace Faster.Map;
 
+
+/// <summary>
+/// A specialized implementation of <see cref="DenseMap{TKey, TValue, THasher}"/> that
+/// defaults to using the <see cref="GoldenRatioHasher{TKey}"/> for efficient hashing.
+/// This avoids requiring three generic parameters when a custom hasher is not needed.
+/// </summary>
+/// <typeparam name="TKey">The type of the keys stored in the map.</typeparam>
+/// <typeparam name="TValue">The type of the values stored in the map.</typeparam>
+/// <remarks>
+/// The default hasher, <see cref="GoldenRatioHasher{TKey}"/>, is chosen for its strong 
+/// distribution properties, ensuring minimal collisions and improved lookup performance.
+/// </remarks>
+public class DenseMap<TKey, TValue> : DenseMap<TKey, TValue, GoldenRatioHasher<TKey>>
+{
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DenseMap{TKey, TValue}"/> class 
+    /// with the specified initial capacity and a default load factor of 0.875.
+    /// </summary>
+    /// <param name="length">The initial capacity (number of buckets) in the map.</param>
+    /// <remarks>
+    /// The default load factor (0.875) is chosen to balance memory usage and performance.
+    /// Higher load factors reduce memory overhead while still maintaining efficient lookups.
+    /// </remarks>
+    public DenseMap(uint length) : base(length, 0.875) { }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DenseMap{TKey, TValue}"/> class 
+    /// with the specified initial capacity and load factor.
+    /// </summary>
+    /// <param name="length">The initial capacity (number of buckets) in the map.</param>
+    /// <param name="loadFactor">
+    /// The maximum allowed load factor before resizing occurs. A higher load factor
+    /// reduces memory usage at the cost of increased collision probability.
+    /// </param>
+    /// <remarks>
+    /// This constructor allows fine-tuned control over performance trade-offs:
+    /// - **Higher load factors (e.g., 0.9 - 0.95):** More memory-efficient but may cause more collisions.
+    /// - **Lower load factors (e.g., 0.5 - 0.7):** Faster lookups but higher memory usage.
+    /// </remarks>
+    public DenseMap(uint length, double loadFactor) : base(length, loadFactor) { }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    public DenseMap() : base(16, 0.875) { }
+}
 /// <summary>
 /// DenseMap is a high-performance hashmap implementation that uses open-addressing with quadratic probing and SIMD (Single Instruction, Multiple Data) for parallel searches.
 /// This map is designed for scenarios requiring efficient key-value storage with fast lookups, inserts, and deletions.
@@ -40,7 +86,10 @@ namespace Faster.Map;
 /// </summary>
 /// <typeparam name="TKey">The type of keys in the map. Must be non-nullable.</typeparam>
 /// <typeparam name="TValue">The type of values in the map.</typeparam>
-public class DenseMap<TKey, TValue>
+/// <typeparam name="THasher">
+/// A struct implementing <see cref="Hasher.IHasher{TKey}"/> to provide an optimized hashing function.
+/// Using a struct-based hasher avoids virtual method calls and allows aggressive inlining.</typeparam>
+public class DenseMap<TKey, TValue, THasher> where THasher : struct, Hasher.IHasher<TKey>
 {
     #region Properties
 
@@ -148,13 +197,12 @@ public class DenseMap<TKey, TValue>
     #endregion
 
     #region Fields
-    private ulong _groupMask;
     private const uint ElementsInGroupMinusOne = 15;
     private const sbyte _emptyBucket = -127;
     private const sbyte _tombstone = -126;
     private static readonly Vector128<sbyte> _emptyBucketVector = Vector128.Create(_emptyBucket);
     private static readonly Vector128<sbyte> _tombstoneVector = Vector128.Create(_tombstone);
-    private ControlBytes _controlBytes;
+    private sbyte[] _controlBytes;
     private double _maxTombstoneBeforeRehash;
     private uint _tombstoneCounter;
     private Entry[] _entries;
@@ -162,30 +210,12 @@ public class DenseMap<TKey, TValue>
     private double _maxLookupsBeforeResize;
     private uint _lengthMinusOne;
     private readonly double _loadFactor;
-    private readonly IHasher<TKey> _hasher;
+    private readonly THasher _hasher;
     private readonly IEqualityComparer<TKey> _comparer;
 
     #endregion
 
     #region Constructor
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class with default parameters.
-    /// Example:
-    /// <code>
-    /// var map = new DenseMap<int, string>();
-    /// </code>
-    /// </summary>
-    public DenseMap(IHasher<TKey> hasher) : this(16, 0.875, hasher) { }
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class with default parameters.
-    /// Example:
-    /// <code>
-    /// var map = new DenseMap<int, string>();
-    /// </code>
-    /// </summary>
-    public DenseMap() : this(16, 0.875, new GoldenRatioHasher<TKey>()) { }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class with the specified length and default load factor.
@@ -195,7 +225,16 @@ public class DenseMap<TKey, TValue>
     /// </code>
     /// </summary>
     /// <param name="length">The length of the hashmap. Will always take the closest power of two.</param>
-    public DenseMap(uint length) : this(length, 0.875, new GoldenRatioHasher<TKey>()) { }
+    public DenseMap(uint length) : this(length, 0.875) { }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class with the specified length and default load factor.
+    /// Example:
+    /// <code>
+    /// var map = new DenseMap<int, string>(32);
+    /// </code>
+    /// </summary>
+    public DenseMap() : this(16, 0.875) { }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class with the specified parameters.
@@ -207,7 +246,7 @@ public class DenseMap<TKey, TValue>
     /// <param name="length">The length of the hashmap. Will always take the closest power of two.</param>
     /// <param name="loadFactor">The load factor determines when the hashmap will resize.</param>
     /// <param name="keyComparer">Used to compare keys to resolve hash collisions.</param>
-    public DenseMap(uint length, double loadFactor, IHasher<TKey> hasher = null)
+    public DenseMap(uint length, double loadFactor)
     {
         if (!Vector128.IsHardwareAccelerated)
         {
@@ -216,7 +255,7 @@ public class DenseMap<TKey, TValue>
 
         _length = length;
         _loadFactor = loadFactor;
-        _hasher = hasher ?? new GoldenRatioHasher<TKey>();
+        _hasher = default;
 
         if (loadFactor > 0.875)
         {
@@ -239,14 +278,13 @@ public class DenseMap<TKey, TValue>
         _maxLookupsBeforeResize = (uint)(_length * _loadFactor);
         _comparer = EqualityComparer<TKey>.Default;
 
-        _controlBytes = new ControlBytes((int)_length);
-        _entries = GC.AllocateArray<Entry>((int)_length);
+        _controlBytes = GC.AllocateArray<sbyte>((int)_length + 16);
+        _entries = GC.AllocateArray<Entry>((int)_length + 16);
 
         _controlBytes.AsSpan().Fill(_emptyBucket);
 
         _maxTombstoneBeforeRehash = _length * 0.125;
         _lengthMinusOne = _length - 1;
-        _groupMask = _lengthMinusOne & ~ElementsInGroupMinusOne;
     }
 
     #endregion
@@ -293,15 +331,17 @@ public class DenseMap<TKey, TValue>
         var target = Vector128.Create(h2);
         // This operation ensures that `index` is in the range [0, capacity - 1] by using only the lower bits of `hashcode`,
         // which helps in efficient and quick indexing.
-        var index = hashcode & _groupMask;
+        var index = hashcode & _lengthMinusOne;
         // Initialize the probing jump distance to zero, which will increase with each probe iteration.
         byte jumpDistance = 0;
+
+        ref sbyte start = ref MemoryMarshal.GetArrayDataReference(_controlBytes);
 
         while (true)
         {
             // Load a vector from the control bytes starting at the computed index.
             // Control bytes hold metadata about the entries in the map.
-            var source = ReadVector128(_controlBytes, index);
+            var source = ReadVector128(ref start, index);
             // Compare `source` and `target` vectors to find any positions with a matching control byte.
             var resultMask = Vector128.Equals(source, target).ExtractMostSignificantBits();
             // Loop over each set bit in `mask` (indicating matching positions).
@@ -334,7 +374,7 @@ public class DenseMap<TKey, TValue>
                 index = index + (uint)BitOperations.TrailingZeroCount(emptyMask);
                 // Update the control byte at position `i` in `_controlBytes` to `h2`, marking it as occupied.
                 // The control byte typically indicates the status of the slot (occupied, empty, or tombstone).
-                _controlBytes[index] = h2;
+                Unsafe.Add(ref start, index) = h2;
                 // Access the entry in `_entries` at position `i` for insertion or update.
                 ref var entry = ref Find(_entries, index);
                 // Assign the specified `key` to the `Key` field of the located entry.
@@ -383,16 +423,18 @@ public class DenseMap<TKey, TValue>
         var target = Vector128.Create(h2);
         // This operation ensures that `index` is in the range [0, capacity - 1] by using only the lower bits of `hashcode`,
         // which helps in efficient and quick indexing.
-        var index = hashcode & _groupMask;
+        var index = hashcode & _lengthMinusOne;
         // Initialize a variable to keep track of the distance to jump when probing the map.
         byte jumpDistance = 0;
+
+        ref sbyte start = ref MemoryMarshal.GetArrayDataReference(_controlBytes);
 
         // Loop until we find either a match or an empty slot.
         while (true)
         {
             // Load a vector from the control bytes starting at the computed index.
             // Control bytes hold metadata about the entries in the map.
-            var source = ReadVector128(_controlBytes, index);
+            var source = ReadVector128(ref start, index);
             // Compare the target vector (hashed key) with the loaded source vector to find matches.
             // `ExtractMostSignificantBits()` returns a mask where each bit set indicates a match.
             var mask = Vector128.Equals(target, source).ExtractMostSignificantBits();
@@ -467,15 +509,17 @@ public class DenseMap<TKey, TValue>
         var target = Vector128.Create(h2);
         // This operation ensures that `index` is in the range [0, capacity - 1] by using only the lower bits of `hashcode`,
         // which helps in efficient and quick indexing.
-        var index = hashcode & _groupMask;
+        var index = hashcode & _lengthMinusOne;
         // Initialize the probing jump distance to zero, which will increase with each probe iteration.
         byte jumpDistance = 0;
+
+        ref sbyte start = ref MemoryMarshal.GetArrayDataReference(_controlBytes);
 
         while (true)
         {
             // Load a vector from the control bytes starting at the computed index.
             // Control bytes hold metadata about the entries in the map.
-            var source = ReadVector128(_controlBytes, index);
+            var source = ReadVector128(ref start, index);
             // Compare `source` and `target` vectors to find any positions with a matching control byte.
             var mask = Vector128.Equals(source, target).ExtractMostSignificantBits();
             // Loop over each set bit in `mask` (indicating matching positions).
@@ -555,16 +599,18 @@ public class DenseMap<TKey, TValue>
         var target = Vector128.Create(h2);
         // This operation ensures that `index` is in the range [0, capacity - 1] by using only the lower bits of `hashcode`,
         // which helps in efficient and quick indexing.
-        var index = hashcode & _groupMask;
+        var index = hashcode & _lengthMinusOne;
         // Initialize `jumpDistance` to control the distance between probes, starting at zero.
         byte jumpDistance = 0;
+
+        ref sbyte start = ref MemoryMarshal.GetArrayDataReference(_controlBytes);
 
         // Loop until we either find the key to update or confirm it's absent.
         while (true)
         {
             // Load a vector from the control bytes starting at the computed index.
             // Control bytes hold metadata about the entries in the map.
-            var source = ReadVector128(_controlBytes, index);
+            var source = ReadVector128(ref start, index);
 
             // Compare the `source` vector with the `target` vector. `ExtractMostSignificantBits` produces a bit mask
             // where each set bit corresponds to a position that matches the target hash.
@@ -636,16 +682,18 @@ public class DenseMap<TKey, TValue>
         var target = Vector128.Create(h2);
         // This operation ensures that `index` is in the range [0, capacity - 1] by using only the lower bits of `hashcode`,
         // which helps in efficient and quick indexing.
-        var index = hashcode & _groupMask;
+        var index = hashcode & _lengthMinusOne;
         // Initialize `jumpDistance` to control the distance between probes, starting at zero.
         byte jumpDistance = 0;
+
+        ref sbyte start = ref MemoryMarshal.GetArrayDataReference(_controlBytes);
 
         // Begin probing until either the key is found and removed, or it's confirmed as absent.
         while (true)
         {
             // Load a vector from the control bytes starting at the computed index.
             // Control bytes hold metadata about the entries in the map.
-            var source = ReadVector128(_controlBytes, index);
+            var source = ReadVector128(ref start, index);
 
             // Compare `source` with `target`. `ExtractMostSignificantBits` returns a bitmask
             // where each set bit represents a potential match with `target`.
@@ -678,11 +726,11 @@ public class DenseMap<TKey, TValue>
 
                     if (emptyMask > 0)
                     {
-                        _controlBytes[i] = _emptyBucket;
+                        Unsafe.Add(ref start, i) = _emptyBucket;
                     }
                     else
                     {
-                        _controlBytes[i] = _tombstone;
+                        Unsafe.Add(ref start, i) = _tombstone;
                         _tombstoneCounter++;
                     }
 
@@ -739,16 +787,18 @@ public class DenseMap<TKey, TValue>
         var target = Vector128.Create(h2);
         // This operation ensures that `index` is in the range [0, capacity - 1] by using only the lower bits of `hashcode`,
         // which helps in efficient and quick indexing.
-        var index = hashcode & _groupMask;
+        var index = hashcode & _lengthMinusOne;
         // Initialize `jumpDistance` to control the distance between probes, starting at zero.
         byte jumpDistance = 0;
+
+        ref sbyte start = ref MemoryMarshal.GetArrayDataReference(_controlBytes);
 
         // Begin probing the hash map until the key is found or confirmed absent.
         while (true)
         {
             // Load a vector from the control bytes starting at the computed index.
             // Control bytes hold metadata about the entries in the map.
-            var source = ReadVector128(_controlBytes, index);
+            var source = ReadVector128(ref start, index);
             // Compare `source` with `target`, and `ExtractMostSignificantBits` returns a bitmask
             // where each set bit indicates a position in `source` that matches `target`.
             var mask = Vector128.Equals(source, target).ExtractMostSignificantBits();
@@ -876,17 +926,17 @@ public class DenseMap<TKey, TValue>
 
         _tombstoneCounter = 0;
         _maxTombstoneBeforeRehash = (int)(_length * 0.125);
-        _groupMask = _lengthMinusOne & ~ElementsInGroupMinusOne;
-
         // Allocate new arrays
-        var size = (int)_length; // Safely cast _length to int for array allocation
+        var size = (int)_length + 16; // Safely cast _length to int for array allocation
 
         // Save references to old data
         var newEntries = GC.AllocateArray<Entry>(size);
-        var newControlBytes = new ControlBytes(size);
+        var newControlBytes = GC.AllocateArray<sbyte>(size);
 
         // Initialize the control bytes to represent empty buckets
         newControlBytes.AsSpan().Fill(_emptyBucket);
+
+        ref sbyte home = ref MemoryMarshal.GetArrayDataReference(newControlBytes);
 
         // Rehash and reinsert all valid entries
         for (uint i = 0; i < _controlBytes.Length; ++i)
@@ -900,14 +950,12 @@ public class DenseMap<TKey, TValue>
             var entry = Find(_entries, i);
 
             var hashcode = _hasher.ComputeHash(entry.Key);
-            var index = hashcode & _groupMask;
+            var index = hashcode & _lengthMinusOne;
             byte jumpDistance = 0;
 
             while (true)
             {
-                var source = ReadVector128(newControlBytes, index);
-
-                //var equalsResult = Vector128.Equals(source, _emptyBucketVector);
+                var source = ReadVector128(ref home, index);
                 var mask = source.ExtractMostSignificantBits();
                 if (mask != 0)
                 {
@@ -922,7 +970,6 @@ public class DenseMap<TKey, TValue>
             }
         }
 
-        _controlBytes.Dispose();
         _controlBytes = newControlBytes;
         _entries = newEntries;
     }
@@ -942,29 +989,9 @@ public class DenseMap<TKey, TValue>
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public unsafe static Vector128<sbyte> ReadVector128(ControlBytes array, ulong index)
+    public unsafe static Vector128<sbyte> ReadVector128(ref sbyte controlByte, uint index)
     {
-#if DEBUG
-
-        if ((index & 15) != 0)
-        {
-            throw new ArgumentException("Offset must be 16-byte aligned.", nameof(index));
-        }
-
-#endif
-        // Use `Unsafe.AsPointer` and pointer arithmetic for direct memory access
-        // Calculate the pointer offset and load the vector directly
-        // ref var arr0 = ref MemoryMarshal.GetArrayDataReference(array);
-        // return Vector128.LoadAligned((sbyte*)Unsafe.AsPointer(ref array[0]) + index);
-
-        //// Get the pointer to the start of the array
-        //fixed (sbyte* ptr = &array[index])
-        //{
-        //    // Read the 16-byte-aligned data as a Vector128
-        //    return Vector128.LoadAligned(ptr);
-        //}
-
-        return array.LoadAligned(index);
+        return Vector128.LoadUnsafe(ref controlByte, index);
     }
 
     /// <summary>
@@ -973,7 +1000,7 @@ public class DenseMap<TKey, TValue>
     /// <param name="hashcode">The hashcode.</param>
     /// <returns>The 7 lowest bits of the hashcode.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static sbyte H2(ulong hashcode) => (sbyte)(hashcode >> 57);
+    private static sbyte H2(uint hashcode) => (sbyte)(hashcode >> 25);
 
     /// <summary>
     /// Resets the lowest significant bit in the given value.
@@ -993,139 +1020,3 @@ public class DenseMap<TKey, TValue>
         public TValue Value;
     };
 }
-
-
-/// <summary>
-/// Represents a memory-aligned byte control class that provides direct access to a block of unmanaged memory.
-/// </summary>
-public unsafe class ControlBytes : IDisposable
-{
-    /// <summary>
-    /// Pointer to the aligned memory block.
-    /// </summary>
-    private readonly sbyte* _alignedPointer;
-
-    /// <summary>
-    /// Length of the allocated memory block in bytes.
-    /// </summary>
-    public readonly int Length;
-
-    /// <summary>
-    /// Pointer to the original allocated memory block.
-    /// </summary>
-    private readonly IntPtr _originalAllocation;
-
-    /// <summary>
-    /// Indicates whether the object has been disposed.
-    /// </summary>
-    private bool _disposed = false;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="ControlBytes"/> class with the specified length.
-    /// </summary>
-    /// <param name="length">The length of the memory block to allocate.</param>
-    public ControlBytes(int length)
-    {
-        Length = length;
-        _originalAllocation = Marshal.AllocHGlobal(length + 15);
-        sbyte* ptr = (sbyte*)_originalAllocation;
-        _alignedPointer = (sbyte*)(((long)ptr + 15) & ~15);
-    }
-
-    /// <summary>
-    /// Provides access to the memory block at the specified index.
-    /// </summary>
-    /// <param name="index">The zero-based index.</param>
-    /// <returns>A reference to the sbyte at the specified index.</returns>
-    public ref sbyte this[int index] => ref _alignedPointer[index];
-
-    /// <summary>
-    /// Provides access to the memory block at the specified index.
-    /// </summary>
-    /// <param name="index">The zero-based unsigned index.</param>
-    /// <returns>A reference to the sbyte at the specified index.</returns>
-    public ref sbyte this[uint index] => ref _alignedPointer[index];
-
-    /// <summary>
-    /// Provides access to the memory block at the specified index.
-    /// </summary>
-    /// <param name="index">The zero-based unsigned long index.</param>
-    /// <returns>A reference to the sbyte at the specified index.</returns>
-    public ref sbyte this[ulong index] => ref _alignedPointer[index];
-
-    /// <summary>
-    /// Creates a span that represents the memory block.
-    /// </summary>
-    /// <remarks>
-    /// Accessing this after the object is disposed will result in undefined behavior.
-    /// </remarks>
-    /// <returns>A span of the memory block.</returns>
-    public Span<sbyte> AsSpan() => new Span<sbyte>(_alignedPointer, Length);
-
-    /// <summary>
-    /// Creates a read-only span that represents the memory block.
-    /// </summary>
-    /// <remarks>
-    /// Accessing this after the object is disposed will result in undefined behavior.
-    /// </remarks>
-    /// <returns>A read-only span of the memory block.</returns>
-    public ReadOnlySpan<sbyte> AsReadOnlySpan() => new ReadOnlySpan<sbyte>(_alignedPointer, Length);
-
-    /// <summary>
-    /// Loads a 128-bit vector from the aligned memory block at the specified index.
-    /// </summary>
-    /// <param name="index">The index from which to load the vector.</param>
-    /// <returns>A 128-bit vector containing the data.</returns>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Vector128<sbyte> LoadAligned(ulong index)
-    {
-        return Vector128.LoadAligned(_alignedPointer + index);
-    }
-
-    /// <summary>
-    /// Loads a 128-bit vector from the memory block at the specified index.
-    /// </summary>
-    /// <param name="index">The index from which to load the vector.</param>
-    /// <returns>A 128-bit vector containing the data.</returns>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Vector128<sbyte> Load(ulong index)
-    {
-        return Vector128.Load(_alignedPointer + index);
-    }
-
-    /// <summary>
-    /// Releases the unmanaged resources used by the class.
-    /// </summary>
-    /// <param name="disposing">Indicates whether the method is called from Dispose() or a finalizer.</param>
-    protected virtual void Dispose(bool disposing)
-    {
-        if (_disposed)
-            return;
-
-        if (disposing)
-        {
-            // Dispose of managed resources here (if any).
-        }
-
-        Marshal.FreeHGlobal(_originalAllocation);
-        _disposed = true;
-    }
-
-    /// <summary>
-    /// Releases all resources used by the class.
-    /// </summary>
-    public void Dispose()
-    {
-        Dispose(true);
-        GC.SuppressFinalize(this);
-    }
-
-    /// <summary>
-    /// Finalizes the class and releases unmanaged resources.
-    /// </summary>
-    ~ControlBytes()
-    {
-        Dispose(false);
-    }
-}
-
