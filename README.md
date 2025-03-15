@@ -24,6 +24,7 @@ These standard collections are widely used for key-value pair storage in .NET ap
 - [Installation](#installation)
 - [Basic Usage](#basic-usage)
 - [Advanced Usage](#Advanced-usage)
+- [Selecting the Right Hashmap](#selecting-the-right-hashmap)
 - [Tested Platforms](#tested-on-platforms)
 - [Benchmarks](#benchmarks)
   - [📊 Get Benchmark](#-get-benchmark)
@@ -116,6 +117,26 @@ Using **custom hashing** can significantly reduce collisions and improve lookup 
 * x64
 * arm
 * arm64
+
+## Selecting the Right Hashmap
+
+Choosing the right hashmap depends on the workload, concurrency requirements, and expected load factors:
+
+- **DenseMap**: **Really shines when the table is nearly full**, showing **incredible performance**. Note that **DenseMap's load factor can easily exceed the 0.8 used in benchmarks**, making it a strong choice for high-density scenarios.
+- **RobinHoodMap**: **Probably your best choice when you only care about retrieval speed**. Performs well at moderate load factors (**≤0.5**) and is ideal when stability in retrieval times is critical.
+- **CMap**: The best choice for **multi-threaded applications** where **lock-free** operations are essential. Suitable for workloads requiring frequent concurrent reads and writes without significant synchronization overhead.
+- **BlitzMap**: **Usually the winner in most benchmarks**. It is incredibly fast in **most situations** and provides **consistent performance across all load factors**. However, it is **not recommended to exceed a load factor of 0.8**, as performance can degrade beyond this threshold.
+
+### ✅ Summary of Recommendations:
+
+| Hashmap          | Best Use Case                                       |
+| ---------------- | --------------------------------------------------- |
+| **DenseMap**     | High-performance, large datasets, SIMD acceleration, excellent at high load factors |
+| **RobinHoodMap** | Best for retrieval-heavy workloads, moderate load factors (≤0.5) |
+| **CMap**         | Multi-threaded applications, lock-free performance  |
+| **BlitzMap**     | General-purpose, predictable performance, fastest in most cases but avoid high load factors |
+
+---
 
 ## Benchmark
 
