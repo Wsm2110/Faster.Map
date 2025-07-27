@@ -105,10 +105,12 @@ Faster.Map allows for **custom hashing algorithms** to optimize performance base
 To specify a custom hash function, you can use **BlitzMap** or **DenseMap** with an explicitly defined hash:
 
 ```csharp
-var map = new BlitzMap<int, string, XXHash3>();
+var map = new BlitzMap<int, string, XxHash3StringHasher>();
 map.Insert(1, "Value One");
 map.Insert(2, "Value Two");
 ```
+
+Different Hasher implementations can be found in Faster.Map.Hasher
 
 Using **custom hashing** can significantly reduce collisions and improve lookup times, especially for large datasets.
 

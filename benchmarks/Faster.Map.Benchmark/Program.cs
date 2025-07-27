@@ -10,7 +10,7 @@ namespace Faster.Map.Benchmark
             //BenchmarkRunner.Run<AddBenchmark>();
            // BenchmarkRunner.Run<EnumerableBenchmark>();
             //BenchmarkRunner.Run<UpdateBenchmark>();
-            BenchmarkRunner.Run<LargeStringCustomHasherBenchmark>(/*new DebugInProcessConfig()*/);
+            BenchmarkRunner.Run<GetBenchmark>(/*new DebugInProcessConfig()*/);
         }
     }
 }

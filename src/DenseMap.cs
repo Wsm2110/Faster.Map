@@ -12,7 +12,6 @@ using System.Runtime.Intrinsics;
 
 namespace Faster.Map;
 
-
 /// <summary>
 /// A specialized implementation of <see cref="DenseMap{TKey, TValue, THasher}"/> that
 /// defaults to using the <see cref="GoldenRatioHasher{TKey}"/> for efficient hashing.
@@ -197,7 +196,7 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, Hasher.IHas
     #endregion
 
     #region Fields
-    private const uint ElementsInGroupMinusOne = 15;
+    
     private const sbyte _emptyBucket = -127;
     private const sbyte _tombstone = -126;
     private static readonly Vector128<sbyte> _emptyBucketVector = Vector128.Create(_emptyBucket);

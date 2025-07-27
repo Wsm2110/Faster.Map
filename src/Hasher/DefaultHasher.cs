@@ -72,7 +72,7 @@ internal readonly struct DefaultUlongHasher : IHasher<ulong>
 /// Uses bit shifts and multiplications with high-entropy constants
 /// to produce a well-distributed hash.
 /// </summary>
-internal readonly struct DefaultUintHasher : IHasher<uint>
+public readonly struct DefaultUintHasher : IHasher<uint>
 {
     /// <summary>
     /// Computes a high-quality hash for a given <see cref="uint"/> value.
@@ -82,16 +82,25 @@ internal readonly struct DefaultUintHasher : IHasher<uint>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public uint ComputeHash(uint x)
     {
-        // Initial XOR shift to mix high and low bits
+        //For a comprehensive understanding of the XMX mixer and its applications, you can refer to Jon Maiga's detailed article: "The construct of a bit mixer."
         x ^= x >> 15;
-        // Multiply by a high-entropy constant for mixing
-        x *= 0x2C1B3C6D;
-        // Another XOR shift to spread the bits
+        x *= 0x85ebca6b;
         x ^= x >> 13;
-        // Another multiplication with a different high-entropy constant
-        x *= 0x297A2D39;
-        // Final XOR shift for additional diffusion
-        x ^= x >> 15;
+        x *= 0xc2b2ae35;
+        x ^= x >> 16;
         return x;
+
+
+        //// Initial XOR shift to mix high and low bits
+        //x ^= x >> 15;
+        //// Multiply by a high-entropy constant for mixing
+        //x *= 0x2C1B3C6D;
+        //// Another XOR shift to spread the bits
+        //x ^= x >> 13;
+        //// Another multiplication with a different high-entropy constant
+        //x *= 0x297A2D39;
+        //// Final XOR shift for additional diffusion
+        //x ^= x >> 15;
+        //return x;
     }
 }

@@ -717,8 +717,8 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private uint FindLastBucket(ref Bucket bucketBase, ref Entry entryBase, uint target)
     {
-        // Directly calculate the hash code and index without intermediate variables
-        var index = (uint)Unsafe.Add(ref entryBase, target).Key.GetHashCode() & _mask;
+        var key = Unsafe.Add(ref entryBase, target).Key;
+        var index = _hasher.ComputeHash(key) & _mask;
 
         // Pointer to the initial bucket
         ref var bucket = ref Unsafe.Add(ref bucketBase, index);
@@ -856,7 +856,7 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
         var bucket = index;
 
         // Check if the bucket is empty
-        if (Unsafe.Add(ref bucketBase, bucket).Signature == INACTIVE ||
+        if (Unsafe.Add(ref bucketBase, ++bucket).Signature == INACTIVE ||
             Unsafe.Add(ref bucketBase, ++bucket).Signature == INACTIVE)
         {
             return bucket;
