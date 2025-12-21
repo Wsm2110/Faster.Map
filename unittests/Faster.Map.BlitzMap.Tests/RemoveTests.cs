@@ -857,7 +857,91 @@ public class RemoveTests
             var key = keys[i];
             map.Remove(key);
         }
-
     }
+
+    [Fact]
+    public void Remove_MiddleOfChain_PreservesLookup()
+    {
+        var map = new BlitzMap<int, string>(4);
+
+        // Force collisions
+        map.Insert(1, "A");
+        map.Insert(5, "B"); // same bucket as 1 if mask=3
+        map.Insert(9, "C");
+
+        Assert.True(map.Remove(5));
+
+        Assert.True(map.Contains(1));
+        Assert.False(map.Contains(5));
+        Assert.True(map.Contains(9));
+
+        Assert.Equal("A", map[1]);
+        Assert.Equal("C", map[9]);
+    }
+
+    [Fact]
+    public void Remove_HeadOfChain_Works()
+    {
+        var map = new BlitzMap<int, int>(4);
+
+        map.Insert(1, 10);
+        map.Insert(5, 20);
+
+        Assert.True(map.Remove(1));
+        Assert.False(map.Contains(1));
+        Assert.True(map.Contains(5));
+        Assert.Equal(20, map[5]);
+    }
+
+
+    [Fact]
+    public void Remove_TailOfChain_Works()
+    {
+        var map = new BlitzMap<int, int>(4);
+
+        map.Insert(1, 10);
+        map.Insert(5, 20);
+        map.Insert(9, 30);
+
+        Assert.True(map.Remove(9));
+
+        Assert.True(map.Contains(1));
+        Assert.True(map.Contains(5));
+        Assert.False(map.Contains(9));
+    }
+
+    [Fact]
+    public void Remove_ThenInsert_ReusesSlotCorrectly()
+    {
+        var map = new BlitzMap<int, int>(4);
+
+        map.Insert(1, 1);
+        map.Insert(5, 2);
+
+        map.Remove(1);
+        map.Insert(9, 3);
+
+        Assert.False(map.Contains(1));
+        Assert.True(map.Contains(5));
+        Assert.True(map.Contains(9));
+    }
+
+    [Fact]
+    public void Stress_CollisionsAndRemovals()
+    {
+        var map = new BlitzMap<int, int>(8);
+
+        for (int i = 0; i < 1000; i++)
+            map.Insert(i * 4, i);
+
+        for (int i = 0; i < 500; i++)
+            Assert.True(map.Remove(i * 4));
+
+        for (int i = 500; i < 1000; i++)
+            Assert.Equal(i, map[i * 4]);
+    }
+
+
+
 
 }

@@ -9,11 +9,11 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <CopyRight>MIT</CopyRight>
     <PackageReleaseNotes>
-    Adding blitzmap a new highly optimized hashmap
+      minor changes and fixes
     </PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/Wsm2110/Faster.Map</PackageProjectUrl>
-    <AssemblyVersion>7.0.1</AssemblyVersion>
-    <FileVersion>7.0.1</FileVersion>
+    <AssemblyVersion>7.0.2</AssemblyVersion>
+    <FileVersion>7.0.2</FileVersion>
     <Title>Fastest .net hashmap</Title>
     <Version>7.0.1</Version>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
