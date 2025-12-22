@@ -7,33 +7,71 @@ using System.Runtime.Intrinsics;
 
 namespace Faster.Map.Hasher;
 
+#region FastHasherUint
+
 /// <summary>
-/// Specialized implementation of a fast hasher for the <c>uint</c> type.
+/// Specialized high-performance hasher for <see cref="uint"/> keys.
+///
+/// Uses FastHash to produce a well-mixed hash while relying on
+/// direct value comparison for equality.
 /// </summary>
 public readonly struct FastHasherUint : IHasher<uint>
 {
     /// <summary>
-    /// Computes a hash for a 32-bit unsigned integer using the FastHash library.
+    /// Computes a 32-bit hash for a <see cref="uint"/> key using FastHash.
     /// </summary>
-    /// <param name="key">The <c>uint</c> key to hash.</param>
-    /// <returns>A 64-bit hash value.</returns>
+    /// <param name="key">The key to hash.</param>
+    /// <returns>A well-distributed 32-bit hash.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public uint ComputeHash(uint key)
-    {
-        return FastHash.HashU64(key).AsUInt32().GetElement(0);
-    }
+        => FastHash.HashU64(key).AsUInt32().GetElement(0);
+
+    /// <summary>
+    /// Performs a direct equality comparison between two <see cref="uint"/> values.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool Equals(uint x, uint y) => x == y;
 }
 
+#endregion
+
+#region FastHasherString
+
+/// <summary>
+/// High-performance ordinal string hasher backed by FastHash.
+///
+/// Uses byte-level hashing over the UTF-16 representation of the string
+/// and performs equality using ordinal comparison.
+/// </summary>
+/// <remarks>
+/// This hasher is optimized for performance and determinism.
+/// It intentionally avoids culture-aware or case-insensitive semantics.
+/// </remarks>
 public readonly struct FastHasherString : IHasher<string>
 {
     /// <summary>
-    /// Computes a hash for a 32-bit unsigned integer using the FastHash library.
+    /// Computes a 32-bit hash for a string by hashing its UTF-16 byte representation.
     /// </summary>
-    /// <param name="key">The <c>uint</c> key to hash.</param>
-    /// <returns>A 64-bit hash value.</returns>
+    /// <param name="key">The string to hash. Must not be <see langword="null"/>.</param>
+    /// <returns>A well-distributed 32-bit hash.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public uint ComputeHash(string key)
     {
-        return FastHash.HashU64(MemoryMarshal.AsBytes(key.AsSpan())).AsUInt32().GetElement(0);
+        // Hash the raw UTF-16 bytes of the string (no allocation)
+        ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(key.AsSpan());
+        return FastHash.HashU64(bytes).AsUInt32().GetElement(0);
     }
+
+    /// <summary>
+    /// Determines whether two strings are equal using ordinal comparison.
+    /// </summary>
+    /// <remarks>
+    /// This comparison is non-virtual, culture-invariant, and suitable
+    /// for use in performance-critical hash table operations.
+    /// </remarks>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool Equals(string x, string y)
+        => string.Equals(x, y, StringComparison.Ordinal);
 }
+
+#endregion

@@ -1,3 +1,4 @@
+using Faster.Map.Contracts;
 using Faster.Map.Hasher;
 using System;
 using System.Collections;
@@ -102,8 +103,7 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
     private uint _maxCountBeforeResize;
     private THasher _hasher;
     private uint _lastBucket = INACTIVE;
-    private EqualityComparer<TKey> _eq = EqualityComparer<TKey>.Default;
-
+   
     #endregion
     /// <summary>
     /// Initializes a new instance of the <see cref="BlitzMap{TKey, TValue, THasher}"/> class
@@ -190,7 +190,7 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
                 var entry = Unsafe.Add(ref entryBase, bucket.Signature & _mask);
 
                 // Verify that the key matches using the equality comparer
-                if (_eq.Equals(key, entry.Key))
+                if (_hasher.Equals(key, entry.Key))
                 {
                     value = entry.Value; // Set the output value
                     return true; // Key found, return success
@@ -239,7 +239,7 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
                 // Retrieve the entry associated with the current bucket
                 var entry = Unsafe.Add(ref entryBase, bucket.Signature & _mask);
                 // Verify that the key matches using the equality comparer
-                if (_eq.Equals(key, entry.Key))
+                if (_hasher.Equals(key, entry.Key))
                 {
                     return true; // Key found, return success
                 }
@@ -287,7 +287,7 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
                 ref var entry = ref Unsafe.Add(ref entryBase, bucket.Signature & _mask);
 
                 // Verify that the key matches using the equality comparer
-                if (_eq.Equals(key, entry.Key))
+                if (_hasher.Equals(key, entry.Key))
                 {
                     entry.Value = value; // Update the value
                     return true;
@@ -350,7 +350,7 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
 
         // Check if the current bucket already contains the key
         if (signature == (bucket.Signature & ~_mask) &&
-            _eq.Equals(key, Unsafe.Add(ref entryBase, bucket.Signature & _mask).Key))
+            _hasher.Equals(key, Unsafe.Add(ref entryBase, bucket.Signature & _mask).Key))
         {
             return false; // Key already exists, insertion fails
         }
@@ -383,7 +383,7 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
 
             // Check for an existing key in the chain
             if (signature == (bucket.Signature & ~_mask) &&
-                _eq.Equals(key, _entries[bucket.Signature & _mask].Key))
+                _hasher.Equals(key, _entries[bucket.Signature & _mask].Key))
             {
                 return false; // Key already exists, insertion fails
             }
@@ -550,7 +550,7 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
         else if (signature == (bucket.Signature & ~_mask))
         {
             ref var entry = ref Unsafe.Add(ref entryBase, bucket.Signature & _mask);
-            if (_eq.Equals(key, entry.Key))
+            if (_hasher.Equals(key, entry.Key))
             {
                 entry.Value = value;
                 return true; // Key already exists, update value
@@ -566,7 +566,7 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
             if (signature == (bucket.Signature & ~_mask))
             {
                 ref var entry = ref Unsafe.Add(ref entryBase, bucket.Signature & _mask);
-                if (_eq.Equals(key, entry.Key))
+                if (_hasher.Equals(key, entry.Key))
                 {
                     entry.Value = value;
                     return true; // Key already exists, update value
@@ -624,7 +624,7 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
                 uint entryIndex = bucket.Signature & _mask;
                 ref var entry = ref Unsafe.Add(ref entryBase, entryIndex);
 
-                if (_eq.Equals(key, entry.Key))
+                if (_hasher.Equals(key, entry.Key))
                 {
                     // --- unlink bucket from chain ---
                     if (prevIndex == INACTIVE)

@@ -88,7 +88,7 @@ public class DenseMap<TKey, TValue> : DenseMap<TKey, TValue, GoldenRatioHasher<T
 /// <typeparam name="THasher">
 /// A struct implementing <see cref="Hasher.IHasher{TKey}"/> to provide an optimized hashing function.
 /// Using a struct-based hasher avoids virtual method calls and allows aggressive inlining.</typeparam>
-public class DenseMap<TKey, TValue, THasher> where THasher : struct, Hasher.IHasher<TKey>
+public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKey>
 {
     #region Properties
 
@@ -210,7 +210,6 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, Hasher.IHas
     private uint _lengthMinusOne;
     private readonly double _loadFactor;
     private readonly THasher _hasher;
-    private readonly IEqualityComparer<TKey> _comparer;
 
     #endregion
 
@@ -275,8 +274,7 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, Hasher.IHas
         }
 
         _maxLookupsBeforeResize = (uint)(_length * _loadFactor);
-        _comparer = EqualityComparer<TKey>.Default;
-
+  
         _controlBytes = GC.AllocateArray<sbyte>((int)_length + 16);
         _entries = GC.AllocateArray<Entry>((int)_length + 16);
 
@@ -349,7 +347,7 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, Hasher.IHas
                 // Find the lowest set bit in `mask` (first matching position). 
                 ref var entry = ref Find(_entries, index + (uint)BitOperations.TrailingZeroCount(resultMask));
                 // If a matching key is found, update the entry's value and return the old value.
-                if (_comparer.Equals(entry.Key, key))
+                if (_hasher.Equals(entry.Key, key))
                 {
                     entry.Value = value;
                     return;
@@ -445,7 +443,7 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, Hasher.IHas
                 // Retrieve the entry corresponding to the matched bit position within the map's entries.
                 var entry = Find(_entries, index + (uint)bitPos);
                 // Check if the entry's key matches the specified key using the equality comparer.
-                if (_comparer.Equals(entry.Key, key))
+                if (_hasher.Equals(entry.Key, key))
                 {
                     // If a match is found, set the output value and return true.
                     value = entry.Value;
@@ -529,7 +527,7 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, Hasher.IHas
                 // Use `bitPos` to access the corresponding entry in `_entries`.
                 ref var entry = ref Find(_entries, index + (uint)bitPos);
                 // If a matching key is found, update the entry's value and return the old value.
-                if (_comparer.Equals(entry.Key, key))
+                if (_hasher.Equals(entry.Key, key))
                 {
                     return ref entry.Value;
                 }
@@ -625,7 +623,7 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, Hasher.IHas
                 ref var entry = ref Find(_entries, index + (uint)bitPos);
 
                 // Check if the current entry's key matches the specified key using the equality comparer.
-                if (_comparer.Equals(entry.Key, key))
+                if (_hasher.Equals(entry.Key, key))
                 {
                     // If a match is found, update the entry's value and return `true` to indicate success.
                     entry.Value = value;
@@ -708,8 +706,8 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, Hasher.IHas
                 var i = index + (uint)bitPos;
 
                 // Check if the entry at the matched position has a key that equals the specified key.
-                // Use `_comparer` to ensure accurate key comparison.              
-                if (_comparer.Equals(Find(_entries, i).Key, key))
+                // Use `_hasher` to ensure accurate key comparison.              
+                if (_hasher.Equals(Find(_entries, i).Key, key))
                 {
                     // If the group that contains the entry to be removed has an empty slot (an unoccupied slot that is marked empty rather than as a tombstone), this indicates that any probe sequence for a key would terminate upon reaching that empty slot.
                     // Since probe sequences terminate at the first empty slot they encounter, having an empty slot in the group means that removing the current entry without placing a tombstone won’t disrupt probe chains.
@@ -807,8 +805,8 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, Hasher.IHas
                 // Get the position of the first set bit in `mask`, indicating a potential key match.
                 var bitPos = BitOperations.TrailingZeroCount(mask);
                 // Check if the entry at this position has a key that matches the specified key.
-                // Use `_comparer` to ensure accurate key comparison.
-                if (_comparer.Equals(Find(_entries, index + (uint)bitPos).Key, key))
+                // Use `_hasher` to ensure accurate key comparison.
+                if (_hasher.Equals(Find(_entries, index + (uint)bitPos).Key, key))
                 {
                     // If a match is found, return `true` to indicate the key exists in the map.
                     return true;

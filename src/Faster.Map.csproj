@@ -3,19 +3,19 @@
     <ImplicitUsings>false</ImplicitUsings>
     <Nullable>disable</Nullable>
     <LangVersion>preview</LangVersion>
-    <TargetFrameworks>net9.0;net8.0;net7.0</TargetFrameworks>
+    <TargetFrameworks>net9.0;net8.0;net7.0;</TargetFrameworks>
     <LangVersion>Latest</LangVersion>
     <Authors>Wiljan Ruizendaal</Authors>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <CopyRight>MIT</CopyRight>
     <PackageReleaseNotes>
-      minor changes and fixes
+      Add Equals method to IHasher to eliminate virtual key comparisons
     </PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/Wsm2110/Faster.Map</PackageProjectUrl>
-    <AssemblyVersion>7.0.2</AssemblyVersion>
-    <FileVersion>7.0.2</FileVersion>
+    <AssemblyVersion>7.1.0</AssemblyVersion>
+    <FileVersion>7.1.0</FileVersion>
     <Title>Fastest .net hashmap</Title>
-    <Version>7.0.1</Version>
+    <Version>7.1.0</Version>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Description>
       Incredibly fast hashmap

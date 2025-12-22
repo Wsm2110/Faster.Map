@@ -5,13 +5,12 @@ using System.Numerics;
 using System.Linq;
 using BenchmarkDotNet.Engines;
 using Faster.Map.Benchmark.Utilities;
-using Faster.Map.Hasher;
 
 namespace Faster.Map.Benchmark
 {
     [MarkdownExporterAttribute.GitHub]
     [DisassemblyDiagnoser]
-    //[MemoryDiagnoser]
+    [MemoryDiagnoser]
     [SimpleJob(RunStrategy.Monitoring, launchCount: 1, iterationCount: 50, warmupCount: 3)]
 
     public class GetBenchmark

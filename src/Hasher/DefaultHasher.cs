@@ -1,88 +1,107 @@
 ﻿using Faster.Map.Contracts;
-using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
-namespace Faster.Map.Hasher;
-
 /// <summary>
-/// Defines a hashing strategy for generating 32-bit hash values from a given key type.
-/// Implementations should provide an optimized hashing function for specific key types.
+/// A generic fallback hashing strategy that delegates to
+/// <see cref="EqualityComparer{T}.Default"/> for both hashing and equality.
+///
+/// This hasher prioritizes correctness and broad compatibility over absolute performance
+/// and serves as the default when no specialized hasher is supplied.
 /// </summary>
-/// <typeparam name="T">The type of the key to be hashed.</typeparam>
-public interface IHasher<T>
-{
-    /// <summary>
-    /// Computes a 32-bit hash value for the given key.
-    /// </summary>
-    /// <param name="key">The key to hash.</param>
-    /// <returns>A 32-bit unsigned integer representing the hash of the key.</returns>
-    uint ComputeHash(T key);
-}
-
-/// <summary>
-/// A default hashing strategy that utilizes the built-in <see cref="object.GetHashCode"/> method.
-/// Provides a generic fallback for types without a specialized hasher.
-/// </summary>
-/// <typeparam name="T">The type of the key to be hashed.</typeparam>
+/// <typeparam name="T">
+/// The type of the key to be hashed.
+/// </typeparam>
+/// <remarks>
+/// <para>
+/// For value types, calls to <see cref="EqualityComparer{T}.Default"/> are typically
+/// devirtualized and inlined by the JIT.
+/// </para>
+/// <para>
+/// For reference types, hashing and equality may involve virtual dispatch and therefore
+/// incur additional overhead. Performance-critical code paths should prefer a specialized
+/// hasher for such types.
+/// </para>
+/// </remarks>
 public readonly struct DefaultHasher<T> : IHasher<T>
 {
     /// <summary>
-    /// Computes a hash for the given key using its <see cref="object.GetHashCode"/> method.
+    /// Computes a hash code for the specified key using
+    /// <see cref="EqualityComparer{T}.Default"/>.
     /// </summary>
     /// <param name="key">The key to hash.</param>
-    /// <returns>A 32-bit unsigned integer representing the hash of the key.</returns>
-    /// <remarks>
-    /// This implementation simply calls <see cref="object.GetHashCode"/> and casts it to <see cref="uint"/>.
-    /// Be cautious when using this with types that return negative hash codes, as the cast can cause unintended wrapping.
-    /// </remarks>
+    /// <returns>
+    /// A 32-bit unsigned hash code derived from the key.
+    /// </returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public uint ComputeHash(T key) => (uint)key.GetHashCode();
+    public uint ComputeHash(T key)
+        => (uint)EqualityComparer<T>.Default.GetHashCode(key);
+
+    /// <summary>
+    /// Determines equality between two keys using
+    /// <see cref="EqualityComparer{T}.Default"/>.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool Equals(T x, T y)
+        => EqualityComparer<T>.Default.Equals(x, y);
 }
 
 /// <summary>
-/// A fast default hashing strategy for <see cref="ulong"/> values.
-/// Utilizes strong mixing operations to produce high-entropy hash values.
+/// A high-quality hashing strategy for <see cref="ulong"/> values.
+///
+/// Uses multiplicative mixing and bit folding inspired by Murmur-style finalizers
+/// to achieve strong avalanche properties and low collision rates.
 /// </summary>
 internal readonly struct DefaultUlongHasher : IHasher<ulong>
 {
     /// <summary>
-    /// Computes a high-quality hash for a given <see cref="ulong"/> value.
+    /// Computes a high-entropy 32-bit hash from a 64-bit input value.
     /// </summary>
-    /// <param name="x">The input value to hash.</param>
-    /// <returns>A 32-bit hash derived from the input value.</returns>
+    /// <param name="x">The value to hash.</param>
+    /// <returns>A well-distributed 32-bit hash.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public uint ComputeHash(ulong x)
     {
-        // Multiplication by a high-entropy constant (Murmur-inspired)
+        // Multiply by a large odd constant to mix bits
         x *= 0xBF58476D1CE4E5B9UL;
 
-        // XOR with its high bits to improve diffusion and avalanche effect
+        // Fold high bits into low bits to improve diffusion
         x ^= x >> 56;
 
-        // Another multiplication to further mix bits
+        // Second mixing stage
         x *= 0x94D049BB133111EBUL;
 
-        // Return the lower 32 bits as the final hash
+        // Return lower 32 bits
         return (uint)x;
     }
+
+    /// <summary>
+    /// Performs a direct equality comparison between two <see cref="ulong"/> values.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool Equals(ulong x, ulong y) => x == y;
 }
 
 /// <summary>
-/// A fast default hashing strategy for <see cref="uint"/> values.
-/// Uses bit shifts and multiplications with high-entropy constants
-/// to produce a well-distributed hash.
+/// A high-performance hashing strategy for <see cref="uint"/> values.
+///
+/// Implements an XMX-style bit mixer to achieve good diffusion and avalanche behavior
+/// while remaining inexpensive to compute.
 /// </summary>
 public readonly struct DefaultUintHasher : IHasher<uint>
 {
     /// <summary>
-    /// Computes a high-quality hash for a given <see cref="uint"/> value.
+    /// Computes a well-distributed hash for a 32-bit unsigned integer.
     /// </summary>
-    /// <param name="x">The input value to hash.</param>
-    /// <returns>A 32-bit hash derived from the input value.</returns>
+    /// <param name="x">The value to hash.</param>
+    /// <returns>A mixed 32-bit hash value.</returns>
+    /// <remarks>
+    /// This mixer is inspired by common XMX-style finalizers and is suitable for
+    /// hash table usage where speed and low collision rates are required.
+    /// </remarks>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public uint ComputeHash(uint x)
     {
-        //For a comprehensive understanding of the XMX mixer and its applications, you can refer to Jon Maiga's detailed article: "The construct of a bit mixer."
         x ^= x >> 15;
         x *= 0x85ebca6b;
         x ^= x >> 13;
@@ -91,16 +110,22 @@ public readonly struct DefaultUintHasher : IHasher<uint>
         return x;
 
 
-        //// Initial XOR shift to mix high and low bits
+        // Initial XOR shift to mix high and low bits
         //x ^= x >> 15;
-        //// Multiply by a high-entropy constant for mixing
+        // Multiply by a high-entropy constant for mixing
         //x *= 0x2C1B3C6D;
-        //// Another XOR shift to spread the bits
+        // Another XOR shift to spread the bits
         //x ^= x >> 13;
         //// Another multiplication with a different high-entropy constant
         //x *= 0x297A2D39;
-        //// Final XOR shift for additional diffusion
+        // Final XOR shift for additional diffusion
         //x ^= x >> 15;
         //return x;
     }
+
+    /// <summary>
+    /// Performs a direct equality comparison between two <see cref="uint"/> values.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool Equals(uint x, uint y) => x == y;
 }
