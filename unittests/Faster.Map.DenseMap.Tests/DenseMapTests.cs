@@ -1,4 +1,5 @@
-﻿using Faster.Map.DenseMap;
+﻿using Faster.Map.Core;
+using Faster.Map.DenseMap;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;

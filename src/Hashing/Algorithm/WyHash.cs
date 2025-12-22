@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics.X86;
 
-namespace Faster.Map.Hash;
+namespace Faster.Map.Hashing.Algorithm;
 
 public static class WyHash
 {

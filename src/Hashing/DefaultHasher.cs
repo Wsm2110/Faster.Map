@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
+namespace Faster.Map.Hashing;
+
 /// <summary>
 /// A generic fallback hashing strategy that delegates to
 /// <see cref="EqualityComparer{T}.Default"/> for both hashing and equality.

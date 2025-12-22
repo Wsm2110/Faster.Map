@@ -3,7 +3,7 @@ using System.Linq;
 using System.Runtime.Intrinsics;
 using System.Text;
 using Xunit;
-using Faster.Map.Hash;
+using Faster.Map.Hashing.Algorithm;
 
 namespace Faster.Map.Hash.Tests;
 

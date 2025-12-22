@@ -7,6 +7,7 @@ using System.Collections;
 using BenchmarkDotNet.Engines;
 using Faster.Map.Benchmark.Utilities;
 using Faster.Map.Hasher;
+using Faster.Map.Core;
 
 namespace Faster.Map.Benchmark
 {

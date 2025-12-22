@@ -1,5 +1,8 @@
+// Copyright (c) 2026, Wiljan Ruizendaal. All rights reserved. <wruizendaal@gmail.com> 
+// Distributed under the MIT Software License, Version 1.0.
+
 using Faster.Map.Contracts;
-using Faster.Map.Hasher;
+using Faster.Map.Hashing;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -7,7 +10,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
-namespace Faster.Map;
+namespace Faster.Map.Core;
 
 /// <summary>
 /// A specialized implementation of <see cref="BlitzMap{TKey, TValue, THasher}"/> that
@@ -55,6 +58,7 @@ public class BlitzMap<TKey, TValue> : BlitzMap<TKey, TValue, DefaultHasher<TKey>
 public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKey>
 {
     #region Properties
+
     /// <summary>
     /// Gets the number of key-value pairs currently stored in the map.
     /// </summary>

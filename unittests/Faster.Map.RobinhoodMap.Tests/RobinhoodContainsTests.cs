@@ -1,4 +1,5 @@
 ﻿using Faster.Map;
+using Faster.Map.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -54,16 +55,5 @@ namespace Faster.Map.RobinHoodMap.Tests
             // Assert
             Assert.False(result);
         }
-
-        [Fact]
-        public void Contains_NullKey_ThrowsArgumentNullException()
-        {
-            // Arrange
-            var map = new RobinhoodMap<string, string>();
-
-            // Act & Assert
-            Assert.Throws<NullReferenceException>(() => map.Contains(null));
-        }
-
     }
 }

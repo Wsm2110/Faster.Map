@@ -1,13 +1,11 @@
 ﻿using Faster.Map.Contracts;
-using Faster.Map.Hash;
+using Faster.Map.Hashing.Algorithm;
 using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 
-namespace Faster.Map.Hasher;
-
-#region FastHasherUint
+namespace Faster.Map.Hashing;
 
 /// <summary>
 /// Specialized high-performance hasher for <see cref="uint"/> keys.
@@ -32,10 +30,6 @@ public readonly struct FastHasherUint : IHasher<uint>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Equals(uint x, uint y) => x == y;
 }
-
-#endregion
-
-#region FastHasherString
 
 /// <summary>
 /// High-performance ordinal string hasher backed by FastHash.
@@ -73,5 +67,3 @@ public readonly struct FastHasherString : IHasher<string>
     public bool Equals(string x, string y)
         => string.Equals(x, y, StringComparison.Ordinal);
 }
-
-#endregion

@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using static Faster.Map.BlitzMap.Tests.Get;
 using Xunit;
+using Faster.Map.Core;
 
 namespace Faster.Map.BlitzMap.Tests;
 

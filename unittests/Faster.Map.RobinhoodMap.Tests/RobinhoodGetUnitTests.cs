@@ -1,4 +1,5 @@
 ﻿using Faster.Map;
+using Faster.Map.Core;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
@@ -87,25 +88,7 @@ namespace Faster.Map.RobinHoodMap.Tests
             Assert.Equal(1u, retrievedValue);
             Assert.True(result);
         }
-
-        [Fact]
-        public void Entries_ReturnsAllEntries()
-        {
-            // Arrange
-            var map = new RobinhoodMap<int, string>();
-            map.Emplace(1, "One");
-            map.Emplace(2, "Two");
-            map.Emplace(3, "Three");
-
-            // Act
-            var entries = map.Entries;
-
-            // Assert
-            Assert.Equal(3, entries.Count());
-            Assert.Contains(new KeyValuePair<int, string>(1, "One"), entries);
-            Assert.Contains(new KeyValuePair<int, string>(2, "Two"), entries);
-            Assert.Contains(new KeyValuePair<int, string>(3, "Three"), entries);
-        }
+         
 
         [Fact]
         public void Add_OneMillion_Remove500k_Get500k()

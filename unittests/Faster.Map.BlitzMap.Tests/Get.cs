@@ -1,5 +1,7 @@
 ﻿
+using Faster.Map.Core;
 using Faster.Map.Hasher;
+using Faster.Map.Hashing;
 using System;
 using System.Collections.Generic;
 using System.Linq;

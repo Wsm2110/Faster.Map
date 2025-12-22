@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Faster.Map.Core;
+using System;
 using System.Linq;
 using Xunit;
 

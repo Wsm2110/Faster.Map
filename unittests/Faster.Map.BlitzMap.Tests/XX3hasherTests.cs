@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Faster.Map.Core;
+using Faster.Map.Hashing;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -9,12 +11,12 @@ namespace Faster.Map.BlitzMap.Tests;
 
 public class XX3hasherIntTests
 {
-    private BlitzMap<int, string, Faster.Map.Hasher.XxHash3Hasher<int>> _map;
+    private BlitzMap<int, string, XxHash3Hasher<int>> _map;
 
     public XX3hasherIntTests()
     {
         // Initialize with a small capacity to ensure resizing is tested
-        _map = new BlitzMap<int, string, Faster.Map.Hasher.XxHash3Hasher<int>>(4);
+        _map = new BlitzMap<int, string, XxHash3Hasher<int>>(4);
     }
 
     [Fact]
@@ -123,7 +125,7 @@ public class XX3hasherIntTests
     {
         // Initial capacity 4, load factor 0.8 => resize at 4 * 0.8 = 3.2, so after 3 inserts
         // Actual _maxCountBeforeResize will be 3 (uint cast of 3.2)
-        _map = new BlitzMap<int, string, Faster.Map.Hasher.XxHash3Hasher<int>>(4, 0.8);
+        _map = new BlitzMap<int, string, XxHash3Hasher<int>>(4, 0.8);
         int initialSize = _map.Size; // Should be 4
 
         _map.Insert(1, "One");
@@ -212,11 +214,11 @@ public class XX3hasherIntTests
 
 public class XX3hasherStringTests
 {
-    private BlitzMap<string, int, Faster.Map.Hasher.XxHash3StringHasher> _map;
+    private BlitzMap<string, int, XxHash3StringHasher> _map;
 
     public XX3hasherStringTests()
     {
-        _map = new BlitzMap<string, int, Faster.Map.Hasher.XxHash3StringHasher>(4);
+        _map = new BlitzMap<string, int, XxHash3StringHasher>(4);
     }
 
     [Fact]
@@ -321,7 +323,7 @@ public class XX3hasherStringTests
     [Fact]
     public void BlitzMap_ResizesCorrectly_StringKeys()
     {
-        _map = new BlitzMap<string, int, Faster.Map.Hasher.XxHash3StringHasher>(4, 0.8);
+        _map = new BlitzMap<string, int, XxHash3StringHasher>(4, 0.8);
         int initialSize = _map.Size;
 
         _map.Insert("A", 1);

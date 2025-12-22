@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using Faster.Map.Core;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;

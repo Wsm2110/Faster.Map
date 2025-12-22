@@ -1,4 +1,5 @@
 ﻿using Faster.Map.Concurrent;
+using Faster.Map.Core;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using Xunit;

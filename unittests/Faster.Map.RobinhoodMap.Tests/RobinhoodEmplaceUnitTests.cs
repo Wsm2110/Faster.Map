@@ -1,4 +1,4 @@
-using Faster.Map;
+using Faster.Map.Core;
 using Newtonsoft.Json.Linq;
 
 namespace Faster.Map.RobinHoodMap.Tests

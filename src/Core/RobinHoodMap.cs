@@ -1,6 +1,8 @@
-﻿// Copyright (c) 2024, Wiljan Ruizendaal. All rights reserved. <wruizendaal@gmail.com> 
+﻿// Copyright (c) 2024, Wiljan Ruizendaal. All rights reserved. <wruizendaal@gmail.com>
 // Distributed under the MIT Software License, Version 1.0.
 
+using Faster.Map.Contracts;
+using Faster.Map.Hashing;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -11,6 +13,39 @@ using System.Runtime.InteropServices;
 #nullable enable
 
 namespace Faster.Map;
+
+/// <summary>
+/// A specialized implementation of <see cref="RobinhoodMap{TKey, TValue, THasher}"/> that
+/// simplifies usage by defaulting the hasher to <see cref="DefaultHasher{TKey}"/>.
+/// This avoids requiring three generic type parameters when the user doesn't need
+/// a custom hashing function.
+/// </summary>
+/// <typeparam name="TKey">The type of the keys in the map. Must be non-nullable.</typeparam>
+/// <typeparam name="TValue">The type of the values in the map.</typeparam>
+public sealed class RobinhoodMap<TKey, TValue> : RobinhoodMap<TKey, TValue, DefaultHasher<TKey>>
+    where TKey : notnull
+{
+    /// <summary>
+    /// Initializes a new instance of the <see cref="RobinhoodMap{TKey, TValue}"/> class
+    /// with a default initial length of 8 and a load factor of 0.5.
+    /// </summary>
+    public RobinhoodMap() : base(8, 0.5d) { }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="RobinhoodMap{TKey, TValue}"/> class
+    /// with the specified initial length and a default load factor of 0.5.
+    /// </summary>
+    /// <param name="length">The initial length of the hashmap. Will be rounded up to a power of two.</param>
+    public RobinhoodMap(uint length) : base(length, 0.5d) { }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="RobinhoodMap{TKey, TValue}"/> class
+    /// with the specified initial length and load factor.
+    /// </summary>
+    /// <param name="length">The initial length of the hashmap. Will be rounded up to a power of two.</param>
+    /// <param name="loadFactor">The load factor determines when the hashmap will resize (default is 0.5).</param>
+    public RobinhoodMap(uint length, double loadFactor) : base(length, loadFactor) { }
+}
 
 /// <summary>
 /// RobinhoodMap is a high-performance hashmap implementation that uses Robin Hood hashing with linear probing.
@@ -42,7 +77,7 @@ namespace Faster.Map;
 /// </summary>
 /// <typeparam name="TKey">The type of keys in the map. Must be non-nullable.</typeparam>
 /// <typeparam name="TValue">The type of values in the map.</typeparam>
-public class RobinhoodMap<TKey, TValue> where TKey : notnull
+public class RobinhoodMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKey>
 {
     #region Properties
 
@@ -152,14 +187,13 @@ public class RobinhoodMap<TKey, TValue> where TKey : notnull
     #region Fields
 
     private byte[] _meta;
+    private THasher _hasher;
     private Entry[] _entries;
     private uint _length;
     private readonly double _loadFactor;
-    private const uint _goldenRatio = 0x9E3779B9; // 2654435769;
-    private byte _shift = 32;
     private byte _maxProbeSequenceLength;
-    private readonly IEqualityComparer<TKey> _keyComparer;
     private int _maxLookupsBeforeResize;
+    private uint _mask;
 
     #endregion
 
@@ -200,13 +234,13 @@ public class RobinhoodMap<TKey, TValue> where TKey : notnull
         }
 
         _maxProbeSequenceLength = (byte)BitOperations.Log2(_length);
-        _maxLookupsBeforeResize = (int)((_length + _maxProbeSequenceLength) * loadFactor);
-        _keyComparer = keyComparer ?? EqualityComparer<TKey>.Default;
-        _shift = (byte)(_shift - BitOperations.Log2(_length));
-
+        _maxLookupsBeforeResize = (int)((_length + _maxProbeSequenceLength) * loadFactor);      
+     
         var size = (int)_length + _maxProbeSequenceLength;
+        _mask = _length - 1;
         _entries = GC.AllocateUninitializedArray<Entry>(size);
         _meta = GC.AllocateArray<byte>(size);
+        _hasher = default;
     }
 
     #endregion
@@ -232,7 +266,7 @@ public class RobinhoodMap<TKey, TValue> where TKey : notnull
             Resize();
         }
 
-        var index = Hash(key);
+        var index = _hasher.ComputeHash(key) & _mask;
 
         byte distance = 1;
         var entry = new Entry(key, value);
@@ -253,14 +287,11 @@ public class RobinhoodMap<TKey, TValue> where TKey : notnull
             {
                 Swap(ref distance, ref meta);
                 Swap(ref entry, ref Find(_entries, index));
-
-
-                             
                 ++index;
                 continue;
-            }  
+            }
 
-            if (_keyComparer.Equals(key, Find(_entries, index).Key))
+            if (_hasher.Equals(key, Find(_entries, index).Key))
             {
                 return false;
             }
@@ -288,14 +319,14 @@ public class RobinhoodMap<TKey, TValue> where TKey : notnull
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Get(TKey key, out TValue value)
     {
-        var index = Hash(key);
+        var index = _hasher.ComputeHash(key) & _mask;
         var maxDistance = index + _maxProbeSequenceLength;
 
         do
         {
             ref var entry = ref Find(_entries, index);
 
-            if (_keyComparer.Equals(entry.Key, key))
+            if (_hasher.Equals(entry.Key, key))
             {
                 value = entry.Value;
                 return true;
@@ -327,7 +358,7 @@ public class RobinhoodMap<TKey, TValue> where TKey : notnull
             Resize();
         }
 
-        var index = Hash(key);
+        var index = _hasher.ComputeHash(key) & _mask;
         var entry = new Entry(key, default);
         byte distance = 1;
 
@@ -352,7 +383,7 @@ public class RobinhoodMap<TKey, TValue> where TKey : notnull
                 goto next;
             }
 
-            if (_keyComparer.Equals(key, Find(_entries, index).Key))
+            if (_hasher.Equals(key, Find(_entries, index).Key))
             {
                 return ref Find(_entries, index).Value;
             }
@@ -379,14 +410,14 @@ public class RobinhoodMap<TKey, TValue> where TKey : notnull
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Update(TKey key, TValue value)
     {
-        var index = Hash(key);
+        var index = _hasher.ComputeHash(key) & _mask;
         var maxDistance = index + _maxProbeSequenceLength;
 
         do
         {
             ref var entry = ref Find(_entries, index);
 
-            if (_keyComparer.Equals(entry.Key, key))
+            if (_hasher.Equals(entry.Key, key))
             {
                 entry.Value = value;
                 return true;
@@ -411,12 +442,12 @@ public class RobinhoodMap<TKey, TValue> where TKey : notnull
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Remove(TKey key)
     {
-        var index = Hash(key);
+        var index = _hasher.ComputeHash(key) & _mask;
         var maxDistance = index + _maxProbeSequenceLength;
 
         do
         {
-            if (_keyComparer.Equals(key, Find(_entries, index).Key))
+            if (_hasher.Equals(key, Find(_entries, index).Key))
             {
                 uint nextIndex = index + 1;
                 var nextMeta = Find(_meta, nextIndex);
@@ -462,13 +493,13 @@ public class RobinhoodMap<TKey, TValue> where TKey : notnull
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Contains(TKey key)
     {
-        var index = Hash(key);
+        var index = _hasher.ComputeHash(key) & _mask;
         var maxDistance = index + _maxProbeSequenceLength;
 
         do
         {
             var entry = Find(_entries, index);
-            if (_keyComparer.Equals(entry.Key, key))
+            if (_hasher.Equals(entry.Key, key))
             {
                 return true;
             }
@@ -556,18 +587,6 @@ public class RobinhoodMap<TKey, TValue> where TKey : notnull
     #region Private Methods
 
     /// <summary>
-    /// Computes the hash for a given key using Fibonacci hashing.  
-    /// </summary>
-    /// <param name="key">The key to hash.</param>
-    /// <returns>The computed hash value.</returns>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private uint Hash(TKey key)
-    {
-        var hashcode = (uint)key.GetHashCode();
-        return (_goldenRatio * hashcode) >> _shift;
-    }
-
-    /// <summary>
     /// Finds the entry in the array at the specified index.
     /// </summary>
     /// <param name="array">The array to search.</param>
@@ -597,7 +616,7 @@ public class RobinhoodMap<TKey, TValue> where TKey : notnull
     /// <param name="entry">The entry to insert.</param>
     private void EmplaceInternal(ref Entry entry)
     {
-        var index = Hash(entry.Key);
+        var index = _hasher.ComputeHash(entry.Key) & _mask;
         byte distance = 1;
 
         do
@@ -642,8 +661,8 @@ public class RobinhoodMap<TKey, TValue> where TKey : notnull
     private void Resize()
     {
         _length <<= 1;
-        _shift--;
-
+      
+        _mask = _length - 1;
         _maxProbeSequenceLength = (byte)BitOperations.Log2(_length);
         _maxLookupsBeforeResize = (int)((_length + _maxProbeSequenceLength) * _loadFactor);
 

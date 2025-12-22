@@ -8,6 +8,7 @@ using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Engines;
 using BenchmarkDotNet.Running;
 using Faster.Map.Benchmark.Utilities;
+using Faster.Map.Core;
 using Faster.Map.Hasher;
 
 namespace Faster.Map.Benchmark

@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 using X86Aes = System.Runtime.Intrinsics.X86.Aes;
 
-namespace Faster.Map.Hash
+namespace Faster.Map.Hashing.Algorithm
 {
     /// <summary>
     /// This hash is based on gxHash https://github.com/ogxd/gxhash-csharp/blob/main/GxHash

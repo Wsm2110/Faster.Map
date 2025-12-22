@@ -1,4 +1,6 @@
 ﻿
+using Faster.Map.Core;
+
 namespace Faster.Map.RobinHoodMap.Tests
 {
     public class RobinhoodBenchmarkFixture

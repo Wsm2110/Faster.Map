@@ -2,6 +2,8 @@
 using Xunit;
 using System.Collections.Generic;
 using Faster.Map.Hasher;
+using Faster.Map.Core;
+using Faster.Map.Hashing;
 
 namespace Faster.Map.DenseMap.Tests
 {

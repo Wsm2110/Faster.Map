@@ -1,4 +1,5 @@
 ﻿using Faster.Map.Concurrent;
+using Faster.Map.Core;
 using Xunit;
 
 namespace Faster.Map.BlitzMap.Tests;

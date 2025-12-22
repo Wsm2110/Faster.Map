@@ -1,8 +1,8 @@
 ﻿using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Engines;
 using Faster.Map.Benchmark.Utilities;
-using Faster.Map.Hash;
-using Faster.Map.Hasher;
+using Faster.Map.Core;
+using Faster.Map.Hashing;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;

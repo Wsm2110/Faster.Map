@@ -1,4 +1,5 @@
 ﻿using BenchmarkDotNet.Attributes;
+using Faster.Map.Hashing.Algorithm;
 using System.Runtime.InteropServices;
 
 namespace Faster.Map.Hash.Benchmark
