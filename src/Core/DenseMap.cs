@@ -197,7 +197,7 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
     #endregion
 
     #region Fields
-    
+
     private const sbyte _emptyBucket = -127;
     private const sbyte _tombstone = -126;
     private static readonly Vector128<sbyte> _emptyBucketVector = Vector128.Create(_emptyBucket);
@@ -275,7 +275,7 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
         }
 
         _maxLookupsBeforeResize = (uint)(_length * _loadFactor);
-  
+
         _controlBytes = GC.AllocateArray<sbyte>((int)_length + 16);
         _entries = GC.AllocateArray<Entry>((int)_length + 16);
 
@@ -668,10 +668,12 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
     public bool Remove(TKey key)
     {
         // We dont expect to trigger this. Use a resize sinds this will only happen when the table is nearly full
-        if (_tombstoneCounter >= _maxTombstoneBeforeRehash)
+        if ((_tombstoneCounter & 31) == 0)
         {
-            Resize();
+            if (_tombstoneCounter >= _maxTombstoneBeforeRehash)
+                Resize();
         }
+
         // Compute the hash code for the given key and cast it to an unsigned integer for bitwise operations.
         var hashcode = _hasher.ComputeHash(key);
         // Apply a secondary hash function to further spread the hash bits.
@@ -873,6 +875,14 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
         Array.Clear(_entries);
         _controlBytes.AsSpan().Fill(_emptyBucket);
         Count = 0;
+        _tombstoneCounter = 0;
+
+        // 2. Optional: Clear entries to allow GC to collect objects
+        // Only strictly necessary if TKey or TValue are reference types
+        if (RuntimeHelpers.IsReferenceOrContainsReferences<Entry>())
+        {
+            Array.Clear(_entries, 0, _entries.Length);
+        }
     }
 
     /// <summary>
@@ -987,7 +997,7 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public unsafe static Vector128<sbyte> ReadVector128(ref sbyte controlByte, uint index)
+    public static Vector128<sbyte> ReadVector128(ref sbyte controlByte, uint index)
     {
         return Vector128.LoadUnsafe(ref controlByte, index);
     }
@@ -998,7 +1008,15 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
     /// <param name="hashcode">The hashcode.</param>
     /// <returns>The 7 lowest bits of the hashcode.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static sbyte H2(uint hashcode) => (sbyte)(hashcode >> 25);
+    private static sbyte H2(uint hashcode) 
+    {
+        // Mix the bits so the top 7 are influenced by the bottom
+        hashcode ^= (hashcode >> 16);
+
+        // Extract 7 bits from the very top of the 32-bit range
+        // 32 - 7 = 25
+        return (sbyte)((hashcode >> 25) & 0x7F);
+    }
 
     /// <summary>
     /// Resets the lowest significant bit in the given value.
