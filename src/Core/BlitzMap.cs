@@ -82,12 +82,22 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
     #region Enumerable
 
     /// <summary>
-    /// Fallback for `foreach` compatibility.
+    /// Fallback for `foreach` compatibility.   
+    /// Example:
+    /// <code>
+    /// foreach (ref readonly var entry in map)
+    /// {
+    /// 
+    /// }
+    /// </code>   
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public IEnumerator<Entry> GetEnumerator()
+    public SpanEnumerator GetEnumerator()
     {
-        return new FastEnumerator(_entries, (int)_count);
+        return new SpanEnumerator(
+            MemoryMarshal.CreateReadOnlySpan(
+                ref MemoryMarshal.GetArrayDataReference(_entries),
+                (int)_count));
     }
 
     #endregion
@@ -107,7 +117,7 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
     private uint _maxCountBeforeResize;
     private THasher _hasher;
     private uint _lastBucket = INACTIVE;
-   
+
     #endregion
     /// <summary>
     /// Initializes a new instance of the <see cref="BlitzMap{TKey, TValue, THasher}"/> class
@@ -951,62 +961,35 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
         public uint Next;
     }
 
-    public unsafe struct FastEnumerator : IEnumerator<Entry>
+    public ref struct SpanEnumerator
     {
-        private readonly Entry* _start;
-        private readonly Entry* _end;
-        private Entry* _current;
+        private ReadOnlySpan<Entry> _span;
+        private int _index;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="FastEnumerator"/> struct.
-        /// Uses unsafe pointer-based iteration for extreme performance.
-        /// </summary>
-        /// <param name="entries">The array of entries to enumerate.</param>
-        /// <param name="length">The number of elements in the array.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public FastEnumerator(Entry[] entries, int length)
+        public SpanEnumerator(ReadOnlySpan<Entry> span)
         {
-            // Convert array reference to a raw pointer (avoiding fixed blocks)
-            _start = (Entry*)Unsafe.AsPointer(ref MemoryMarshal.GetArrayDataReference(entries));
-            _end = _start + length;  // Pointer to the end of the array
-            _current = _start - 1;    // Start before the first element (MoveNext() advances it)
+            _span = span;
+            _index = -1;
         }
 
-        /// <summary>
-        /// Moves to the next element in the collection.
-        /// </summary>
-        /// <returns>True if the enumerator successfully moved to the next element, false if at the end.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool MoveNext()
         {
-            _current++; // Move pointer to the next entry
-            return _current < _end; // Check if within bounds
+            int next = _index + 1;
+            if (next < _span.Length)
+            {
+                _index = next;
+                return true;
+            }
+            return false;
         }
 
-        /// <summary>
-        /// Gets the current entry in the enumeration.
-        /// </summary>
-        public readonly Entry Current
+        public ref readonly Entry Current
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => *_current; // Dereference pointer to get the current element
+            get => ref _span[_index];
         }
-
-        /// <summary>
-        /// Gets the current element of the collection (explicit interface implementation).
-        /// </summary>
-        object IEnumerator.Current => Current;
-
-        /// <summary>
-        /// Resets the enumerator to its initial position before the first element.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Reset() => _current = _start - 1;
-
-        /// <summary>
-        /// Releases resources used by the enumerator (not needed for structs).
-        /// </summary>
-        public void Dispose() { }
     }
 
     #endregion

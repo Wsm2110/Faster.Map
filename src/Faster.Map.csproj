@@ -5,6 +5,8 @@
     <LangVersion>preview</LangVersion>
     <TargetFrameworks>net10.0;net9.0;net8.0;net7.0</TargetFrameworks>
     <LangVersion>Latest</LangVersion>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <Authors>Wiljan Ruizendaal</Authors>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <Copyright>MIT</Copyright>
@@ -12,10 +14,10 @@
       Add Equals method to IHasher to eliminate virtual key comparisons
     </PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/Wsm2110/Faster.Map</PackageProjectUrl>
-    <AssemblyVersion>8.0.1</AssemblyVersion>
-    <FileVersion>8.0.1</FileVersion>
+    <AssemblyVersion>8.0.3</AssemblyVersion>
+    <FileVersion>8.0.3</FileVersion>
     <Title>Fastest .net hashmap</Title>
-    <Version>8.0.1</Version>
+    <Version>8.0.3</Version>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Description>
       Incredibly fast hashmap
@@ -57,6 +59,10 @@
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
     <PackageReference Include="System.IO.Hashing" Version="10.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
   </ItemGroup>
 
   <Target Name="GenerateSnk" BeforeTargets="BeforeBuild" Condition="!Exists('$(ProjectDir)Faster.Map.snk')">
