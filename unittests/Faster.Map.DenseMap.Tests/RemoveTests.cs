@@ -749,7 +749,7 @@ public class RemoveTests
 
         for (int i = 0; i < 100000; i++)
         {
-            int k = rnd.Next(32);
+            int k = rnd.Next(1000);
             int v = rnd.Next();
 
             switch (rnd.Next(4))

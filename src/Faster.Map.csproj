@@ -29,10 +29,10 @@
       This change set brings DenseMap’s internal behavior in line with Abseil SwissTable while maintaining API stability.
     </PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/Wsm2110/Faster.Map</PackageProjectUrl>
-    <AssemblyVersion>8.0.5</AssemblyVersion>
-    <FileVersion>8.0.5</FileVersion>
+    <AssemblyVersion>8.0.6</AssemblyVersion>
+    <FileVersion>8.0.6</FileVersion>
     <Title>Fastest .net hashmap</Title>
-    <Version>8.0.5</Version>
+    <Version>8.0.6</Version>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Description>
       Incredibly fast hashmap

@@ -357,7 +357,7 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
     /// <param name="key">The key.</param>
     /// <param name="value">The value.</param>
     /// <returns>Returns the old value</returns>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]  
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void InsertOrUpdate(TKey key, TValue value)
     {
         if (Count >= _maxLookupsBeforeResize)
@@ -427,7 +427,7 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
     /// <param name="key">The key.</param>
     /// <param name="value">The value.</param>
     /// <returns>Returns false if the key is not found.</returns>       
-    [MethodImpl(MethodImplOptions.AggressiveInlining)] 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Get(TKey key, out TValue value)
     {
         var hashcode = _hasher.ComputeHash(key);
@@ -547,7 +547,7 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
     /// <param name="key">The key.</param>
     /// <param name="value">The new value.</param>
     /// <returns>Returns true if the update succeeded, otherwise false.</returns>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]  
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Update(TKey key, TValue value)
     {
         var hashcode = _hasher.ComputeHash(key);
@@ -630,15 +630,8 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
                 ref var entry = ref Unsafe.Add(ref entryBase, slot);
                 if (_hasher.Equals(entry.Key, key))
                 {
-                    if (Vector128.Equals(source, _emptyBucketVector).ExtractMostSignificantBits() != 0)
-                    {
-                        SetCtrl(ref ctrl, slot, _emptyBucket);
-                    }
-                    else
-                    {
-                        SetCtrl(ref ctrl, slot, _tombstone);
-                        _tombstoneCounter++;
-                    }               
+                    SetCtrl(ref ctrl, slot, _tombstone);
+                    _tombstoneCounter++;
 
                     entry = default;
                     --Count;
@@ -831,7 +824,7 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
         Array.Clear(_entries);
         _controlBytes.AsSpan().Fill(_emptyBucket);
         Count = 0;
-        _tombstoneCounter = 0;              
+        _tombstoneCounter = 0;
     }
 
     /// <summary>
