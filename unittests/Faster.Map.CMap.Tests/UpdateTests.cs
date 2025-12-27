@@ -1,6 +1,4 @@
-﻿using Faster.Map.Concurrent;
-using System.Collections;
-using System.Collections.Concurrent;
+﻿using Faster.Map.Core;
 
 namespace Faster.Map.CMap.Tests
 {

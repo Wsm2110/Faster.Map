@@ -12,7 +12,7 @@ using System.Runtime.InteropServices;
 
 #nullable enable
 
-namespace Faster.Map;
+namespace Faster.Map.Core;
 
 /// <summary>
 /// A specialized implementation of <see cref="RobinhoodMap{TKey, TValue, THasher}"/> that

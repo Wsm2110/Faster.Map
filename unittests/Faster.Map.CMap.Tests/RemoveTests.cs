@@ -1,4 +1,5 @@
 ﻿using Faster.Map.Concurrent;
+using Faster.Map.Core;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;

@@ -294,13 +294,17 @@ public class Get
     public void Get_ShouldReturnCorrectValue_WhenKeyIsReinsertedAfterRemovalInCollisionChain()
     {
         var map = new BlitzMap<int, string, DefaultHasher<int>>();
+
         int baseKey = 50;
         int[] collidingKeys = { baseKey, baseKey + 16, baseKey + 32 };
+
         foreach (var key in collidingKeys)
         {
             map.Insert(key, $"value{key}");
         }
+
         map.Remove(collidingKeys[2]);
+
         map.Insert(collidingKeys[2], "newValue");
 
         Assert.True(map.Get(collidingKeys[2], out var value));
