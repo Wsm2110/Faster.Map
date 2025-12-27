@@ -2,6 +2,7 @@
 using System.IO;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
+using Faster.Map.Core;
 
 namespace Faster.Map.Concurrent.Benchmark
 {

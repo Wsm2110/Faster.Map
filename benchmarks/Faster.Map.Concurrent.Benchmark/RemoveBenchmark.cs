@@ -1,4 +1,5 @@
 ﻿using BenchmarkDotNet.Attributes;
+using Faster.Map.Core;
 using NonBlocking;
 using System;
 using System.Collections.Concurrent;
