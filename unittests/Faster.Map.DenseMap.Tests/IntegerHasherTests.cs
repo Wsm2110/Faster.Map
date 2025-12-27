@@ -15,8 +15,8 @@ namespace Faster.Map.DenseMap.Tests
         public void Emplace_AddsNewKeyValuePairs()
         {
             var map = CreateMap();
-            map.Emplace(1, "One");
-            map.Emplace(2, "Two");
+            map.InsertOrUpdate(1, "One");
+            map.InsertOrUpdate(2, "Two");
 
             Assert.Equal(2, map.Count);
             Assert.Equal("One", map[1]);
@@ -27,8 +27,8 @@ namespace Faster.Map.DenseMap.Tests
         public void Emplace_UpdatesValueForExistingKey()
         {
             var map = CreateMap();
-            map.Emplace(1, "One");
-            map.Emplace(1, "UpdatedOne");
+            map.InsertOrUpdate(1, "One");
+            map.InsertOrUpdate(1, "UpdatedOne");
 
             Assert.Equal(1, map.Count);
             Assert.Equal("UpdatedOne", map[1]);
@@ -38,7 +38,7 @@ namespace Faster.Map.DenseMap.Tests
         public void Get_ReturnsValueIfExists()
         {
             var map = CreateMap();
-            map.Emplace(1, "One");
+            map.InsertOrUpdate(1, "One");
 
             Assert.True(map.Get(1, out var value));
             Assert.Equal("One", value);
@@ -69,7 +69,7 @@ namespace Faster.Map.DenseMap.Tests
         public void Update_ChangesValueIfKeyExists()
         {
             var map = CreateMap();
-            map.Emplace(1, "One");
+            map.InsertOrUpdate(1, "One");
 
             Assert.True(map.Update(1, "UpdatedOne"));
             Assert.Equal("UpdatedOne", map[1]);
@@ -87,7 +87,7 @@ namespace Faster.Map.DenseMap.Tests
         public void Remove_DeletesExistingKey()
         {
             var map = CreateMap();
-            map.Emplace(1, "One");
+            map.InsertOrUpdate(1, "One");
             Assert.True(map.Remove(1));
             Assert.False(map.Contains(1));
         }
@@ -103,7 +103,7 @@ namespace Faster.Map.DenseMap.Tests
         public void Contains_ReturnsTrueForExistingKey()
         {
             var map = CreateMap();
-            map.Emplace(1, "One");
+            map.InsertOrUpdate(1, "One");
             Assert.True(map.Contains(1));
         }
 
@@ -118,8 +118,8 @@ namespace Faster.Map.DenseMap.Tests
         public void Clear_RemovesAllEntries()
         {
             var map = CreateMap();
-            map.Emplace(1, "One");
-            map.Emplace(2, "Two");
+            map.InsertOrUpdate(1, "One");
+            map.InsertOrUpdate(2, "Two");
 
             map.Clear();
 
@@ -136,7 +136,7 @@ namespace Faster.Map.DenseMap.Tests
             // Emplace more than initial capacity to force resize
             for (int i = 0; i < 20; i++)
             {
-                map.Emplace(i, $"Value{i}");
+                map.InsertOrUpdate(i, $"Value{i}");
             }
 
             Assert.Equal(20, map.Count);
@@ -152,8 +152,8 @@ namespace Faster.Map.DenseMap.Tests
         public void Enumerator_ReturnsAllEntries()
         {
             var map = CreateMap();
-            map.Emplace(1, "One");
-            map.Emplace(2, "Two");
+            map.InsertOrUpdate(1, "One");
+            map.InsertOrUpdate(2, "Two");
 
             var entries = new List<KeyValuePair<int, string>>(map.Entries);
 
@@ -174,7 +174,7 @@ namespace Faster.Map.DenseMap.Tests
         public void Indexer_Get_ReturnsValueForExistingKey()
         {
             var map = CreateMap();
-            map.Emplace(1, "One");
+            map.InsertOrUpdate(1, "One");
 
             Assert.Equal("One", map[1]);
         }
@@ -183,7 +183,7 @@ namespace Faster.Map.DenseMap.Tests
         public void Indexer_Set_UpdatesValueForExistingKey()
         {
             var map = CreateMap();
-            map.Emplace(1, "One");
+            map.InsertOrUpdate(1, "One");
 
             map[1] = "UpdatedOne";
 
@@ -195,9 +195,9 @@ namespace Faster.Map.DenseMap.Tests
         {
             var map = new DenseMap<int, string, XxHash3Hasher<int>>(4, 0.75);
 
-            map.Emplace(1, "One");
-            map.Emplace(2, "Two");
-            map.Emplace(3, "Three");
+            map.InsertOrUpdate(1, "One");
+            map.InsertOrUpdate(2, "Two");
+            map.InsertOrUpdate(3, "Three");
 
             Assert.True(map.Count <= 4 * 0.75);
         }

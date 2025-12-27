@@ -19,8 +19,8 @@ namespace Faster.Map.DenseMap.Tests
         [Fact]
         public void Emplace_AddsNewStringKeyValuePairs()
         {
-            _map.Emplace("key1", "value1");
-            _map.Emplace("key2", "value2");
+            _map.InsertOrUpdate("key1", "value1");
+            _map.InsertOrUpdate("key2", "value2");
 
             Assert.Equal(2, _map.Count);
             Assert.Equal("value1", _map["key1"]);
@@ -30,8 +30,8 @@ namespace Faster.Map.DenseMap.Tests
         [Fact]
         public void Emplace_UpdatesValueForExistingStringKey()
         {       
-            _map.Emplace("key1", "value1");
-            _map.Emplace("key1", "updatedValue1");
+            _map.InsertOrUpdate("key1", "value1");
+            _map.InsertOrUpdate("key1", "updatedValue1");
 
             Assert.Equal(1, _map.Count);
             Assert.Equal("updatedValue1", _map["key1"]);
@@ -40,7 +40,7 @@ namespace Faster.Map.DenseMap.Tests
         [Fact]
         public void Get_ReturnsValueIfStringKeyExists()
         {       
-            _map.Emplace("key1", "value1");
+            _map.InsertOrUpdate("key1", "value1");
 
             Assert.True(_map.Get("key1", out var value));
             Assert.Equal("value1", value);
@@ -59,7 +59,7 @@ namespace Faster.Map.DenseMap.Tests
         public void Update_ChangesValueIfStringKeyExists()
         {
        
-            _map.Emplace("key1", "value1");
+            _map.InsertOrUpdate("key1", "value1");
 
             Assert.True(_map.Update("key1", "updatedValue1"));
             Assert.Equal("updatedValue1", _map["key1"]);
@@ -74,7 +74,7 @@ namespace Faster.Map.DenseMap.Tests
         [Fact]
         public void Remove_DeletesExistingStringKey()
         {       
-            _map.Emplace("key1", "value1");
+            _map.InsertOrUpdate("key1", "value1");
 
             Assert.True(_map.Remove("key1"));
             Assert.False(_map.Contains("key1"));
@@ -89,7 +89,7 @@ namespace Faster.Map.DenseMap.Tests
         [Fact]
         public void Contains_ReturnsTrueForExistingStringKey()
         {       
-            _map.Emplace("key1", "value1");
+            _map.InsertOrUpdate("key1", "value1");
 
             Assert.True(_map.Contains("key1"));
         }
@@ -103,8 +103,8 @@ namespace Faster.Map.DenseMap.Tests
         [Fact]
         public void Clear_RemovesAllStringEntries()
         {       
-            _map.Emplace("key1", "value1");
-            _map.Emplace("key2", "value2");
+            _map.InsertOrUpdate("key1", "value1");
+            _map.InsertOrUpdate("key2", "value2");
 
             _map.Clear();
 
@@ -118,7 +118,7 @@ namespace Faster.Map.DenseMap.Tests
         {    
             for (int i = 0; i < 20; i++)
             {
-                _map.Emplace($"key{i}", $"value{i}");
+                _map.InsertOrUpdate($"key{i}", $"value{i}");
             }
 
             Assert.Equal(20, _map.Count);
@@ -133,8 +133,8 @@ namespace Faster.Map.DenseMap.Tests
         [Fact]
         public void Enumerator_ReturnsAllStringEntries()
         {       
-            _map.Emplace("key1", "value1");
-            _map.Emplace("key2", "value2");
+            _map.InsertOrUpdate("key1", "value1");
+            _map.InsertOrUpdate("key2", "value2");
 
             var entries = new List<KeyValuePair<string, string>>(_map.Entries);
 
@@ -152,7 +152,7 @@ namespace Faster.Map.DenseMap.Tests
         [Fact]
         public void Indexer_Get_ReturnsValueForExistingStringKey()
         {       
-            _map.Emplace("key1", "value1");
+            _map.InsertOrUpdate("key1", "value1");
 
             Assert.Equal("value1", _map["key1"]);
         }
@@ -160,7 +160,7 @@ namespace Faster.Map.DenseMap.Tests
         [Fact]
         public void Indexer_Set_UpdatesValueForExistingStringKey()
         {       
-            _map.Emplace("key1", "value1");
+            _map.InsertOrUpdate("key1", "value1");
 
             _map["key1"] = "updatedValue1";
 
@@ -172,9 +172,9 @@ namespace Faster.Map.DenseMap.Tests
         {
             var result = new DenseMap<string, string, XxHash3StringHasher>(4, 0.75);
 
-            result.Emplace("key1", "value1");
-            result.Emplace("key2", "value2");
-            result.Emplace("key3", "value3");
+            result.InsertOrUpdate("key1", "value1");
+            result.InsertOrUpdate("key2", "value2");
+            result.InsertOrUpdate("key3", "value3");
 
             Assert.True(result.Count <= 4 * 0.75);
         }

@@ -26,7 +26,7 @@ namespace Faster.Map.DenseMap.Tests
         [Fact]
         public void GetValueRefOrAddDefault_ShouldReturnExistingEntry_WhenKeyExists()
         {
-            _map.Emplace(2, 20);
+            _map.InsertOrUpdate(2, 20);
             ref int value = ref _map.GetValueRefOrAddDefault(2);
 
             Assert.Equal(20, value);
@@ -54,7 +54,7 @@ namespace Faster.Map.DenseMap.Tests
         [Fact]
         public void GetValueRefOrAddDefault_ShouldReuseTombstonedSlot()
         {
-            _map.Emplace(3, 300);
+            _map.InsertOrUpdate(3, 300);
             _map.Remove(3);
 
             ref int value = ref _map.GetValueRefOrAddDefault(3);
@@ -147,7 +147,7 @@ namespace Faster.Map.DenseMap.Tests
         [Fact]
         public void GetValueRefOrAddDefault_ShouldReturnUpdatedValue_AfterPreviousRemoval()
         {
-            _map.Emplace(15, 150);
+            _map.InsertOrUpdate(15, 150);
             _map.Remove(15);
 
             ref int value = ref _map.GetValueRefOrAddDefault(15);

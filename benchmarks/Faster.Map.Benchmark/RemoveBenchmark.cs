@@ -91,7 +91,7 @@ namespace Faster.Map.Benchmark
                         _blitz.Insert(key, key);
                         break;
                     case nameof(DenseMap):
-                        _denseMap.Emplace(key, key);
+                        _denseMap.InsertOrUpdate(key, key);
                         break;
                     case nameof(RobinhoodMap):
                         _robinHoodMap.Emplace(key, key);

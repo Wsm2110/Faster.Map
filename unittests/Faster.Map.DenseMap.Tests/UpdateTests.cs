@@ -10,7 +10,7 @@ namespace Faster.Map.DenseMap.Tests
         public void Update_ShouldUpdateValue_WhenKeyExists()
         {
             var map = new DenseMap<int, string>();
-            map.Emplace(1, "initialValue");
+            map.InsertOrUpdate(1, "initialValue");
             bool updated = map.Update(1, "newValue");
 
             Assert.True(updated);
@@ -30,8 +30,8 @@ namespace Faster.Map.DenseMap.Tests
         public void Update_ShouldHandleMinAndMaxIntKeys()
         {
             var map = new DenseMap<int, string>();
-            map.Emplace(int.MinValue, "minValue");
-            map.Emplace(int.MaxValue, "maxValue");
+            map.InsertOrUpdate(int.MinValue, "minValue");
+            map.InsertOrUpdate(int.MaxValue, "maxValue");
 
             bool minUpdated = map.Update(int.MinValue, "updatedMinValue");
             bool maxUpdated = map.Update(int.MaxValue, "updatedMaxValue");
@@ -55,7 +55,7 @@ namespace Faster.Map.DenseMap.Tests
         public void Update_ShouldHandleNullValues()
         {
             var map = new DenseMap<int, string?>();
-            map.Emplace(1, "initialValue");
+            map.InsertOrUpdate(1, "initialValue");
 
             bool updated = map.Update(1, null);
 
@@ -67,7 +67,7 @@ namespace Faster.Map.DenseMap.Tests
         public void Update_ShouldHandleZeroKey()
         {
             var map = new DenseMap<int, string>();
-            map.Emplace(0, "initialValue");
+            map.InsertOrUpdate(0, "initialValue");
 
             bool updated = map.Update(0, "updatedValue");
 
@@ -82,7 +82,7 @@ namespace Faster.Map.DenseMap.Tests
 
             for (int i = 0; i < 14; i++)
             {
-                map.Emplace(i, $"value{i}");
+                map.InsertOrUpdate(i, $"value{i}");
             }
 
             bool updated = map.Update(5, "updatedValue");
@@ -95,9 +95,9 @@ namespace Faster.Map.DenseMap.Tests
         public void Update_ShouldReuseTombstonedSlot_WhenKeyReinserted()
         {
             var map = new DenseMap<int, string>();
-            map.Emplace(1, "initialValue");
+            map.InsertOrUpdate(1, "initialValue");
             map.Remove(1);
-            map.Emplace(1, "newValue");
+            map.InsertOrUpdate(1, "newValue");
 
             bool updated = map.Update(1, "updatedAgain");
 
@@ -114,7 +114,7 @@ namespace Faster.Map.DenseMap.Tests
 
             foreach (var key in collidingKeys)
             {
-                map.Emplace(key, $"value{key}");
+                map.InsertOrUpdate(key, $"value{key}");
             }
 
             bool updated = map.Update(collidingKeys[1], "updatedValue");
@@ -127,9 +127,9 @@ namespace Faster.Map.DenseMap.Tests
         public void Update_ShouldNotAffectOtherEntries_InCollisionChain()
         {
             var map = new DenseMap<int, string>();
-            map.Emplace(1, "value1");
-            map.Emplace(2, "value2");
-            map.Emplace(17, "value17"); // Assuming it causes a collision with key 1
+            map.InsertOrUpdate(1, "value1");
+            map.InsertOrUpdate(2, "value2");
+            map.InsertOrUpdate(17, "value17"); // Assuming it causes a collision with key 1
 
             bool updated = map.Update(1, "newValue1");
 
@@ -143,7 +143,7 @@ namespace Faster.Map.DenseMap.Tests
         public void Update_ShouldReturnFalse_WhenTryingToUpdateTombstonedEntry()
         {
             var map = new DenseMap<int, string>();
-            map.Emplace(1, "value1");
+            map.InsertOrUpdate(1, "value1");
             map.Remove(1);
 
             bool updated = map.Update(1, "newValue");
@@ -155,7 +155,7 @@ namespace Faster.Map.DenseMap.Tests
         public void Update_ShouldHandleNegativeKeys()
         {
             var map = new DenseMap<int, string>();
-            map.Emplace(-1, "negativeValue");
+            map.InsertOrUpdate(-1, "negativeValue");
 
             bool updated = map.Update(-1, "updatedNegativeValue");
 
@@ -167,8 +167,8 @@ namespace Faster.Map.DenseMap.Tests
         public void Update_ShouldReturnTrue_WhenUpdatingKeyInCollisionGroup()
         {
             var map = new DenseMap<int, string>();
-            map.Emplace(1, "value1");
-            map.Emplace(17, "value17"); // Assuming collision with key 1
+            map.InsertOrUpdate(1, "value1");
+            map.InsertOrUpdate(17, "value17"); // Assuming collision with key 1
 
             bool updated = map.Update(17, "updatedValue17");
 
@@ -180,7 +180,7 @@ namespace Faster.Map.DenseMap.Tests
         public void Update_ShouldHandleMultipleUpdateOperations_OnSameKey()
         {
             var map = new DenseMap<int, string>();
-            map.Emplace(1, "initialValue");
+            map.InsertOrUpdate(1, "initialValue");
 
             map.Update(1, "updatedValue1");
             map.Update(1, "updatedValue2");
@@ -195,7 +195,7 @@ namespace Faster.Map.DenseMap.Tests
 
             for (int i = 0; i < 5; i++)
             {
-                map.Emplace(i, $"value{i}");
+                map.InsertOrUpdate(i, $"value{i}");
             }
 
             bool updated = map.Update(3, "updatedValue");
@@ -209,7 +209,7 @@ namespace Faster.Map.DenseMap.Tests
         public void Update_ShouldReturnFalse_WhenCalledAfterClear()
         {
             var map = new DenseMap<int, string>();
-            map.Emplace(1, "value1");
+            map.InsertOrUpdate(1, "value1");
 
             map.Clear();
 
@@ -222,7 +222,7 @@ namespace Faster.Map.DenseMap.Tests
         public void Update_ShouldNotReinsertRemovedKey()
         {
             var map = new DenseMap<int, string>();
-            map.Emplace(1, "value1");
+            map.InsertOrUpdate(1, "value1");
             map.Remove(1);
 
             bool updated = map.Update(1, "newValue");
@@ -235,9 +235,9 @@ namespace Faster.Map.DenseMap.Tests
         public void Update_ShouldHandleReinsertedKey_AfterBeingRemovedAndReinserted()
         {
             var map = new DenseMap<int, string>();
-            map.Emplace(1, "initialValue");
+            map.InsertOrUpdate(1, "initialValue");
             map.Remove(1);
-            map.Emplace(1, "newValue");
+            map.InsertOrUpdate(1, "newValue");
 
             bool updated = map.Update(1, "finalValue");
 
@@ -252,7 +252,7 @@ namespace Faster.Map.DenseMap.Tests
 
             for (int i = 0; i < 28; i++)
             {
-                map.Emplace(i, $"value{i}");
+                map.InsertOrUpdate(i, $"value{i}");
             }
 
             map.Update(4, "updatedValue4");
@@ -268,7 +268,7 @@ namespace Faster.Map.DenseMap.Tests
 
             for (int i = 0; i < 28; i++)
             {
-                map.Emplace(i, $"value{i}");
+                map.InsertOrUpdate(i, $"value{i}");
             }
 
             bool updated = map.Update(29, "newValue");
@@ -280,7 +280,7 @@ namespace Faster.Map.DenseMap.Tests
         public void Update_ShouldReturnFalse_WhenAttemptingToUpdateKeyInClearedMap()
         {
             var map = new DenseMap<int, string>();
-            map.Emplace(1, "initialValue");
+            map.InsertOrUpdate(1, "initialValue");
             map.Clear();
 
             bool updated = map.Update(1, "newValue");
@@ -292,7 +292,7 @@ namespace Faster.Map.DenseMap.Tests
         public void Update_ShouldWorkCorrectly_WhenUpdatingValueToEmptyString()
         {
             var map = new DenseMap<int, string>();
-            map.Emplace(1, "initialValue");
+            map.InsertOrUpdate(1, "initialValue");
 
             bool updated = map.Update(1, "");
 
@@ -307,7 +307,7 @@ namespace Faster.Map.DenseMap.Tests
 
             for (int i = 0; i < 64; i++)
             {
-                map.Emplace(i, $"initialValue{i}");
+                map.InsertOrUpdate(i, $"initialValue{i}");
             }
 
             for (int i = 0; i < 64; i++)

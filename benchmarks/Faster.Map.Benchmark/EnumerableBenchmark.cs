@@ -66,7 +66,7 @@ public class EnumerableBenchmark
         foreach (var key in keys)
         {
             _dictionary.Add(key, key);
-            _denseMap.Emplace(key, key);
+            _denseMap.InsertOrUpdate(key, key);
             _blitz.Insert(key, key);
             _robinHoodMap.Emplace(key, key);
         }

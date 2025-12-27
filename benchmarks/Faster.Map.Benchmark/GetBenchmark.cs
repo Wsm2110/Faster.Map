@@ -65,21 +65,21 @@ namespace Faster.Map.Benchmark
             foreach (var key in keys)
             {
                 _dictionary.Add(key, key);
-                _denseMap.Emplace(key, key);
+                _denseMap.InsertOrUpdate(key, key);
                 _blitz.Insert(key, key);           
                 _robinHoodMap.Emplace(key, key);
             }
         }
 
-        [Benchmark]
-        public void BlitzMap()
-        {
-            for (int i = 0; i < keys.Length; i++)
-            {
-                var key = keys[i];
-                _blitz.Get(key, out var _);
-            }
-        }
+        //[Benchmark]
+        //public void BlitzMap()
+        //{
+        //    for (int i = 0; i < keys.Length; i++)
+        //    {
+        //        var key = keys[i];
+        //        _blitz.Get(key, out var _);
+        //    }
+        //}
 
         [Benchmark]
         public void DenseMap()

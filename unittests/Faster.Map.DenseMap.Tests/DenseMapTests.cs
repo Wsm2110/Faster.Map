@@ -31,8 +31,8 @@ namespace Faster.Map.DenseMap.Tests
             var map = new DenseMap<uint, uint>(16);
 
             //act
-            map.Emplace(1, 1);
-            map.Emplace(1, 2);
+            map.InsertOrUpdate(1, 1);
+            map.InsertOrUpdate(1, 2);
 
             Assert.IsTrue(map[1] == 2);
         }
@@ -42,7 +42,7 @@ namespace Faster.Map.DenseMap.Tests
         {
             //arrange
             var map = new DenseMap<uint, uint>(16);
-            map.Emplace(1, 1);
+            map.InsertOrUpdate(1, 1);
 
             //act
             map.Update(1, 100);
@@ -74,7 +74,7 @@ namespace Faster.Map.DenseMap.Tests
         {
             //arrange
             var map = new DenseMap<uint, uint>(16);
-            map.Emplace(1, 1);
+            map.InsertOrUpdate(1, 1);
 
             //act
             var result = map.Contains(1);
@@ -104,7 +104,7 @@ namespace Faster.Map.DenseMap.Tests
             var map = new DenseMap<uint, uint>(16);
 
             //act
-            map.Emplace(1, 1);
+            map.InsertOrUpdate(1, 1);
             map.Clear();
 
             //assert        
@@ -129,7 +129,7 @@ namespace Faster.Map.DenseMap.Tests
         {
             //arrange
             var map = new DenseMap<uint, uint>(16);
-            map.Emplace(1, 1);
+            map.InsertOrUpdate(1, 1);
 
             //act
             var result = map.Remove(1);
@@ -146,30 +146,30 @@ namespace Faster.Map.DenseMap.Tests
             var map = new DenseMap<uint, uint>(16);
 
             //act    
-            map.Emplace(1, 1);
-            map.Emplace(2, 1);
-            map.Emplace(3, 1);
-            map.Emplace(4, 1);
-            map.Emplace(5, 1);
-            map.Emplace(6, 1);
-            map.Emplace(7, 1);
-            map.Emplace(8, 1);
-            map.Emplace(9, 1);
-            map.Emplace(10, 1);
-            map.Emplace(11, 1);
-            map.Emplace(12, 1);
-            map.Emplace(13, 1);
-            map.Emplace(14, 2);
-            map.Emplace(15, 1);
-            map.Emplace(16, 1);
-            map.Emplace(17, 1);
-            map.Emplace(18, 1);
-            map.Emplace(19, 1);
+            map.InsertOrUpdate(1, 1);
+            map.InsertOrUpdate(2, 1);
+            map.InsertOrUpdate(3, 1);
+            map.InsertOrUpdate(4, 1);
+            map.InsertOrUpdate(5, 1);
+            map.InsertOrUpdate(6, 1);
+            map.InsertOrUpdate(7, 1);
+            map.InsertOrUpdate(8, 1);
+            map.InsertOrUpdate(9, 1);
+            map.InsertOrUpdate(10, 1);
+            map.InsertOrUpdate(11, 1);
+            map.InsertOrUpdate(12, 1);
+            map.InsertOrUpdate(13, 1);
+            map.InsertOrUpdate(14, 2);
+            map.InsertOrUpdate(15, 1);
+            map.InsertOrUpdate(16, 1);
+            map.InsertOrUpdate(17, 1);
+            map.InsertOrUpdate(18, 1);
+            map.InsertOrUpdate(19, 1);
 
             //assert  
             // 16 * 2) + 16
 
-            Assert.AreEqual(48, (int)map.Size);
+            Assert.AreEqual(32, (int)map.Size);
         }
 
         [TestMethod]
@@ -179,25 +179,25 @@ namespace Faster.Map.DenseMap.Tests
             var map = new DenseMap<uint, uint>(16);
 
             //act    
-            map.Emplace(1, 1);
-            map.Emplace(2, 1);
-            map.Emplace(3, 1);
-            map.Emplace(4, 1);
-            map.Emplace(5, 1);
-            map.Emplace(6, 1);
-            map.Emplace(7, 1);
-            map.Emplace(8, 1);
-            map.Emplace(9, 1);
-            map.Emplace(10, 1);
-            map.Emplace(11, 1);
-            map.Emplace(12, 1);
-            map.Emplace(13, 1);
-            map.Emplace(14, 2);
-            map.Emplace(15, 1);
-            map.Emplace(16, 1);
-            map.Emplace(17, 1);
-            map.Emplace(18, 1);
-            map.Emplace(19, 1);
+            map.InsertOrUpdate(1, 1);
+            map.InsertOrUpdate(2, 1);
+            map.InsertOrUpdate(3, 1);
+            map.InsertOrUpdate(4, 1);
+            map.InsertOrUpdate(5, 1);
+            map.InsertOrUpdate(6, 1);
+            map.InsertOrUpdate(7, 1);
+            map.InsertOrUpdate(8, 1);
+            map.InsertOrUpdate(9, 1);
+            map.InsertOrUpdate(10, 1);
+            map.InsertOrUpdate(11, 1);
+            map.InsertOrUpdate(12, 1);
+            map.InsertOrUpdate(13, 1);
+            map.InsertOrUpdate(14, 2);
+            map.InsertOrUpdate(15, 1);
+            map.InsertOrUpdate(16, 1);
+            map.InsertOrUpdate(17, 1);
+            map.InsertOrUpdate(18, 1);
+            map.InsertOrUpdate(19, 1);
 
             //assert  
             // 16 * 2) + 16
@@ -212,25 +212,25 @@ namespace Faster.Map.DenseMap.Tests
             var map = new DenseMap<uint, uint>(16);
 
             //act    
-            map.Emplace(1, 1);
-            map.Emplace(2, 1);
-            map.Emplace(3, 1);
-            map.Emplace(4, 1);
-            map.Emplace(5, 1);
-            map.Emplace(6, 1);
-            map.Emplace(7, 1);
-            map.Emplace(8, 1);
-            map.Emplace(9, 1);
-            map.Emplace(10, 1);
-            map.Emplace(11, 1);
-            map.Emplace(12, 1);
-            map.Emplace(13, 1);
-            map.Emplace(14, 2);
-            map.Emplace(15, 1);
-            map.Emplace(16, 1);
-            map.Emplace(17, 1);
-            map.Emplace(18, 1);
-            map.Emplace(19, 1);
+            map.InsertOrUpdate(1, 1);
+            map.InsertOrUpdate(2, 1);
+            map.InsertOrUpdate(3, 1);
+            map.InsertOrUpdate(4, 1);
+            map.InsertOrUpdate(5, 1);
+            map.InsertOrUpdate(6, 1);
+            map.InsertOrUpdate(7, 1);
+            map.InsertOrUpdate(8, 1);
+            map.InsertOrUpdate(9, 1);
+            map.InsertOrUpdate(10, 1);
+            map.InsertOrUpdate(11, 1);
+            map.InsertOrUpdate(12, 1);
+            map.InsertOrUpdate(13, 1);
+            map.InsertOrUpdate(14, 2);
+            map.InsertOrUpdate(15, 1);
+            map.InsertOrUpdate(16, 1);
+            map.InsertOrUpdate(17, 1);
+            map.InsertOrUpdate(18, 1);
+            map.InsertOrUpdate(19, 1);
 
             var result = map.Get(19, out var r1);
             //assert  
@@ -247,7 +247,7 @@ namespace Faster.Map.DenseMap.Tests
             var map = new DenseMap<uint, uint>(16);
 
             //act    
-            map.Emplace(1, 5);
+            map.InsertOrUpdate(1, 5);
 
             var result = map[1];
 
@@ -262,7 +262,7 @@ namespace Faster.Map.DenseMap.Tests
             var map = new DenseMap<uint, uint>(16);
 
             //act    
-            map.Emplace(1, 5);
+            map.InsertOrUpdate(1, 5);
 
             map[1] = 10;
 
@@ -280,7 +280,7 @@ namespace Faster.Map.DenseMap.Tests
             var map = new DenseMap<uint, uint>(16);
 
             //act    
-            map.Emplace(1, 5);
+            map.InsertOrUpdate(1, 5);
 
             //throws
             map[5] = 10;
@@ -295,7 +295,7 @@ namespace Faster.Map.DenseMap.Tests
             var map = new DenseMap<uint, uint>(16);
 
             //act    
-            map.Emplace(1, 5);
+            map.InsertOrUpdate(1, 5);
 
             //throws
             var x = map[5];
@@ -308,7 +308,7 @@ namespace Faster.Map.DenseMap.Tests
             var map = new DenseMap<uint, uint>(16);
 
             //act
-            map.Emplace(1, 1);
+            map.InsertOrUpdate(1, 1);
 
             //assert
             Assert.AreEqual(1, map.Count);
@@ -332,21 +332,21 @@ namespace Faster.Map.DenseMap.Tests
         public void AssertDeletedEntriesShouldLeaveTombstones()
         {
             var fmap = new DenseMap<int, int>();
-            fmap.Emplace(1, 1);
-            fmap.Emplace(2, 1);
-            fmap.Emplace(3, 1);
-            fmap.Emplace(4, 1);
-            fmap.Emplace(5, 1);
-            fmap.Emplace(6, 1);
-            fmap.Emplace(7, 1);
-            fmap.Emplace(8, 1);
-            fmap.Emplace(9, 1);
-            fmap.Emplace(10, 1);
-            fmap.Emplace(11, 1);
+            fmap.InsertOrUpdate(1, 1);
+            fmap.InsertOrUpdate(2, 1);
+            fmap.InsertOrUpdate(3, 1);
+            fmap.InsertOrUpdate(4, 1);
+            fmap.InsertOrUpdate(5, 1);
+            fmap.InsertOrUpdate(6, 1);
+            fmap.InsertOrUpdate(7, 1);
+            fmap.InsertOrUpdate(8, 1);
+            fmap.InsertOrUpdate(9, 1);
+            fmap.InsertOrUpdate(10, 1);
+            fmap.InsertOrUpdate(11, 1);
 
 
 
-            fmap.Emplace(1, 1);
+            fmap.InsertOrUpdate(1, 1);
 
 
 
@@ -358,7 +358,7 @@ namespace Faster.Map.DenseMap.Tests
         public void AssertEntryNotFound()
         {
             var fmap = new DenseMap<long, long>(1);
-            fmap.Emplace(0L, 0L);
+            fmap.InsertOrUpdate(0L, 0L);
 
             var r = fmap.Get(1, out _);
 
@@ -372,11 +372,11 @@ namespace Faster.Map.DenseMap.Tests
             DenseMap<uint, uint> map = new DenseMap<uint, uint>(16);
             DenseMap<uint, uint> map2 = new DenseMap<uint, uint>(16);
 
-            map.Emplace(1, 1);
-            map.Emplace(2, 1);
+            map.InsertOrUpdate(1, 1);
+            map.InsertOrUpdate(2, 1);
 
-            map2.Emplace(3, 1);
-            map2.Emplace(4, 1);
+            map2.InsertOrUpdate(3, 1);
+            map2.InsertOrUpdate(4, 1);
 
             map.Copy(map2);
 
@@ -389,10 +389,10 @@ namespace Faster.Map.DenseMap.Tests
             //assign
             DenseMap<uint, uint> map = new DenseMap<uint, uint>(16);
 
-            map.Emplace(1, 1);
-            map.Emplace(2, 2);
-            map.Emplace(3, 3);
-            map.Emplace(4, 4);
+            map.InsertOrUpdate(1, 1);
+            map.InsertOrUpdate(2, 2);
+            map.InsertOrUpdate(3, 3);
+            map.InsertOrUpdate(4, 4);
 
             //act
 
@@ -413,14 +413,14 @@ namespace Faster.Map.DenseMap.Tests
             //assign
             DenseMap<uint, uint> map = new DenseMap<uint, uint>(16);
 
-            map.Emplace(1, 1);
-            map.Emplace(13, 2);
-            map.Emplace(16, 3);
-            map.Emplace(111, 4);
+            map.InsertOrUpdate(1, 1);
+            map.InsertOrUpdate(13, 2);
+            map.InsertOrUpdate(16, 3);
+            map.InsertOrUpdate(111, 4);
             //act
             map.Remove(1);
             //assert
-            map.Emplace(1, 1);
+            map.InsertOrUpdate(1, 1);
 
             Assert.IsTrue(map.Count == 4);
         }
@@ -432,9 +432,9 @@ namespace Faster.Map.DenseMap.Tests
             DenseMap<uint, uint> map = new DenseMap<uint, uint>(16);
 
             //act
-            map.Emplace(1, 1);
+            map.InsertOrUpdate(1, 1);
             map.Remove(1);
-            map.Emplace(1, 2);
+            map.InsertOrUpdate(1, 2);
 
             //assert
             map.Get(1, out var result);
@@ -449,10 +449,10 @@ namespace Faster.Map.DenseMap.Tests
             var map = new DenseMap<uint, uint>(16, 0.5);
 
             //act
-            map.Emplace(1, 1);
-            map.Emplace(2, 2);
-            map.Emplace(3, 2);
-            map.Emplace(4, 2);
+            map.InsertOrUpdate(1, 1);
+            map.InsertOrUpdate(2, 2);
+            map.InsertOrUpdate(3, 2);
+            map.InsertOrUpdate(4, 2);
 
             var count = 0;
             foreach (var item in map.Keys)
@@ -471,10 +471,10 @@ namespace Faster.Map.DenseMap.Tests
             var map = new DenseMap<uint, uint>(16, 0.5);
 
             //act
-            map.Emplace(1, 1);
-            map.Emplace(2, 2);
-            map.Emplace(3, 2);
-            map.Emplace(4, 2);
+            map.InsertOrUpdate(1, 1);
+            map.InsertOrUpdate(2, 2);
+            map.InsertOrUpdate(3, 2);
+            map.InsertOrUpdate(4, 2);
 
             var count = 0;
             foreach (var item in map.Values)
@@ -493,10 +493,10 @@ namespace Faster.Map.DenseMap.Tests
             var map = new DenseMap<uint, uint>(16, 0.5);
 
             //act
-            map.Emplace(1, 1);
-            map.Emplace(2, 2);
-            map.Emplace(3, 2);
-            map.Emplace(4, 2);
+            map.InsertOrUpdate(1, 1);
+            map.InsertOrUpdate(2, 2);
+            map.InsertOrUpdate(3, 2);
+            map.InsertOrUpdate(4, 2);
 
             var count = 0;
             foreach (var item in map.Entries)
@@ -542,11 +542,11 @@ namespace Faster.Map.DenseMap.Tests
             Assert.IsTrue(keysList.Contains(missingKey), "Sanity check failed");
 
             var keysSet = new DenseMap<long, long>(190);
-            keysSet.Emplace(0L, 0L);
+            keysSet.InsertOrUpdate(0L, 0L);
 
             foreach (var key in keysList)
             {
-                keysSet.Emplace(key, key);
+                keysSet.InsertOrUpdate(key, key);
 
                 if (key == missingKey)
                 {

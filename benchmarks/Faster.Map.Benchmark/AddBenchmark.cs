@@ -85,7 +85,7 @@ namespace Faster.Map.Benchmark
             for (int i = 0; i < keys.Length; i++)
             {
                 var key = keys[i];
-                _dense.Emplace(key, key);
+                _dense.InsertOrUpdate(key, key);
             }
         }
 

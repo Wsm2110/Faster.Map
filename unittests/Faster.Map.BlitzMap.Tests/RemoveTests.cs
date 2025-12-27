@@ -941,4 +941,37 @@ public class RemoveTests
         for (int i = 0; i < 100; i++)
             Assert.False(map.Get(i * 4, out var _));
     }
+
+    [Fact]
+    public void LongRunningFuzz()
+    {
+        var rnd = new Random();
+        var map = new BlitzMap<int, int>();
+        var dict = new Dictionary<int, int>();
+
+        for (int i = 0; i < 100000; i++)
+        {
+            int k = rnd.Next(1000);
+            int v = rnd.Next();
+
+            switch (rnd.Next(4))
+            {
+                case 0:
+                    map.InsertOrUpdate(k, v); dict[k] = v; break;
+                case 1:                  
+                    map.Remove(k); dict.Remove(k); break;
+                case 2:
+                    Assert.Equal(
+                        dict.TryGetValue(k, out var dv),
+                        map.Get(k, out var mv));
+                    if (dict.ContainsKey(k)) Assert.Equal(dv, mv);
+                    break;
+                case 3:
+
+                    Assert.Equal(dict.ContainsKey(k), map.Contains(k));
+                    break;
+            }
+        }
+    }
+
 }

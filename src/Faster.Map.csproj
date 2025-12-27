@@ -11,13 +11,28 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <Copyright>MIT</Copyright>
     <PackageReleaseNotes>
-      Add Equals method to IHasher to eliminate virtual key comparisons
+      Blitzmap: removal corruption caused by stale _lastBucket pointing into freed buckets.
+      Correct chain unlinking so tail removal no longer leaves dangling Next links.
+      Ensure moved entry slot updates the owning bucket after compaction.
+      Introduce kickout-on-insert to restore home-bucket invariant for foreign heads.
+      Prevents overlapping chains and hard-to-reproduce lookup failures.
+      
+      DenseMap: add SwissTable-style mirroring, compaction scopes, and probe-safe APIs
+      Implemented mirrored control-byte padding to allow SIMD probing across table boundaries without branches.
+      Normalized all slot addressing using power-of-two masking to prevent out-of-bounds entry access.
+      Rewrote Insert, InsertOrUpdate, Get, Update, Remove, Contains, and GetValueRefOrAddDefault to be mirror-safe and slot-normalized.
+      Added in-place table Rehash() to compact tombstones without resizing.
+      Added automatic rehash trigger based on tombstone pressure.
+      Introduced rehash suppression scopes (BeginRehashScope / EndRehashScope) for O(n) bulk deletes without rebuild thrashing.
+      Fixed enumeration (Entries, Keys, Values) to avoid mirrored tail duplication.
+      Hardened probe logic to preserve SwissTable invariants under wrap-around SIMD reads.
+      This change set brings DenseMap’s internal behavior in line with Abseil SwissTable while maintaining API stability.
     </PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/Wsm2110/Faster.Map</PackageProjectUrl>
-    <AssemblyVersion>8.0.3</AssemblyVersion>
-    <FileVersion>8.0.3</FileVersion>
+    <AssemblyVersion>8.0.5</AssemblyVersion>
+    <FileVersion>8.0.5</FileVersion>
     <Title>Fastest .net hashmap</Title>
-    <Version>8.0.3</Version>
+    <Version>8.0.5</Version>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Description>
       Incredibly fast hashmap

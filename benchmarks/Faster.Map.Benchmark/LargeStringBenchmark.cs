@@ -73,7 +73,7 @@ namespace Faster.Map.Benchmark
             {
                 var key = keys[i];
                 _dictionary.Add(key, key);
-                _dense.Emplace(key, key);
+                _dense.InsertOrUpdate(key, key);
                 _robinhoodMap.Emplace(key, key);
                 _blitzMap.Insert(key, key);
             }

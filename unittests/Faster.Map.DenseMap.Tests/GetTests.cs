@@ -10,7 +10,7 @@ namespace Faster.Map.DenseMap.Tests
         public void Get_ShouldReturnTrueAndCorrectValue_WhenKeyExists()
         {
             var map = new DenseMap<int, string>();
-            map.Emplace(1, "value1");
+            map.InsertOrUpdate(1, "value1");
             Assert.True(map.Get(1, out var value));
             Assert.Equal("value1", value);
         }
@@ -35,7 +35,7 @@ namespace Faster.Map.DenseMap.Tests
         public void Get_ShouldReturnCorrectValue_WhenKeyIsZero()
         {
             var map = new DenseMap<int, string>();
-            map.Emplace(0, "zeroValue");
+            map.InsertOrUpdate(0, "zeroValue");
             Assert.True(map.Get(0, out var value));
             Assert.Equal("zeroValue", value);
         }
@@ -44,7 +44,7 @@ namespace Faster.Map.DenseMap.Tests
         public void Get_ShouldReturnTrueAndCorrectValue_ForNegativeKeys()
         {
             var map = new DenseMap<int, string>();
-            map.Emplace(-1, "negativeValue");
+            map.InsertOrUpdate(-1, "negativeValue");
             Assert.True(map.Get(-1, out var value));
             Assert.Equal("negativeValue", value);
         }
@@ -53,7 +53,7 @@ namespace Faster.Map.DenseMap.Tests
         public void Get_ShouldReturnDefault_WhenKeyIsRemoved()
         {
             var map = new DenseMap<int, string>();
-            map.Emplace(1, "value1");
+            map.InsertOrUpdate(1, "value1");
             map.Remove(1);
             Assert.False(map.Get(1, out var value));
             Assert.Null(value);
@@ -63,9 +63,9 @@ namespace Faster.Map.DenseMap.Tests
         public void Get_ShouldReturnUpdatedValue_WhenKeyIsReinsertedAfterRemoval()
         {
             var map = new DenseMap<int, string>();
-            map.Emplace(1, "value1");
+            map.InsertOrUpdate(1, "value1");
             map.Remove(1);
-            map.Emplace(1, "newValue1");
+            map.InsertOrUpdate(1, "newValue1");
             Assert.True(map.Get(1, out var value));
             Assert.Equal("newValue1", value);
         }
@@ -74,8 +74,8 @@ namespace Faster.Map.DenseMap.Tests
         public void Get_ShouldReturnCorrectValue_ForMinAndMaxIntKeys()
         {
             var map = new DenseMap<int, string>();
-            map.Emplace(int.MinValue, "minValue");
-            map.Emplace(int.MaxValue, "maxValue");
+            map.InsertOrUpdate(int.MinValue, "minValue");
+            map.InsertOrUpdate(int.MaxValue, "maxValue");
             Assert.True(map.Get(int.MinValue, out var minValue));
             Assert.Equal("minValue", minValue);
             Assert.True(map.Get(int.MaxValue, out var maxValue));
@@ -88,7 +88,7 @@ namespace Faster.Map.DenseMap.Tests
             var map = new DenseMap<int, string>(16, 0.9);
             for (int i = 0; i < 14; i++)
             {
-                map.Emplace(i, $"value{i}");
+                map.InsertOrUpdate(i, $"value{i}");
             }
             Assert.False(map.Get(99, out var value));
             Assert.Null(value);
@@ -100,7 +100,7 @@ namespace Faster.Map.DenseMap.Tests
             var map = new DenseMap<int, string>(4, 0.9);
             for (int i = 0; i < 5; i++)
             {
-                map.Emplace(i, $"value{i}");
+                map.InsertOrUpdate(i, $"value{i}");
             }
             Assert.True(map.Get(3, out var value));
             Assert.Equal("value3", value);
@@ -111,7 +111,7 @@ namespace Faster.Map.DenseMap.Tests
         public void Get_ShouldReturnDefault_AfterClear()
         {
             var map = new DenseMap<int, string>();
-            map.Emplace(1, "value1");
+            map.InsertOrUpdate(1, "value1");
             map.Clear();
             Assert.False(map.Get(1, out var value));
             Assert.Null(value);
@@ -125,7 +125,7 @@ namespace Faster.Map.DenseMap.Tests
             int[] collidingKeys = { baseKey, baseKey + 16, baseKey + 32 };
             foreach (var key in collidingKeys)
             {
-                map.Emplace(key, $"value{key}");
+                map.InsertOrUpdate(key, $"value{key}");
             }
             foreach (var key in collidingKeys)
             {
@@ -140,7 +140,7 @@ namespace Faster.Map.DenseMap.Tests
             var map = new DenseMap<int, string>(16, 0.9);
             for (int i = 0; i < 1000; i++)
             {
-                map.Emplace(i, $"value{i}");
+                map.InsertOrUpdate(i, $"value{i}");
             }
             Assert.True(map.Get(999, out var value));
             Assert.Equal("value999", value);
@@ -154,10 +154,10 @@ namespace Faster.Map.DenseMap.Tests
             int[] collidingKeys = { baseKey, baseKey + 16, baseKey + 32 };
             foreach (var key in collidingKeys)
             {
-                map.Emplace(key, $"value{key}");
+                map.InsertOrUpdate(key, $"value{key}");
             }
             map.Remove(collidingKeys[2]);
-            map.Emplace(collidingKeys[2], "newValue");
+            map.InsertOrUpdate(collidingKeys[2], "newValue");
 
             Assert.True(map.Get(collidingKeys[2], out var value));
             Assert.Equal("newValue", value);
@@ -167,9 +167,9 @@ namespace Faster.Map.DenseMap.Tests
         public void Get_ShouldReturnTrue_AfterReinsertionInTombstonedSlot()
         {
             var map = new DenseMap<int, string>();
-            map.Emplace(1, "value1");
+            map.InsertOrUpdate(1, "value1");
             map.Remove(1);
-            map.Emplace(1, "newValue");
+            map.InsertOrUpdate(1, "newValue");
 
             Assert.True(map.Get(1, out var value));
             Assert.Equal("newValue", value);
@@ -181,7 +181,7 @@ namespace Faster.Map.DenseMap.Tests
             var map = new DenseMap<int, string>();
             for (int i = 0; i < 1000; i++)
             {
-                map.Emplace(i, $"value{i}");
+                map.InsertOrUpdate(i, $"value{i}");
             }
             map.Remove(500);
             Assert.False(map.Get(500, out var value));
@@ -194,7 +194,7 @@ namespace Faster.Map.DenseMap.Tests
             var map = new DenseMap<int, string>(16, 0.9);
             for (int i = 0; i < 14; i++)
             {
-                map.Emplace(i, $"value{i}");
+                map.InsertOrUpdate(i, $"value{i}");
             }
             map.Remove(10);
             Assert.False(map.Get(10, out var value));
@@ -205,8 +205,8 @@ namespace Faster.Map.DenseMap.Tests
         public void Get_ShouldReturnCorrectValue_WhenBoundaryKeysArePresent()
         {
             var map = new DenseMap<int, string>();
-            map.Emplace(int.MinValue, "minValue");
-            map.Emplace(int.MaxValue, "maxValue");
+            map.InsertOrUpdate(int.MinValue, "minValue");
+            map.InsertOrUpdate(int.MaxValue, "maxValue");
 
             Assert.True(map.Get(int.MinValue, out var minValue));
             Assert.Equal("minValue", minValue);
@@ -218,7 +218,7 @@ namespace Faster.Map.DenseMap.Tests
         public void Get_ShouldReturnDefault_WhenKeyNotInMap()
         {
             var map = new DenseMap<int, string>();
-            map.Emplace(1, "value1");
+            map.InsertOrUpdate(1, "value1");
             Assert.False(map.Get(999, out var value));
             Assert.Null(value);
         }
@@ -227,7 +227,7 @@ namespace Faster.Map.DenseMap.Tests
         public void Get_ShouldReturnCorrectValue_ForZeroKey()
         {
             var map = new DenseMap<int, string>();
-            map.Emplace(0, "zeroValue");
+            map.InsertOrUpdate(0, "zeroValue");
 
             Assert.True(map.Get(0, out var value));
             Assert.Equal("zeroValue", value);
@@ -237,7 +237,7 @@ namespace Faster.Map.DenseMap.Tests
         public void Get_ShouldReturnCorrectValue_ForNegativeKey()
         {
             var map = new DenseMap<int, string>();
-            map.Emplace(-10, "negativeValue");
+            map.InsertOrUpdate(-10, "negativeValue");
 
             Assert.True(map.Get(-10, out var value));
             Assert.Equal("negativeValue", value);
@@ -252,12 +252,12 @@ namespace Faster.Map.DenseMap.Tests
             int[] keys = { 3, 19, 35 }; // Assuming these hash to different groups
             foreach (var key in keys)
             {
-                map.Emplace(key, $"value{key}");
+                map.InsertOrUpdate(key, $"value{key}");
             }
 
             // Remove a key and reinsert
             map.Remove(19);
-            map.Emplace(19, "newValue19");
+            map.InsertOrUpdate(19, "newValue19");
 
             Assert.True(map.Get(19, out var value));
             Assert.Equal("newValue19", value);
@@ -269,10 +269,10 @@ namespace Faster.Map.DenseMap.Tests
             var map = new DenseMap<int, string>(4, 0.9);
             for (int i = 0; i < 10; i++)
             {
-                map.Emplace(i, $"value{i}");
+                map.InsertOrUpdate(i, $"value{i}");
             }
             map.Remove(8);
-            map.Emplace(8, "newEight");
+            map.InsertOrUpdate(8, "newEight");
             Assert.True(map.Get(8, out var value));
             Assert.Equal("newEight", value);
         }
@@ -283,7 +283,7 @@ namespace Faster.Map.DenseMap.Tests
             var dense = new DenseMap<int, int>();
             for (int i = 1; i <= 16; ++i)
             {
-                dense.Emplace(i, 0);
+                dense.InsertOrUpdate(i, 0);
                 dense.Remove(i);
             }
 

@@ -18,7 +18,7 @@ public class RemoveTests
     [Fact]
     public void Remove_ShouldReturnTrue_WhenKeyExists()
     {
-        _map.Emplace(1, "value1");
+        _map.InsertOrUpdate(1, "value1");
         bool result = _map.Remove(1);
 
         Assert.True(result);
@@ -37,7 +37,7 @@ public class RemoveTests
     [Fact]
     public void Remove_ShouldReturnFalse_AfterMultipleAttemptsOnSameKey()
     {
-        _map.Emplace(1, "value1");
+        _map.InsertOrUpdate(1, "value1");
 
         bool firstRemove = _map.Remove(1);
         bool secondRemove = _map.Remove(1);
@@ -50,8 +50,8 @@ public class RemoveTests
     [Fact]
     public void Remove_ShouldNotAffectOtherKeys_WhenKeyIsRemoved()
     {
-        _map.Emplace(1, "value1");
-        _map.Emplace(2, "value2");
+        _map.InsertOrUpdate(1, "value1");
+        _map.InsertOrUpdate(2, "value2");
 
         _map.Remove(1);
 
@@ -63,8 +63,8 @@ public class RemoveTests
     [Fact]
     public void Remove_ShouldHandleMinAndMaxIntKeys()
     {
-        _map.Emplace(int.MinValue, "minValue");
-        _map.Emplace(int.MaxValue, "maxValue");
+        _map.InsertOrUpdate(int.MinValue, "minValue");
+        _map.InsertOrUpdate(int.MaxValue, "maxValue");
 
         _map.Remove(int.MinValue);
 
@@ -76,10 +76,10 @@ public class RemoveTests
     [Fact]
     public void Remove_ShouldReuseSlot_WhenKeyIsRemovedAndReinserted()
     {
-        _map.Emplace(1, "value1");
+        _map.InsertOrUpdate(1, "value1");
         _map.Remove(1);
 
-        _map.Emplace(1, "newValue");
+        _map.InsertOrUpdate(1, "newValue");
 
         Assert.True(_map.Contains(1));
         Assert.Equal("newValue", _map[1]);
@@ -88,13 +88,13 @@ public class RemoveTests
     [Fact]
     public void Remove_ShouldHandleMultipleRemoveAndReinsertCycles()
     {
-        _map.Emplace(1, "value1");
+        _map.InsertOrUpdate(1, "value1");
         _map.Remove(1);
 
-        _map.Emplace(1, "value2");
+        _map.InsertOrUpdate(1, "value2");
         _map.Remove(1);
 
-        _map.Emplace(1, "finalValue");
+        _map.InsertOrUpdate(1, "finalValue");
 
         Assert.True(_map.Contains(1));
         Assert.Equal("finalValue", _map[1]);
@@ -108,7 +108,7 @@ public class RemoveTests
 
         foreach (var key in collidingKeys)
         {
-            _map.Emplace(key, $"value{key}");
+            _map.InsertOrUpdate(key, $"value{key}");
         }
 
         // Remove middle entry and ensure it’s no longer in the map
@@ -125,7 +125,7 @@ public class RemoveTests
     [Fact]
     public void Remove_ShouldHandleKeyZero()
     {
-        _map.Emplace(0, "zeroValue");
+        _map.InsertOrUpdate(0, "zeroValue");
         _map.Remove(0);
 
         Assert.False(_map.Contains(0));
@@ -134,8 +134,8 @@ public class RemoveTests
     [Fact]
     public void Remove_ShouldHandleNegativeKeys()
     {
-        _map.Emplace(-1, "negativeOne");
-        _map.Emplace(-2, "negativeTwo");
+        _map.InsertOrUpdate(-1, "negativeOne");
+        _map.InsertOrUpdate(-2, "negativeTwo");
 
         _map.Remove(-1);
 
@@ -147,7 +147,7 @@ public class RemoveTests
     [Fact]
     public void Remove_ShouldNotAffectCount_AfterRemovingNonExistentKey()
     {
-        _map.Emplace(1, "value1");
+        _map.InsertOrUpdate(1, "value1");
         int initialCount = _map.Count;
 
         _map.Remove(42); // Key 42 does not exist
@@ -158,8 +158,8 @@ public class RemoveTests
     [Fact]
     public void Remove_ShouldDecrementCount_WhenKeyIsRemoved()
     {
-        _map.Emplace(1, "value1");
-        _map.Emplace(2, "value2");
+        _map.InsertOrUpdate(1, "value1");
+        _map.InsertOrUpdate(2, "value2");
         int initialCount = _map.Count;
 
         _map.Remove(1);
@@ -170,8 +170,8 @@ public class RemoveTests
     [Fact]
     public void Remove_ShouldCorrectlyHandleBoundaryValues()
     {
-        _map.Emplace(int.MaxValue, "max");
-        _map.Emplace(int.MinValue, "min");
+        _map.InsertOrUpdate(int.MaxValue, "max");
+        _map.InsertOrUpdate(int.MinValue, "min");
 
         _map.Remove(int.MaxValue);
 
@@ -182,10 +182,10 @@ public class RemoveTests
     [Fact]
     public void Remove_ShouldFreeUpSlotForReinsertion_AfterBoundaryValuesAreRemoved()
     {
-        _map.Emplace(int.MaxValue, "max");
+        _map.InsertOrUpdate(int.MaxValue, "max");
         _map.Remove(int.MaxValue);
 
-        _map.Emplace(int.MaxValue, "newMax");
+        _map.InsertOrUpdate(int.MaxValue, "newMax");
 
         Assert.Equal("newMax", _map[int.MaxValue]);
     }
@@ -193,9 +193,9 @@ public class RemoveTests
     [Fact]
     public void Remove_ShouldPreserveRemainingEntries_WhenRemovingMultipleKeys()
     {
-        _map.Emplace(1, "value1");
-        _map.Emplace(2, "value2");
-        _map.Emplace(3, "value3");
+        _map.InsertOrUpdate(1, "value1");
+        _map.InsertOrUpdate(2, "value2");
+        _map.InsertOrUpdate(3, "value3");
 
         _map.Remove(1);
         _map.Remove(3);
@@ -211,14 +211,14 @@ public class RemoveTests
     {
         for (int i = 0; i < 20; i++)
         {
-            _map.Emplace(i, $"value{i}");
+            _map.InsertOrUpdate(i, $"value{i}");
         }
 
         _map.Remove(5);
         _map.Remove(15);
 
-        _map.Emplace(5, "newValue5");
-        _map.Emplace(15, "newValue15");
+        _map.InsertOrUpdate(5, "newValue5");
+        _map.InsertOrUpdate(15, "newValue15");
 
         Assert.Equal("newValue5", _map[5]);
         Assert.Equal("newValue15", _map[15]);
@@ -229,11 +229,11 @@ public class RemoveTests
     {
         for (int i = 0; i < 50; i++)
         {
-            _map.Emplace(i, $"value{i}");
+            _map.InsertOrUpdate(i, $"value{i}");
         }
 
         _map.Remove(25);
-        _map.Emplace(25, "newValue25");
+        _map.InsertOrUpdate(25, "newValue25");
 
         Assert.Equal("newValue25", _map[25]);
     }
@@ -241,9 +241,9 @@ public class RemoveTests
     [Fact]
     public void Remove_ShouldAllowReinsertionOfKey_WithoutConflictsOrDuplicates()
     {
-        _map.Emplace(10, "initialValue");
+        _map.InsertOrUpdate(10, "initialValue");
         _map.Remove(10);
-        _map.Emplace(10, "reinsertedValue");
+        _map.InsertOrUpdate(10, "reinsertedValue");
 
         Assert.True(_map.Contains(10));
         Assert.Equal("reinsertedValue", _map[10]);
@@ -255,7 +255,7 @@ public class RemoveTests
     {
         for (int i = 0; i < 10; i++)
         {
-            _map.Emplace(i, $"value{i}");
+            _map.InsertOrUpdate(i, $"value{i}");
         }
 
         for (int i = 0; i < 5; i++)
@@ -265,7 +265,7 @@ public class RemoveTests
 
         for (int i = 5; i < 10; i++)
         {
-            _map.Emplace(i + 10, $"newValue{i + 10}");
+            _map.InsertOrUpdate(i + 10, $"newValue{i + 10}");
         }
 
         for (int i = 0; i < 5; i++)
@@ -289,7 +289,7 @@ public class RemoveTests
     {
         for (int i = 0; i < 50; i++)
         {
-            _map.Emplace(i, $"value{i}");
+            _map.InsertOrUpdate(i, $"value{i}");
             if (i % 2 == 0)
             {
                 _map.Remove(i);
@@ -300,7 +300,7 @@ public class RemoveTests
         {
             if (i % 2 == 0)
             {
-                _map.Emplace(i, $"reused{i}");
+                _map.InsertOrUpdate(i, $"reused{i}");
             }
         }
 
@@ -314,7 +314,7 @@ public class RemoveTests
     [Fact]
     public void Remove_ShouldHandleRepeatedlyRemovingSameKey()
     {
-        _map.Emplace(1, "value1");
+        _map.InsertOrUpdate(1, "value1");
 
         for (int i = 0; i < 10; i++) // Attempt to remove the same key multiple times
         {
@@ -336,7 +336,7 @@ public class RemoveTests
         // Fill the map up to its capacity
         for (int i = 0; i < 29; i++) // 90% loadfacotr
         {
-            _map.Emplace(i, $"value{i}");
+            _map.InsertOrUpdate(i, $"value{i}");
         }
 
         // Attempt to remove an entry at max capacity
@@ -353,7 +353,7 @@ public class RemoveTests
         int threshold = (int)(_map.Size * 0.9);
         for (int i = 0; i < threshold; i++)
         {
-            _map.Emplace(i, $"value{i}");
+            _map.InsertOrUpdate(i, $"value{i}");
         }
 
         // Remove some entries
@@ -369,9 +369,9 @@ public class RemoveTests
     [Fact]
     public void Remove_ShouldHandleRemovalFromSparseMap()
     {
-        _map.Emplace(1, "value1");
-        _map.Emplace(1000, "value1000");
-        _map.Emplace(2000, "value2000");
+        _map.InsertOrUpdate(1, "value1");
+        _map.InsertOrUpdate(1000, "value1000");
+        _map.InsertOrUpdate(2000, "value2000");
 
         // Remove non-consecutive keys and ensure sparse structure is maintained
         _map.Remove(1);
@@ -389,8 +389,8 @@ public class RemoveTests
         int baseKey = 16; // Assumed to cause a collision with other keys
         int collidingKey = baseKey + (int)_map.Size;
 
-        _map.Emplace(baseKey, "baseValue");
-        _map.Emplace(collidingKey, "collidingValue");
+        _map.InsertOrUpdate(baseKey, "baseValue");
+        _map.InsertOrUpdate(collidingKey, "collidingValue");
 
         _map.Remove(baseKey); // Remove the first key in the collision chain
 
@@ -405,7 +405,7 @@ public class RemoveTests
         // Insert keys and then remove all to create tombstones
         for (int i = 0; i < 10; i++)
         {
-            _map.Emplace(i, $"value{i}");
+            _map.InsertOrUpdate(i, $"value{i}");
         }
 
         for (int i = 0; i < 10; i++)
@@ -425,7 +425,7 @@ public class RemoveTests
         // Insert keys to force a resize
         for (int i = 0; i <= 28; i++)
         {
-            _map.Emplace(i, $"value{i}");
+            _map.InsertOrUpdate(i, $"value{i}");
         }
 
         int initialSize = (int)_map.Size;
@@ -451,15 +451,15 @@ public class RemoveTests
         int key2 = key1 + (int)_map.Size;
         int key3 = key2 + (int)_map.Size;
 
-        _map.Emplace(key1, "value1");
-        _map.Emplace(key2, "value2");
-        _map.Emplace(key3, "value3");
+        _map.InsertOrUpdate(key1, "value1");
+        _map.InsertOrUpdate(key2, "value2");
+        _map.InsertOrUpdate(key3, "value3");
 
         // Remove a middle entry in the chain
         _map.Remove(key2);
 
         // Reinsert the removed key
-        _map.Emplace(key2, "newValue2");
+        _map.InsertOrUpdate(key2, "newValue2");
 
         Assert.True(_map.Contains(key1));
         Assert.True(_map.Contains(key2));
@@ -472,7 +472,7 @@ public class RemoveTests
     {
         for (int i = 0; i < 15; i++)
         {
-            _map.Emplace(i, $"value{i}");
+            _map.InsertOrUpdate(i, $"value{i}");
         }
 
         int initialCount = _map.Count;
@@ -494,7 +494,7 @@ public class RemoveTests
         // Insert and then remove all entries
         for (int i = 0; i < 20; i++)
         {
-            _map.Emplace(i, $"value{i}");
+            _map.InsertOrUpdate(i, $"value{i}");
         }
 
         for (int i = 0; i < 20; i++)
@@ -514,8 +514,8 @@ public class RemoveTests
     {
         var map = new DenseMap<int, string>();
 
-        map.Emplace(int.MinValue, "minValue");
-        map.Emplace(int.MaxValue, "maxValue");
+        map.InsertOrUpdate(int.MinValue, "minValue");
+        map.InsertOrUpdate(int.MaxValue, "maxValue");
 
         Assert.True(map.Remove(int.MinValue));
         Assert.False(map.Contains(int.MinValue));
@@ -532,7 +532,7 @@ public class RemoveTests
         // Fill map close to capacity
         for (int i = 0; i < 28; i++)
         {
-            map.Emplace(i, $"value{i}");
+            map.InsertOrUpdate(i, $"value{i}");
         }
 
         // Now, start removing
@@ -560,7 +560,7 @@ public class RemoveTests
             // Add entries
             for (int i = 0; i < 10; i++)
             {
-                map.Emplace(i, $"cycle{cycle}-value{i}");
+                map.InsertOrUpdate(i, $"cycle{cycle}-value{i}");
             }
 
             // Remove half of the entries
@@ -588,7 +588,7 @@ public class RemoveTests
         // Insert entries up to half the map size to allow room for tombstone testing.
         for (int i = 0; i < 8; i++)
         {
-            map.Emplace(i, $"value{i}");
+            map.InsertOrUpdate(i, $"value{i}");
         }
 
         // Remove entries to create tombstones.
@@ -599,7 +599,7 @@ public class RemoveTests
 
         // Trigger a rehash by adding enough tombstones.
         // At this point, a rehash should occur based on the tombstone threshold.
-        map.Emplace(99, "value99");
+        map.InsertOrUpdate(99, "value99");
 
         // Assert that the tombstone counter has been reset, indicating rehash.
         Assert.True(map.Count == 3); // Only remaining entries (7, 99, and any added during rehash).
@@ -612,7 +612,7 @@ public class RemoveTests
         var map = new DenseMap<int, string>(32, 0.75);
         for (int i = 0; i < 10; i++)
         {
-            map.Emplace(i, $"value{i}");
+            map.InsertOrUpdate(i, $"value{i}");
         }
 
         // Remove a subset of entries to create tombstones.
@@ -622,7 +622,7 @@ public class RemoveTests
         }
 
         // Trigger a rehash by exceeding the tombstone threshold.
-        map.Emplace(20, "value20");
+        map.InsertOrUpdate(20, "value20");
 
         // Check that remaining entries are accessible and tombstones are cleared.
         for (int i = 5; i < 10; i++)
@@ -645,7 +645,7 @@ public class RemoveTests
         // Insert initial entries
         for (int i = 0; i < 10; i++)
         {
-            map.Emplace(i, $"value{i}");
+            map.InsertOrUpdate(i, $"value{i}");
         }
 
         // Remove a few entries to create tombstones
@@ -654,8 +654,8 @@ public class RemoveTests
         map.Remove(9);
 
         // Insert additional entries to trigger rehash
-        map.Emplace(11, "value11");
-        map.Emplace(12, "value12");
+        map.InsertOrUpdate(11, "value11");
+        map.InsertOrUpdate(12, "value12");
 
         // Assert the rehash has retained the values correctly
         Assert.True(map.Contains(11));
@@ -677,7 +677,7 @@ public class RemoveTests
         // Insert entries to almost full capacity
         for (int i = 0; i < 12; i++)
         {
-            map.Emplace(i, $"value{i}");
+            map.InsertOrUpdate(i, $"value{i}");
         }
 
         // Remove entries to create multiple tombstones
@@ -689,8 +689,8 @@ public class RemoveTests
         map.Remove(11);
 
         // Insert additional entries to trigger resize and rehash
-        map.Emplace(12, "value12");
-        map.Emplace(13, "value13");
+        map.InsertOrUpdate(12, "value12");
+        map.InsertOrUpdate(13, "value13");
 
         // Verify all retained entries are accessible and correct
         for (int i = 0; i < 9; i++)
@@ -726,46 +726,57 @@ public class RemoveTests
         for (int i = 0; i < keys.Length; i++)
         {
             var key = keys[i];
-            map.Emplace(key, key);
+            map.InsertOrUpdate(key, key);
         }
+
+        map.BeginBulkRemove();
 
         for (int i = 0; i < keys.Length; i++)
         {
             var key = keys[i];
             map.Remove(key);
         }
+
+        map.EndBulkRemove();
     }
 
     [Fact]
     public void LongRunningFuzz()
     {
-        var rnd = new Random();
+        var rnd = new Random(3);
         var map = new DenseMap<int, int>();
         var dict = new Dictionary<int, int>();
 
         for (int i = 0; i < 100000; i++)
         {
-            int k = rnd.Next(1000);
+            int k = rnd.Next(32);
             int v = rnd.Next();
 
             switch (rnd.Next(4))
             {
                 case 0:
-                    map.Emplace(k, v);
+                    if (k == 14) 
+                    {
+                    
+                    }
+                    map.InsertOrUpdate(k, v);
                     dict[k] = v; break;
                 case 1:
-                    if (k == 58)
+                    if (k == 14)
                     {
 
                     }
                     map.Remove(k);
                     dict.Remove(k); break;
                 case 2:
+                    if (k == 14)
+                    {
+
+                    }
                     Assert.Equal(dict.TryGetValue(k, out var dv), map.Get(k, out var mv));
                     if (dict.ContainsKey(k)) Assert.Equal(dv, mv);
                     break;
                 case 3:
-
                     Assert.Equal(dict.ContainsKey(k), map.Contains(k));
                     break;
             }
