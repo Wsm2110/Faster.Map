@@ -300,14 +300,19 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Insert(TKey key, TValue value)
     {
-        if (Count >= _maxLookupsBeforeResize)
+        // Use both Count and Tombstones to determine if a Resize/Rebuild is needed
+        // This prevents the P99 latency spikes caused by long probe chains
+        if (Count + _tombstoneCounter >= _maxLookupsBeforeResize)
+        {
             Resize();
+        }
 
         var hashcode = _hasher.ComputeHash(key);
         var h2 = H2(hashcode);
 
-        uint index = hashcode & _mask;
+        uint index = (uint)hashcode & _mask;
         uint jumpDistance = 0;
+        uint firstAvailableSlot = uint.MaxValue;
 
         ref sbyte ctrl = ref MemoryMarshal.GetArrayDataReference(_controlBytes);
         ref Entry entryBase = ref MemoryMarshal.GetArrayDataReference(_entries);
@@ -315,26 +320,55 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
         while (true)
         {
             var source = Vector128.LoadUnsafe(ref ctrl, index);
+
+            // 1. Identify Empty slots (terminates the chain)
             var emptyMask = Vector128.Equals(source, _emptyBucketVector).ExtractMostSignificantBits();
 
+            // 2. Identify Tombstones (potential reuse points)
+            // We only care about the very first tombstone we see in the entire probe sequence
+            if (firstAvailableSlot == uint.MaxValue)
+            {
+                var tombstoneMask = Vector128.Equals(source, _tombstoneVector).ExtractMostSignificantBits();
+                if (tombstoneMask != 0)
+                {
+                    uint bit = (uint)BitOperations.TrailingZeroCount(tombstoneMask);
+                    firstAvailableSlot = (index + bit) & _mask;
+                }
+            }
+
+            // 3. If we hit an empty bucket, the search for the end of the chain is over
             if (emptyMask != 0)
             {
-                uint bit = (uint)BitOperations.TrailingZeroCount(emptyMask);
-                uint slot = (index + bit) & _mask;
+                uint slot;
+                if (firstAvailableSlot != uint.MaxValue)
+                {
+                    // Reuse the tombstone we found earlier to keep the map dense
+                    slot = firstAvailableSlot;
+                    _tombstoneCounter--;
+                }
+                else
+                {
+                    // No tombstones found, use the first empty bucket
+                    uint bit = (uint)BitOperations.TrailingZeroCount(emptyMask);
+                    slot = (index + bit) & _mask;
+                }
 
+                // Write the control byte (and mirror it for SIMD safety)
                 SetCtrl(ref ctrl, slot, h2);
 
+                // Write the data
                 ref var entry = ref Unsafe.Add(ref entryBase, slot);
                 entry.Key = key;
                 entry.Value = value;
+
                 ++Count;
                 return;
             }
 
+            // Triangular Probing: index + 16, then + 32, then + 48...
             index = (index + (jumpDistance += _groupWidth)) & _mask;
         }
     }
-
     /// <summary>
     /// Inserts or updates a key-value pair in the map.
     /// </summary>  
@@ -360,55 +394,65 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void InsertOrUpdate(TKey key, TValue value)
     {
-        if (Count >= _maxLookupsBeforeResize)
-            Resize();
+        if (Count + _tombstoneCounter >= _maxLookupsBeforeResize) Resize();
 
-        var hashcode = _hasher.ComputeHash(key);
-        var h2 = H2(hashcode);
+        var hash = _hasher.ComputeHash(key);
+        var h2 = H2(hash);
         var target = Vector128.Create(h2);
-
-        uint index = hashcode & _mask;
-        uint jumpDistance = 0;
+        uint index = hash & _mask;
+        uint jump = 0;
+        uint firstAvailableSlot = uint.MaxValue;
 
         ref sbyte ctrl = ref MemoryMarshal.GetArrayDataReference(_controlBytes);
-        ref Entry entryBase = ref MemoryMarshal.GetArrayDataReference(_entries);
 
         while (true)
         {
             var source = Vector128.LoadUnsafe(ref ctrl, index);
-            var matchMask = Vector128.Equals(source, target).ExtractMostSignificantBits();
 
+            // 1. Check for Matches
+            var matchMask = Vector128.Equals(source, target).ExtractMostSignificantBits();
             while (matchMask != 0)
             {
-                uint bit = (uint)BitOperations.TrailingZeroCount(matchMask);
-                uint slot = (index + bit) & _mask;
-
-                ref var entry = ref Unsafe.Add(ref entryBase, slot);
-                if (_hasher.Equals(entry.Key, key))
+                uint slot = (index + (uint)BitOperations.TrailingZeroCount(matchMask)) & _mask;
+                if (_hasher.Equals(_entries[slot].Key, key))
                 {
-                    entry.Value = value;
+                    _entries[slot].Value = value;
                     return;
                 }
-
                 matchMask &= matchMask - 1;
             }
 
-            var emptyMask = Vector128.Equals(source, _emptyBucketVector).ExtractMostSignificantBits();
-            if (emptyMask != 0)
+            // 2. Track first available slot (Tombstone or Empty)
+            if (firstAvailableSlot == uint.MaxValue)
             {
-                uint bit = (uint)BitOperations.TrailingZeroCount(emptyMask);
-                uint slot = (index + bit) & _mask;
+                // We prioritize tombstones to keep the map "dense"
+                var tombstoneMask = Vector128.Equals(source, _tombstoneVector).ExtractMostSignificantBits();
+                var emptyMask = Vector128.Equals(source, _emptyBucketVector).ExtractMostSignificantBits();
+                var combinedMask = tombstoneMask | emptyMask;
 
-                SetCtrl(ref ctrl, slot, h2);
+                if (combinedMask != 0)
+                {
+                    firstAvailableSlot = (index + (uint)BitOperations.TrailingZeroCount(combinedMask)) & _mask;
+                }
+            }
 
-                ref var entry = ref Unsafe.Add(ref entryBase, slot);
+            // 3. Terminate on Empty Bucket
+            if (Vector128.Equals(source, _emptyBucketVector).ExtractMostSignificantBits() != 0)
+            {
+                // Finalize insertion at the first slot we found during the probe
+                SetCtrl(ref ctrl, firstAvailableSlot, h2);
+
+                // If the slot we used was a tombstone, decrement the counter
+                if (Unsafe.Add(ref ctrl, firstAvailableSlot) == _tombstone) _tombstoneCounter--;
+
+                ref var entry = ref _entries[firstAvailableSlot];
                 entry.Key = key;
                 entry.Value = value;
-                ++Count;
+                Count++;
                 return;
             }
 
-            index = (index + (jumpDistance += _groupWidth)) & _mask;
+            index = (index + (jump += _groupWidth)) & _mask;
         }
     }
 
