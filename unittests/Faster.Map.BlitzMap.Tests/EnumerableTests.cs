@@ -228,9 +228,9 @@ public class EnumerableTests
             Assert.True(item.Value != default);
             ++count;
         }
-        
 
-        Assert.True(map.Count == count); 
+
+        Assert.True(map.Count == count);
     }
 
     [Fact]

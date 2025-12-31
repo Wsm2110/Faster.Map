@@ -694,7 +694,8 @@ public class RemoveTests
             if (!_map.Remove(i))
             {
                 Assert.Fail();
-            };
+            }
+            ;
         }
 
         Assert.Equal(0, _map.Count); // Verify map is empty
@@ -851,7 +852,7 @@ public class RemoveTests
     //        var key = keys[i];
     //        map.Insert(key, key);
     //    }
-        
+
 
     //    for (int i = 0; i < keys.Length; i++)
     //    {
@@ -958,7 +959,7 @@ public class RemoveTests
             {
                 case 0:
                     map.InsertOrUpdate(k, v); dict[k] = v; break;
-                case 1:                  
+                case 1:
                     map.Remove(k); dict.Remove(k); break;
                 case 2:
                     Assert.Equal(

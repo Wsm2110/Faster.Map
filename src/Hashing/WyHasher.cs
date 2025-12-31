@@ -51,3 +51,29 @@ public readonly struct WyHasher : IHasher<string>
     public bool Equals(string x, string y)
         => string.Equals(x, y, StringComparison.Ordinal);
 }
+
+public readonly struct WyHasherUint : IHasher<uint>
+{
+    /// <summary>
+    /// Computes a 32-bit hash for the specified string using WyHash.
+    /// </summary>
+    /// <param name="key">The string to hash. Must not be <see langword="null"/>.</param>
+    /// <returns>A 32-bit hash derived from the string's UTF-16 byte representation.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public uint ComputeHash(uint key)
+    {     
+        // WyHash returns a 64-bit value; fold to 32-bit for table indexing
+        return (uint)WyHash.Hash(MemoryMarshal.AsBytes(MemoryMarshal.CreateReadOnlySpan(ref key, 1)));
+    }
+
+    /// <summary>
+    /// Determines whether two strings are equal using ordinal comparison.
+    /// </summary>
+    /// <remarks>
+    /// This comparison is culture-invariant, allocation-free, and suitable
+    /// for performance-critical hash table operations.
+    /// </remarks>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool Equals(uint x, uint y)
+        => x == y;
+}

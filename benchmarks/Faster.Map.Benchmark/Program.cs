@@ -1,5 +1,7 @@
 ﻿using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Running;
+using Microsoft.Diagnostics.Tracing.Parsers.MicrosoftWindowsTCPIP;
+using System;
 
 namespace Faster.Map.Benchmark
 {
@@ -10,7 +12,9 @@ namespace Faster.Map.Benchmark
             //BenchmarkRunner.Run<AddBenchmark>();
            // BenchmarkRunner.Run<EnumerableBenchmark>();
             //BenchmarkRunner.Run<UpdateBenchmark>();
-            BenchmarkRunner.Run<GetBenchmark>(/*new DebugInProcessConfig()*/);
+            BenchmarkRunner.Run<GetBenchmark>();
+
+            Console.ReadLine();
         }
     }
 }

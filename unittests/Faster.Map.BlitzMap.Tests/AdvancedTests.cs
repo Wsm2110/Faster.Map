@@ -4,11 +4,6 @@ using Xunit;
 
 namespace Faster.Map.BlitzMap.Tests;
 
-/// <summary>
-/// Comprehensive test suite for BlitzMap.
-/// Focuses on correctness, invariants, resize safety, collision handling,
-/// and real-world usage patterns.
-/// </summary>
 public class AdvancedTests
 {
     #region Basic CRUD
@@ -611,7 +606,7 @@ public class AdvancedTests
     public void Assert_Kickouts_WorkCorrectly()
     {
         var map = new BlitzMap<int, int>(length: 16, loadfactor: 0.75);
-        
+
         // assign all to bucket 5
         map.Insert(5, 5);
         map.Insert(21, 21);
@@ -773,6 +768,7 @@ public class AdvancedTests
         }
     }
 
+
     [Fact]
     public void LongRunningFuzz()
     {
@@ -803,7 +799,7 @@ public class AdvancedTests
                     break;
                 case 3:
 
-                    Assert.Equal(dict.ContainsKey(k), map.Contains(k));
+                    Assert.Equal(dict.ContainsKey(k), map.Get(k, out var value));
                     break;
             }
         }

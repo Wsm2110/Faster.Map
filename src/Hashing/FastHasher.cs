@@ -31,6 +31,24 @@ public readonly struct FastHasherUint : IHasher<uint>
     public bool Equals(uint x, uint y) => x == y;
 }
 
+public readonly struct FastHasherUlong : IHasher<ulong>
+{
+    /// <summary>
+    /// Computes a 32-bit hash for a <see cref="uint"/> key using FastHash.
+    /// </summary>
+    /// <param name="key">The key to hash.</param>
+    /// <returns>A well-distributed 32-bit hash.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public uint ComputeHash(ulong key)
+        => FastHash.HashU64(key).AsUInt32().GetElement(0);
+
+    /// <summary>
+    /// Performs a direct equality comparison between two <see cref="uint"/> values.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool Equals(ulong x, ulong y) => x == y;
+}
+
 /// <summary>
 /// High-performance ordinal string hasher backed by FastHash.
 ///
@@ -67,3 +85,4 @@ public readonly struct FastHasherString : IHasher<string>
     public bool Equals(string x, string y)
         => string.Equals(x, y, StringComparison.Ordinal);
 }
+

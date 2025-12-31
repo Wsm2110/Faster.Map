@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using Xunit;
 
 namespace Faster.Map.BlitzMap.Tests;
+
 public class InsertTests
 {
 
@@ -101,7 +102,7 @@ public class InsertTests
     }
 
     //[Theory]
-   // [InlineData(134217728)]
+    // [InlineData(134217728)]
 
     //public void Insert_Entries_And_Retrieve_Same_Buckets(uint length)
     //{
@@ -119,7 +120,7 @@ public class InsertTests
 
     //    // Arrange
     //    var map = new BlitzMap<uint, uint>((int)BitOperations.RoundUpToPowerOf2(length), 0.5);
-           
+
     //    // Act - Insert all keys
     //    for (int i = 0; i < keys.Length; i++)
     //    {
@@ -133,7 +134,7 @@ public class InsertTests
     //        bool found = map.Get(keys[i], out var retrievedValue);
     //        if (found == false) 
     //        {
-            
+
     //        }
 
     //        Assert.True(found, $"Key {keys[i]} was not found.");
