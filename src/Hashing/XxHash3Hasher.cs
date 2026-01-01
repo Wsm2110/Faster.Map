@@ -1,101 +1,174 @@
-﻿using System;
+﻿using Faster.Map.Contracts;
+using System;
+using System.Collections.Generic;
 using System.IO.Hashing;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using Faster.Map.Contracts;
 
 namespace Faster.Map.Hashing;
 
 /// <summary>
-/// High-performance XXH3-based hasher for unmanaged value types.
-///
-/// Hashing is performed over the raw in-memory byte representation of
-/// <typeparamref name="T"/> without allocation or copying.
+/// Provides high-performance hashing strategies based on the XXH3 algorithm.
 /// </summary>
-/// <typeparam name="T">
-/// An unmanaged value type. The hash is computed over its binary layout.
-/// </typeparam>
 /// <remarks>
-/// <para>
-/// Equality is defined as bitwise equality (<c>x == y</c>), which is valid
-/// for unmanaged value types.
-/// </para>
-/// <para>
-/// The hash is stable only if the binary layout of <typeparamref name="T"/>
-/// is stable. This hasher should not be used with types that contain padding
-/// bytes with undefined values.
-/// </para>
+/// XXH3 is a state-of-the-art hashing algorithm that provides extreme throughput 
+/// and excellent bit distribution, particularly effective for modern 64-bit CPUs.
 /// </remarks>
-public readonly struct XxHash3Hasher<T> : IHasher<T>
-    where T : unmanaged
+public static class XxHash3Hasher
 {
     /// <summary>
-    /// Computes a 32-bit hash for the specified key using XXH3.
+    /// High-performance XXH3-based hasher for unmanaged value types.
     /// </summary>
-    /// <param name="key">The value to hash.</param>
-    /// <returns>
-    /// A 32-bit hash derived from the raw bytes of <typeparamref name="T"/>.
-    /// </returns>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public uint ComputeHash(T key)
+    /// <typeparam name="T">An unmanaged value type.</typeparam>
+    public readonly struct Generic<T> : IHasher<T>
     {
-        // Create a read-only span over the raw bytes of the value
-        ReadOnlySpan<byte> span =
-            MemoryMarshal.AsBytes(
-                MemoryMarshal.CreateReadOnlySpan(
-                    ref Unsafe.AsRef(in key), 1));
+        /// <summary>
+        /// Computes a 32-bit hash. Uses XXH3 for value types without references.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public uint ComputeHash(T key)
+        {
+            // JIT-time constant check: branch is eliminated for specific T types.
+            if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+            {
+                // To bypass the 'unmanaged' constraint of AsBytes, we cast the reference 
+                // to a byte and create a span of the appropriate size.
+                ReadOnlySpan<byte> span = MemoryMarshal.CreateReadOnlySpan(
+                    ref Unsafe.As<T, byte>(ref Unsafe.AsRef(in key)),
+                    Unsafe.SizeOf<T>());
 
-        // Fold the 64-bit XXH3 result down to 32 bits
-        return (uint)XxHash3.HashToUInt64(span);
+                return (uint)XxHash3.HashToUInt64(span);
+            }
+
+            // Fallback for reference types or structs containing references
+            return (uint)EqualityComparer<T>.Default.GetHashCode(key!);
+        }
+
+        /// <summary>
+        /// Determines equality between two values.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Equals(T x, T y)
+        {
+            if (typeof(T).IsValueType)
+            {
+                return x!.Equals(y);
+            }
+
+            return EqualityComparer<T>.Default.Equals(x!, y!);
+        }
+
     }
 
     /// <summary>
-    /// Determines whether two values are equal using direct value comparison.
+    /// High-performance XXH3-based hasher for strings.
     /// </summary>
-    /// <remarks>
-    /// For unmanaged types, this compiles to an efficient, non-virtual comparison.
-    /// </remarks>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool Equals(T x, T y) => x.Equals(y);
-}
-
-/// <summary>
-/// High-performance XXH3-based hasher for strings.
-///
-/// Hashing is performed over the UTF-16 byte representation of the string,
-/// and equality is defined using ordinal comparison.
-/// </summary>
-/// <remarks>
-/// <para>
-/// This hasher is culture-invariant, allocation-free, and deterministic.
-/// </para>
-/// <para>
-/// Hash and equality semantics are consistent: two strings that are
-/// ordinal-equal will always produce the same hash.
-/// </para>
-/// </remarks>
-public readonly struct XxHash3StringHasher : IHasher<string>
-{
-    /// <summary>
-    /// Computes a 32-bit hash for a string using XXH3.
-    /// </summary>
-    /// <param name="key">The string to hash. Must not be <see langword="null"/>.</param>
-    /// <returns>A 32-bit hash derived from the string's UTF-16 bytes.</returns>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public uint ComputeHash(string key)
+    public readonly struct String : IHasher<string>
     {
-        ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(key.AsSpan());
-        return (uint)XxHash3.HashToUInt64(bytes);
+        /// <summary>
+        /// Computes a 32-bit hash for a string using XXH3 over its UTF-16 bytes.
+        /// </summary>
+        /// <param name="key">The string to hash. Must not be null.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public uint ComputeHash(string key)
+        {
+            // Access raw bytes of the string without allocation
+            ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(key.AsSpan());
+            return (uint)XxHash3.HashToUInt64(bytes);
+        }
+
+        /// <summary>
+        /// Determines whether two strings are equal using ordinal comparison.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Equals(string x, string y)
+            => string.Equals(x, y, StringComparison.Ordinal);
     }
 
     /// <summary>
-    /// Determines whether two strings are equal using ordinal comparison.
+    /// 
     /// </summary>
-    /// <remarks>
-    /// This comparison is non-virtual, culture-invariant, and suitable
-    /// for use in performance-critical hash table operations.
-    /// </remarks>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool Equals(string x, string y)
-        => string.Equals(x, y, StringComparison.Ordinal);
+    public readonly struct Uint : IHasher<uint>
+    {
+        /// <summary>
+        /// Computes a 32-bit hash for the specified key using XXH3.
+        /// </summary>
+        /// <param name="key">The value to hash.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public uint ComputeHash(uint key)
+        {
+            // Create a read-only span over the raw bytes of the value (zero-allocation)
+            ReadOnlySpan<byte> span = MemoryMarshal.AsBytes(
+                MemoryMarshal.CreateReadOnlySpan(ref Unsafe.AsRef(in key), 1));
+
+            // Fold the 64-bit XXH3 result down to 32 bits for table indexing
+            return (uint)XxHash3.HashToUInt64(span);
+        }
+
+        /// <summary>
+        /// Determines whether two values are equal using direct value comparison.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Equals(uint x, uint y) => x.Equals(y);
+
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    public readonly struct Ulong : IHasher<ulong>
+    {
+        /// <summary>
+        /// Computes a 32-bit hash for the specified key using XXH3.
+        /// </summary>
+        /// <param name="key">The value to hash.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public uint ComputeHash(ulong key)
+        {
+            // Create a read-only span over the raw bytes of the value (zero-allocation)
+            ReadOnlySpan<byte> span = MemoryMarshal.AsBytes(
+                MemoryMarshal.CreateReadOnlySpan(ref Unsafe.AsRef(in key), 1));
+
+            // Fold the 64-bit XXH3 result down to 32 bits for table indexing
+            return (uint)XxHash3.HashToUInt64(span);
+        }
+
+        /// <summary>
+        /// Determines whether two values are equal using direct value comparison.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Equals(ulong x, ulong y) => x.Equals(y);
+
+    }
+
+    /// <summary>
+    /// High-performance XXH3-based hasher for <see cref="int"/> keys.
+    /// </summary>
+    public readonly struct Int : IHasher<int>
+    {
+        /// <summary>
+        /// Computes a 32-bit hash for the specified key using XXH3.
+        /// </summary>
+        /// <param name="key">The value to hash.</param>
+        /// <returns>A 32-bit hash derived from the raw bytes of the integer.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public uint ComputeHash(int key)
+        {
+            // Reinterpret int as uint to access its raw bytes via span without copying
+            uint tempKey = Unsafe.As<int, uint>(ref key);
+
+            // Create a read-only span over the raw bytes of the value (zero-allocation)
+            ReadOnlySpan<byte> span = MemoryMarshal.AsBytes(
+                MemoryMarshal.CreateReadOnlySpan(ref tempKey, 1));
+
+            // Fold the 64-bit XXH3 result down to 32 bits for table indexing
+            return (uint)XxHash3.HashToUInt64(span);
+        }
+
+        /// <summary>
+        /// Determines whether two values are equal using direct value comparison.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Equals(int x, int y) => x == y;
+    }
 }

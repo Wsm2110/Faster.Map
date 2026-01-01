@@ -22,7 +22,7 @@ namespace Faster.Map.Core;
 /// </summary>
 /// <typeparam name="TKey">The type of the keys in the map. Must be non-nullable.</typeparam>
 /// <typeparam name="TValue">The type of the values in the map.</typeparam>
-public sealed class RobinhoodMap<TKey, TValue> : RobinhoodMap<TKey, TValue, DefaultHasher<TKey>>
+public sealed class RobinhoodMap<TKey, TValue> : RobinhoodMap<TKey, TValue, DefaultHasher.Generic<TKey>>
     where TKey : notnull
 {
     /// <summary>

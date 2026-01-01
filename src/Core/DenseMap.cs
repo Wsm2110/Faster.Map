@@ -2,7 +2,6 @@
 // Distributed under the MIT Software License, Version 1.0.
 
 using Faster.Map.Contracts;
-using Faster.Map.Hasher;
 using Faster.Map.Hashing;
 using System;
 using System.Collections.Generic;
@@ -24,7 +23,7 @@ namespace Faster.Map.Core;
 /// The default hasher, <see cref="GoldenRatioHasher{TKey}"/>, is chosen for its strong 
 /// distribution properties, ensuring minimal collisions and improved lookup performance.
 /// </remarks>
-public class DenseMap<TKey, TValue> : DenseMap<TKey, TValue, DefaultHasher<TKey>>
+public class DenseMap<TKey, TValue> : DenseMap<TKey, TValue, DefaultHasher.Generic<TKey>>
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="DenseMap{TKey, TValue}"/> class 

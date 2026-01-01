@@ -107,10 +107,12 @@ Faster.Map supports **pluggable hash functions** for maximum performance:
 - **WyHash** – High-speed general purpose hashing.
 - **XXHash3** – Optimized for throughput and low latency.
 - **FastHash** – AES-based hashing (requires X86Aes support).
+- **CrcHasher** – Non-cryptographic hash with good distribution (requires Sse42)
+- **DefaultHasher** – .NET's built-in `GetHashCode()`.
 
 Example:
 ```csharp
-var map = new BlitzMap<int, string, XxHash3StringHasher>();
+var map = new BlitzMap<int, string, XxHash3Hasher.String>();
 map.Insert(1, "Value One");
 map.Insert(2, "Value Two");
 ```

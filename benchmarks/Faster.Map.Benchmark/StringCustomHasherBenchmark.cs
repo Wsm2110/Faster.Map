@@ -22,9 +22,9 @@ namespace Faster.Map.Benchmark
         ////fixed size, dont want to measure resize()
         private Dictionary<string, string> _dictionary;
         private BlitzMap<string, string> _blitzMap;
-        private BlitzMap<string, string, XxHash3StringHasher> _blitzMap1;
-        private BlitzMap<string, string, FastHasherString> _blitzMap2;
-        private BlitzMap<string, string, WyHasher> _blitzMap3;
+        private BlitzMap<string, string, XxHash3Hasher.String> _blitzMap1;
+        private BlitzMap<string, string, FastHasher.String> _blitzMap2;
+        private BlitzMap<string, string, WyHasher.String> _blitzMap3;
 
         private string[] keys;
 
@@ -60,9 +60,9 @@ namespace Faster.Map.Benchmark
             int dicLength = HashHelpers.GetPrime((int)Length);
 
             _blitzMap = new BlitzMap<string, string>((int)length, 0.8);
-            _blitzMap1 = new BlitzMap<string, string, XxHash3StringHasher>((int)length, 0.8);
-            _blitzMap2 = new BlitzMap<string, string, FastHasherString>((int)length, 0.8);
-            _blitzMap3 = new BlitzMap<string, string, WyHasher>((int)length, 0.8);
+            _blitzMap1 = new BlitzMap<string, string, XxHash3Hasher.String>((int)length, 0.8);
+            _blitzMap2 = new BlitzMap<string, string, FastHasher.String>((int)length, 0.8);
+            _blitzMap3 = new BlitzMap<string, string, WyHasher.String>((int)length, 0.8);
 
 
             _dictionary = new Dictionary<string, string>(dicLength);

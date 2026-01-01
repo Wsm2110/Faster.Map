@@ -1,7 +1,5 @@
-﻿using System;
-using Xunit;
+﻿using Xunit;
 using System.Collections.Generic;
-using Faster.Map.Hasher;
 using Faster.Map.Core;
 using Faster.Map.Hashing;
 
@@ -9,11 +7,11 @@ namespace Faster.Map.DenseMap.Tests
 {
     public class StringHasherTests
     {
-        private DenseMap<string, string, XxHash3StringHasher> _map;
+        private DenseMap<string, string, XxHash3Hasher.String> _map;
 
         public StringHasherTests()
         {
-            _map = new DenseMap<string, string, XxHash3StringHasher>(16, 0.875);
+            _map = new DenseMap<string, string, XxHash3Hasher.String>(16, 0.875);
         }
 
         [Fact]
@@ -170,7 +168,7 @@ namespace Faster.Map.DenseMap.Tests
         [Fact]
         public void LoadFactorLimit_DoesNotExceedForStringKeys()
         {
-            var result = new DenseMap<string, string, XxHash3StringHasher>(4, 0.75);
+            var result = new DenseMap<string, string, XxHash3Hasher.String>(4, 0.75);
 
             result.InsertOrUpdate("key1", "value1");
             result.InsertOrUpdate("key2", "value2");

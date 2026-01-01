@@ -1,23 +1,16 @@
-﻿
-using Faster.Map.Core;
-using Faster.Map.Hasher;
+﻿using Faster.Map.Core;
 using Faster.Map.Hashing;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Xunit;
 
 namespace Faster.Map.BlitzMap.Tests;
 
 public class Get
 {
-    private readonly BlitzMap<int, string, DefaultHasher<int>> _map;
+    private readonly BlitzMap<int, string, DefaultHasher.Int> _map;
 
     public Get()
     {
-        _map = new BlitzMap<int, string, DefaultHasher<int>>(16, 0.75);
+        _map = new BlitzMap<int, string, DefaultHasher.Int>(16, 0.75);
     }
 
     [Fact]
@@ -101,7 +94,7 @@ public class Get
     [Fact]
     public void Get_CorrectlyHandles_ResizedMap()
     {
-        var largeMap = new BlitzMap<int, string, DefaultHasher<int>>(4, 0.75);
+        var largeMap = new BlitzMap<int, string, DefaultHasher.Int>(4, 0.75);
         for (int i = 0; i < 100; i++)
         {
             largeMap.Insert(i, $"Value{i}");
@@ -125,7 +118,7 @@ public class Get
         }
 
         var rng2 = new Random(3);
-        var map = new BlitzMap<int, int, DefaultHasher<int>>(length, 0.9);
+        var map = new BlitzMap<int, int, DefaultHasher.Int>(length, 0.9);
 
         for (int i = 0; i < length; i++)
         {
@@ -153,7 +146,7 @@ public class Get
     [Fact]
     public void Get_ShouldReturnTrueAndCorrectValue_WhenKeyExists()
     {
-        var map = new BlitzMap<int, string, DefaultHasher<int>>();
+        var map = new BlitzMap<int, string, DefaultHasher.Int>();
         map.Insert(1, "value1");
         Assert.True(map.Get(1, out var value));
         Assert.Equal("value1", value);
@@ -162,7 +155,7 @@ public class Get
     [Fact]
     public void Get_ShouldReturnFalseAndDefaultValue_WhenKeyDoesNotExist()
     {
-        var map = new BlitzMap<int, string, DefaultHasher<int>>();
+        var map = new BlitzMap<int, string, DefaultHasher.Int>();
         Assert.False(map.Get(99, out var value));
         Assert.Null(value);
     }
@@ -170,7 +163,7 @@ public class Get
     [Fact]
     public void Get_ShouldReturnFalseAndDefaultValue_WhenMapIsEmpty()
     {
-        var map = new BlitzMap<int, string, DefaultHasher<int>>();
+        var map = new BlitzMap<int, string, DefaultHasher.Int>();
         Assert.False(map.Get(0, out var value));
         Assert.Null(value);
     }
@@ -178,7 +171,7 @@ public class Get
     [Fact]
     public void Get_ShouldReturnCorrectValue_WhenKeyIsZero()
     {
-        var map = new BlitzMap<int, string, DefaultHasher<int>>();
+        var map = new BlitzMap<int, string, DefaultHasher.Int>();
         map.Insert(0, "zeroValue");
         Assert.True(map.Get(0, out var value));
         Assert.Equal("zeroValue", value);
@@ -187,7 +180,7 @@ public class Get
     [Fact]
     public void Get_ShouldReturnTrueAndCorrectValue_ForNegativeKeys()
     {
-        var map = new BlitzMap<int, string, DefaultHasher<int>>();
+        var map = new BlitzMap<int, string, DefaultHasher.Int>();
         map.Insert(-1, "negativeValue");
         Assert.True(map.Get(-1, out var value));
         Assert.Equal("negativeValue", value);
@@ -196,7 +189,7 @@ public class Get
     [Fact]
     public void Get_ShouldReturnDefault_WhenKeyIsRemoved()
     {
-        var map = new BlitzMap<int, string, DefaultHasher<int>>();
+        var map = new BlitzMap<int, string, DefaultHasher.Int>();
         map.Insert(1, "value1");
         map.Remove(1);
         Assert.False(map.Get(1, out var value));
@@ -206,7 +199,7 @@ public class Get
     [Fact]
     public void Get_ShouldReturnUpdatedValue_WhenKeyIsReinsertedAfterRemoval()
     {
-        var map = new BlitzMap<int, string, DefaultHasher<int>>();
+        var map = new BlitzMap<int, string, DefaultHasher.Int>();
         map.Insert(1, "value1");
         map.Remove(1);
         map.Insert(1, "newValue1");
@@ -217,7 +210,7 @@ public class Get
     [Fact]
     public void Get_ShouldReturnCorrectValue_ForMinAndMaxIntKeys()
     {
-        var map = new BlitzMap<int, string, DefaultHasher<int>>();
+        var map = new BlitzMap<int, string, DefaultHasher.Int>();
         map.Insert(int.MinValue, "minValue");
         map.Insert(int.MaxValue, "maxValue");
         Assert.True(map.Get(int.MinValue, out var minValue));
@@ -229,7 +222,7 @@ public class Get
     [Fact]
     public void Get_ShouldReturnDefault_ForNonExistentKeyInHighLoadMap()
     {
-        var map = new BlitzMap<int, string, DefaultHasher<int>>(16, 0.9);
+        var map = new BlitzMap<int, string, DefaultHasher.Int>(16, 0.9);
         for (int i = 0; i < 14; i++)
         {
             map.Insert(i, $"value{i}");
@@ -241,7 +234,7 @@ public class Get
     [Fact]
     public void Get_ShouldWorkCorrectly_AfterMapResize()
     {
-        var map = new BlitzMap<int, string, DefaultHasher<int>>(4, 0.9);
+        var map = new BlitzMap<int, string, DefaultHasher.Int>(4, 0.9);
         for (int i = 0; i < 5; i++)
         {
             map.Insert(i, $"value{i}");
@@ -254,7 +247,7 @@ public class Get
     [Fact]
     public void Get_ShouldReturnDefault_AfterClear()
     {
-        var map = new BlitzMap<int, string, DefaultHasher<int>>();
+        var map = new BlitzMap<int, string, DefaultHasher.Int>();
         map.Insert(1, "value1");
         map.Clear();
         Assert.False(map.Get(1, out var value));
@@ -264,7 +257,7 @@ public class Get
     [Fact]
     public void Get_ShouldReturnCorrectValue_ForCollidingKeys()
     {
-        var map = new BlitzMap<int, string, DefaultHasher<int>>();
+        var map = new BlitzMap<int, string, DefaultHasher.Int>();
         int baseKey = 100;
         int[] collidingKeys = { baseKey, baseKey + 16, baseKey + 32 };
         foreach (var key in collidingKeys)
@@ -281,7 +274,7 @@ public class Get
     [Fact]
     public void Get_ShouldReturnCorrectValue_AfterHighVolumeInsertions()
     {
-        var map = new BlitzMap<int, string, DefaultHasher<int>>(16, 0.9);
+        var map = new BlitzMap<int, string, DefaultHasher.Int>(16, 0.9);
         for (int i = 0; i < 1000; i++)
         {
             map.Insert(i, $"value{i}");
@@ -293,7 +286,7 @@ public class Get
     [Fact]
     public void Get_ShouldReturnCorrectValue_WhenKeyIsReinsertedAfterRemovalInCollisionChain()
     {
-        var map = new BlitzMap<int, string, DefaultHasher<int>>();
+        var map = new BlitzMap<int, string, DefaultHasher.Int>();
 
         int baseKey = 50;
         int[] collidingKeys = { baseKey, baseKey + 16, baseKey + 32 };
@@ -314,7 +307,7 @@ public class Get
     [Fact]
     public void Get_ShouldReturnTrue_AfterReinsertionInTombstonedSlot()
     {
-        var map = new BlitzMap<int, string, DefaultHasher<int>>();
+        var map = new BlitzMap<int, string, DefaultHasher.Int>();
         map.Insert(1, "value1");
         map.Remove(1);
         map.Insert(1, "newValue");
@@ -326,7 +319,7 @@ public class Get
     [Fact]
     public void Get_ShouldReturnFalse_ForNonExistentKeyAfterHighVolumeInsertionsAndRemovals()
     {
-        var map = new BlitzMap<int, string, DefaultHasher<int>>();
+        var map = new BlitzMap<int, string, DefaultHasher.Int>();
         for (int i = 0; i < 1000; i++)
         {
             map.Insert(i, $"value{i}");
@@ -339,7 +332,7 @@ public class Get
     [Fact]
     public void Get_ShouldReturnFalse_ForRemovedKeyInHighLoadMap()
     {
-        var map = new BlitzMap<int, string, DefaultHasher<int>>(16, 0.9);
+        var map = new BlitzMap<int, string, DefaultHasher.Int>(16, 0.9);
         for (int i = 0; i < 14; i++)
         {
             map.Insert(i, $"value{i}");
@@ -352,7 +345,7 @@ public class Get
     [Fact]
     public void Get_ShouldReturnCorrectValue_WhenBoundaryKeysArePresent()
     {
-        var map = new BlitzMap<int, string, DefaultHasher<int>>();
+        var map = new BlitzMap<int, string, DefaultHasher.Int>();
         map.Insert(int.MinValue, "minValue");
         map.Insert(int.MaxValue, "maxValue");
 
@@ -365,7 +358,7 @@ public class Get
     [Fact]
     public void Get_ShouldReturnDefault_WhenKeyNotInMap()
     {
-        var map = new BlitzMap<int, string, DefaultHasher<int>>();
+        var map = new BlitzMap<int, string, DefaultHasher.Int>();
         map.Insert(1, "value1");
         Assert.False(map.Get(999, out var value));
         Assert.Null(value);
@@ -374,7 +367,7 @@ public class Get
     [Fact]
     public void Get_ShouldReturnCorrectValue_ForZeroKey()
     {
-        var map = new BlitzMap<int, string, DefaultHasher<int>>();
+        var map = new BlitzMap<int, string, DefaultHasher.Int>();
         map.Insert(0, "zeroValue");
 
         Assert.True(map.Get(0, out var value));
@@ -384,7 +377,7 @@ public class Get
     [Fact]
     public void Get_ShouldReturnCorrectValue_ForNegativeKey()
     {
-        var map = new BlitzMap<int, string, DefaultHasher<int>>();
+        var map = new BlitzMap<int, string, DefaultHasher.Int>();
         map.Insert(-10, "negativeValue");
 
         Assert.True(map.Get(-10, out var value));
@@ -394,7 +387,7 @@ public class Get
     [Fact]
     public void Get_ShouldReturnCorrectValue_WhenReinsertingInDifferentGroupsAfterRemoval()
     {
-        var map = new BlitzMap<int, string, DefaultHasher<int>>(32);
+        var map = new BlitzMap<int, string, DefaultHasher.Int>(32);
 
         // Insert multiple keys to different groups
         int[] keys = { 3, 19, 35 }; // Assuming these hash to different groups
@@ -414,7 +407,7 @@ public class Get
     [Fact]
     public void Get_ShouldReturnTrueForReinsertedKey_WhenUsingHighLoadFactorAndResizing()
     {
-        var map = new BlitzMap<int, string, DefaultHasher<int>>(4, 0.9);
+        var map = new BlitzMap<int, string, DefaultHasher.Int>(4, 0.9);
         for (int i = 0; i < 10; i++)
         {
             map.Insert(i, $"value{i}");
@@ -428,7 +421,7 @@ public class Get
     [Fact]
     public void Get_ShouldReturn_WhileMapIsEmpty()
     {
-        var dense = new BlitzMap<int, int, DefaultHasher<int>>();
+        var dense = new BlitzMap<int, int, DefaultHasher.Int>();
         for (int i = 1; i <= 16; ++i)
         {
             dense.Insert(i, 0);

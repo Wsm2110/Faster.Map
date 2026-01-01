@@ -1,14 +1,12 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Numerics;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Engines;
 using Faster.Map.Benchmark.Utilities;
 using Faster.Map.Core;
-using Faster.Map.Hasher;
 
 namespace Faster.Map.Benchmark
 {

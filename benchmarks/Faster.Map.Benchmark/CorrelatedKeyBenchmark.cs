@@ -19,9 +19,9 @@ namespace Faster.Map.Benchmark
     {
         #region Fields
 
-        private DenseMap<uint, uint, FastHasherUint> _denseMapAES;
+        private DenseMap<uint, uint, FastHasher.UInt> _denseMapAES;
         private DenseMap<uint, uint, AvalancheHasherUint> _denseMapAvalanche;
-        private BlitzMap<uint, uint, FastHasherUint> _blitzMapAes;
+        private BlitzMap<uint, uint, FastHasher.UInt> _blitzMapAes;
         private BlitzMap<uint, uint, AvalancheHasherUint> _blitzMapAvalance;
         private uint[] keys;
 
@@ -67,9 +67,9 @@ namespace Faster.Map.Benchmark
 
             uint capacity = BitOperations.RoundUpToPowerOf2(Length);
 
-            _denseMapAES = new DenseMap<uint, uint, FastHasherUint>(capacity);
+            _denseMapAES = new DenseMap<uint, uint, FastHasher.UInt>(capacity);
             _denseMapAvalanche = new DenseMap<uint, uint, AvalancheHasherUint>(capacity);
-            _blitzMapAes = new BlitzMap<uint, uint, FastHasherUint>((int)capacity);
+            _blitzMapAes = new BlitzMap<uint, uint, FastHasher.UInt>((int)capacity);
             _blitzMapAvalance = new BlitzMap<uint, uint, AvalancheHasherUint>((int)capacity);
 
             foreach (var key in keys)

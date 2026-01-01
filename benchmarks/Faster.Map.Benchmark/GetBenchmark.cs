@@ -14,20 +14,15 @@ namespace Faster.Map.Benchmark
 {
     [MarkdownExporterAttribute.GitHub]  
     [SimpleJob(RunStrategy.Monitoring, launchCount: 1, iterationCount: 20, warmupCount: 5)]
-    //[HardwareCounters(
-    //HardwareCounter.BranchMispredictions,
-    //HardwareCounter.BranchInstructions,
-    //HardwareCounter.CacheMisses,
-    //HardwareCounter.TotalCycles)]
 
     public class GetBenchmark
     {
         #region Fields
 
-        private DenseMap<uint, uint, FastHasherUint> _denseMap;
-        private BlitzMap<uint, uint, FastHasherUint> _blitz;
+        private DenseMap<uint, uint, FastHasher.UInt> _denseMap;
+        private BlitzMap<uint, uint, CrcHasher.UInt> _blitz;
         private Dictionary<uint, uint> _dictionary;
-        private RobinhoodMap<uint, uint, FastHasherUint> _robinHoodMap;
+        private RobinhoodMap<uint, uint, FastHasher.UInt> _robinHoodMap;
 
         private uint[] keys;
 
@@ -62,11 +57,11 @@ namespace Faster.Map.Benchmark
             uint length = BitOperations.RoundUpToPowerOf2(Length);
             int dicLength = HashHelpers.GetPrime((int)Length);
 
-            _denseMap = new DenseMap<uint, uint, FastHasherUint>(length);
-            _blitz = new BlitzMap<uint, uint, FastHasherUint>((int)length, LoadFactor);
+            _denseMap = new DenseMap<uint, uint, FastHasher.UInt>(length);
+            _blitz = new BlitzMap<uint, uint, CrcHasher.UInt>((int)length, LoadFactor);
 
             _dictionary = new Dictionary<uint, uint>(dicLength);
-            _robinHoodMap = new RobinhoodMap<uint, uint, FastHasherUint>(length, 0.9);
+            _robinHoodMap = new RobinhoodMap<uint, uint, FastHasher.UInt>(length, 0.9);
 
             foreach (var key in keys)
             {

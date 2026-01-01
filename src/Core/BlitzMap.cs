@@ -21,7 +21,7 @@ namespace Faster.Map.Core;
 /// </summary>
 /// <typeparam name="TKey">The type of the keys in the map.</typeparam>
 /// <typeparam name="TValue">The type of the values in the map.</typeparam>
-public class BlitzMap<TKey, TValue> : BlitzMap<TKey, TValue, DefaultHasher<TKey>>
+public class BlitzMap<TKey, TValue> : BlitzMap<TKey, TValue, DefaultHasher.Generic<TKey>>
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="BlitzMap{TKey, TValue}"/> class

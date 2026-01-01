@@ -7,73 +7,83 @@ using System.Runtime.InteropServices;
 namespace Faster.Map.Hashing;
 
 /// <summary>
-/// High-performance string hasher based on the WyHash algorithm.
-///
-/// This hasher operates directly on the UTF-16 byte representation of strings
-/// and uses ordinal equality semantics. It is optimized for speed, determinism,
-/// and low collision rates in hash table workloads.
+/// Provides high-performance hashing strategies based on the WyHash algorithm.
 /// </summary>
 /// <remarks>
-/// <para>
-/// Hashing is performed over the raw UTF-16 bytes of the string without allocation.
-/// </para>
-/// <para>
-/// Equality is defined using ordinal comparison. As a result, hash and equality
-/// semantics are fully consistent: two strings that are ordinal-equal will always
-/// produce the same hash.
-/// </para>
+/// WyHash is a fast, non-cryptographic hash function that offers excellent 
+/// distribution and avalanche properties for hash table indexing.
 /// </remarks>
-public readonly struct WyHasher : IHasher<string>
+public static class WyHasher
 {
     /// <summary>
-    /// Computes a 32-bit hash for the specified string using WyHash.
+    /// A high-performance string hasher based on the WyHash algorithm.
     /// </summary>
-    /// <param name="key">The string to hash. Must not be <see langword="null"/>.</param>
-    /// <returns>A 32-bit hash derived from the string's UTF-16 byte representation.</returns>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public uint ComputeHash(string key)
+    public readonly struct String : IHasher<string>
     {
-        // Hash the raw UTF-16 bytes of the string (allocation-free)
-        ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(key.AsSpan());
+        /// <summary>
+        /// Computes a 32-bit hash for the specified string using WyHash.
+        /// </summary>
+        /// <param name="key">The string to hash. Must not be null.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public uint ComputeHash(string key)
+        {
+            // Hash the raw UTF-16 bytes of the string (allocation-free)
+            ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(key.AsSpan());
 
-        // WyHash returns a 64-bit value; fold to 32-bit for table indexing
-        return (uint)WyHash.Hash(bytes);
+            // WyHash returns a 64-bit value; cast to 32-bit for table indexing
+            return (uint)WyHash.Hash(bytes);
+        }
+
+        /// <summary>
+        /// Determines whether two strings are equal using ordinal comparison.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Equals(string x, string y)
+            => string.Equals(x, y, StringComparison.Ordinal);
+          
     }
 
     /// <summary>
-    /// Determines whether two strings are equal using ordinal comparison.
+    /// A high-performance hashing strategy for <see cref="uint"/> keys using WyHash.
     /// </summary>
-    /// <remarks>
-    /// This comparison is culture-invariant, allocation-free, and suitable
-    /// for performance-critical hash table operations.
-    /// </remarks>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool Equals(string x, string y)
-        => string.Equals(x, y, StringComparison.Ordinal);
-}
+    public readonly struct UInt : IHasher<uint>
+    {
+        /// <summary>
+        /// Computes a 32-bit hash for the specified uint using WyHash.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public uint ComputeHash(uint key)
+        {
+            // Treat the uint as a 4-byte span to feed into the WyHash engine
+            return (uint)WyHash.Hash(MemoryMarshal.AsBytes(MemoryMarshal.CreateReadOnlySpan(ref key, 1)));
+        }
 
-public readonly struct WyHasherUint : IHasher<uint>
-{
-    /// <summary>
-    /// Computes a 32-bit hash for the specified string using WyHash.
-    /// </summary>
-    /// <param name="key">The string to hash. Must not be <see langword="null"/>.</param>
-    /// <returns>A 32-bit hash derived from the string's UTF-16 byte representation.</returns>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public uint ComputeHash(uint key)
-    {     
-        // WyHash returns a 64-bit value; fold to 32-bit for table indexing
-        return (uint)WyHash.Hash(MemoryMarshal.AsBytes(MemoryMarshal.CreateReadOnlySpan(ref key, 1)));
+        /// <summary>
+        /// Performs a direct equality comparison between two <see cref="uint"/> values.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Equals(uint x, uint y) => x == y;
     }
 
     /// <summary>
-    /// Determines whether two strings are equal using ordinal comparison.
+    /// A high-performance hashing strategy for <see cref="uint"/> keys using WyHash.
     /// </summary>
-    /// <remarks>
-    /// This comparison is culture-invariant, allocation-free, and suitable
-    /// for performance-critical hash table operations.
-    /// </remarks>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool Equals(uint x, uint y)
-        => x == y;
+    public readonly struct Ulong : IHasher<ulong>
+    {
+        /// <summary>
+        /// Computes a 32-bit hash for the specified uint using WyHash.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public uint ComputeHash(ulong key)
+        {        
+            return (uint)WyHash.Hash(MemoryMarshal.AsBytes(MemoryMarshal.CreateReadOnlySpan(ref key, 1)));
+        }
+
+        /// <summary>
+        /// Performs a direct equality comparison between two <see cref="uint"/> values.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Equals(ulong x, ulong y) => x == y;
+    }
+
 }
