@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics.X86;
 using static System.Net.Mime.MediaTypeNames;
 
 namespace Faster.Map.Core;
@@ -208,54 +209,33 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
     /// <param name="value">The value associated with the key if found; otherwise, the default value.</param>
     /// <returns>True if the key exists in the hash table; false otherwise.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
-    public bool Get(TKey key, out TValue value)
+    public unsafe bool Get(TKey key, out TValue value)
     {
+        uint mask = _mask;
         uint hash = _hasher.ComputeHash(key);
-        uint main = hash & _mask;
-        uint sig = hash & ~_mask;
+        uint sig = hash & ~mask;
 
-        // Cache base references to permanently eliminate bounds checks.
+        // Direct references to aligned memory
         ref Bucket buckets = ref MemoryMarshal.GetArrayDataReference(_buckets);
         ref Entry entries = ref MemoryMarshal.GetArrayDataReference(_entries);
 
-        ref Bucket bucket = ref Unsafe.Add(ref buckets, main);
+        // Initial Probe
+        ref Bucket bRef = ref Unsafe.Add(ref buckets, hash & mask);
 
-        // Signature==0 is the empty sentinel. Raw read avoids struct field barriers.
-        uint slot = Unsafe.ReadUnaligned<uint>(ref Unsafe.As<Bucket, byte>(ref bucket));
-        if (slot == 0)
-        { 
-            goto NotFound;
-        }
+        // Treat the 8-byte bucket as a ulong to load Packed + Next in one instruction
+        ulong data = Unsafe.As<Bucket, ulong>(ref bRef);
 
-        // Packed layout: [ signature | entryIndex ], stored as +1 to preserve zero.
-        uint packed = slot - 1;
+        if ((uint)data == 0) goto NotFound;
 
-        // Compare only high bits; low bits hold entry index and are masked out.
-        if ((packed & ~_mask) == sig)
+        while (true)
         {
-            uint index = packed & _mask;
-            ref Entry entry = ref Unsafe.Add(ref entries, index);
-            if (_hasher.Equals(key, entry.Key))
+            uint packed = (uint)data - 1;
+
+            if ((packed & ~mask) == sig)
             {
-                value = entry.Value;
-                return true;
-            }
-        }
-
-        uint next = bucket.Next;
-        while (next != 0)
-        {
-            // Buckets reference entries using 1-based indices.
-            bucket = ref Unsafe.Add(ref buckets, next - 1);
-
-            // Packed as (signature | entryIndex) + 1; subtract to recover original layout and keep 0 as empty sentinel.
-            packed = Unsafe.ReadUnaligned<uint>(ref Unsafe.As<Bucket, byte>(ref bucket)) - 1;
-
-            if ((packed & ~_mask) == sig)
-            {
-                uint index = packed & _mask;
-                ref Entry entry = ref Unsafe.Add(ref entries, index);
-
+                // If Entry is padded to a power of two (e.g., 32 bytes), 
+                // this 'Add' is a simple 'shl' instruction.
+                ref Entry entry = ref Unsafe.Add(ref entries, packed & mask);
                 if (_hasher.Equals(key, entry.Key))
                 {
                     value = entry.Value;
@@ -263,13 +243,16 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
                 }
             }
 
-            // Prefetch only while table remains cache-resident.
-            if (_mask <= (1u << 20))
-            {
-                _ = Unsafe.Add(ref buckets, (next + 4) & _mask);
-            }
+            uint next = (uint)(data >> 32);
+            if (next == 0) break;
 
-            next = bucket.Next;
+            // Move to next bucket and load
+            bRef = ref Unsafe.Add(ref buckets, next - 1);
+            data = Unsafe.As<Bucket, ulong>(ref bRef);
+
+            // Prefetching only the bucket. Prefetching entries here is often
+            // slower due to the overhead of the prefetch instruction itself.
+            Sse.Prefetch0(Unsafe.AsPointer(ref bRef));
         }
 
         NotFound:
