@@ -41,14 +41,6 @@ public static class DefaultHasher
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Equals(T x, T y)
         {
-            // For value types (int, double, structs), the JIT recognizes this pattern
-            // and emits a direct 'ceq' instruction or a non-virtual Equals call.
-            if (typeof(T).IsValueType)
-            {
-                return x!.Equals(y);
-            }
-
-            // Fallback for reference types
             return EqualityComparer<T>.Default.Equals(x!, y!);
         }
     }
