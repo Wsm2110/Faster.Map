@@ -1,0 +1,57 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net10.0;net9.0;net8.0;net7.0</TargetFrameworks>
+
+    <ImplicitUsings>false</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <LangVersion>Latest</LangVersion>
+
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageId>Faster.Map</PackageId>
+    <Version>9.0.0</Version>
+    <AssemblyVersion>9.0.0</AssemblyVersion>
+    <FileVersion>9.0.0</FileVersion>
+
+    <Authors>Wiljan Ruizendaal</Authors>
+    <Title>Fastest .NET hashmap</Title>
+    <Description>Incredibly fast hashmap</Description>
+    <PackageTags>Hashmap; Hashtable; Dictionary; Faster.map; performance; concurrency; simd; concurrenthashmap; concurrentdictionary</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/Wsm2110/Faster.Map</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Wsm2110/Faster.Map</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <EmbedAllSources>true</EmbedAllSources>
+    <DebugType>embedded</DebugType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>minor improvements to blitzmap, move densemap to use vector256</PackageReleaseNotes>
+
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>Faster.Map.snk</AssemblyOriginatorKeyFile>
+
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net7.0' Or '$(TargetFramework)' == 'net8.0'">
+    <PackageReference Include="System.IO.Hashing" Version="8.*" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net9.0'">
+    <PackageReference Include="System.IO.Hashing" Version="9.*" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <PackageReference Include="System.IO.Hashing" Version="10.*" />
+  </ItemGroup>
+
+  <Target Name="GenerateSnk" BeforeTargets="BeforeBuild" Condition="!Exists('$(ProjectDir)Faster.Map.snk')">
+    <Exec Command="powershell -ExecutionPolicy Bypass -Command ^&#xD;&#xA;        $csp = New-Object System.Security.Cryptography.RSACryptoServiceProvider(2048); ^&#xD;&#xA;        $bytes = $csp.ExportCspBlob($true); ^&#xD;&#xA;        [System.IO.File]::WriteAllBytes('$(ProjectDir)Faster.Map.snk', $bytes)" />
+  </Target>
+</Project>

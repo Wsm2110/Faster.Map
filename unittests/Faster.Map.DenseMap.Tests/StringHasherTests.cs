@@ -1,0 +1,181 @@
+﻿using Xunit;
+using System.Collections.Generic;
+using Faster.Map.Core;
+using Faster.Map.Hashing;
+
+namespace Faster.Map.DenseMap.Tests
+{
+    public class StringHasherTests
+    {
+        private DenseMap<string, string, XxHash3Hasher.String> _map;
+
+        public StringHasherTests()
+        {
+            _map = new DenseMap<string, string, XxHash3Hasher.String>(16, 0.875);
+        }
+
+        [Fact]
+        public void Emplace_AddsNewStringKeyValuePairs()
+        {
+            _map.InsertOrUpdate("key1", "value1");
+            _map.InsertOrUpdate("key2", "value2");
+
+            Assert.Equal(2, _map.Count);
+            Assert.Equal("value1", _map["key1"]);
+            Assert.Equal("value2", _map["key2"]);
+        }
+
+        [Fact]
+        public void Emplace_UpdatesValueForExistingStringKey()
+        {       
+            _map.InsertOrUpdate("key1", "value1");
+            _map.InsertOrUpdate("key1", "updatedValue1");
+
+            Assert.Equal(1, _map.Count);
+            Assert.Equal("updatedValue1", _map["key1"]);
+        }
+
+        [Fact]
+        public void Get_ReturnsValueIfStringKeyExists()
+        {       
+            _map.InsertOrUpdate("key1", "value1");
+
+            Assert.True(_map.Get("key1", out var value));
+            Assert.Equal("value1", value);
+        }
+
+        [Fact]
+        public void Get_ReturnsFalseIfStringKeyDoesNotExist()
+        {
+       
+
+            Assert.False(_map.Get("nonexistent", out var value));
+            Assert.Null(value);
+        }
+
+        [Fact]
+        public void Update_ChangesValueIfStringKeyExists()
+        {
+       
+            _map.InsertOrUpdate("key1", "value1");
+
+            Assert.True(_map.Update("key1", "updatedValue1"));
+            Assert.Equal("updatedValue1", _map["key1"]);
+        }
+
+        [Fact]
+        public void Update_ReturnsFalseIfStringKeyDoesNotExist()
+        {      
+            Assert.False(_map.Update("nonexistent", "shouldNotBeAdded"));
+        }
+
+        [Fact]
+        public void Remove_DeletesExistingStringKey()
+        {       
+            _map.InsertOrUpdate("key1", "value1");
+
+            Assert.True(_map.Remove("key1"));
+            Assert.False(_map.Contains("key1"));
+        }
+
+        [Fact]
+        public void Remove_ReturnsFalseIfStringKeyDoesNotExist()
+        {      
+            Assert.False(_map.Remove("nonexistent"));
+        }
+
+        [Fact]
+        public void Contains_ReturnsTrueForExistingStringKey()
+        {       
+            _map.InsertOrUpdate("key1", "value1");
+
+            Assert.True(_map.Contains("key1"));
+        }
+
+        [Fact]
+        public void Contains_ReturnsFalseForNonExistingStringKey()
+        {
+            Assert.False(_map.Contains("nonexistent"));
+        }
+
+        [Fact]
+        public void Clear_RemovesAllStringEntries()
+        {       
+            _map.InsertOrUpdate("key1", "value1");
+            _map.InsertOrUpdate("key2", "value2");
+
+            _map.Clear();
+
+            Assert.Equal(0, _map.Count);
+            Assert.False(_map.Contains("key1"));
+            Assert.False(_map.Contains("key2"));
+        }
+
+        [Fact]
+        public void Resize_IncreasesCapacityCorrectlyForStringKeys()
+        {    
+            for (int i = 0; i < 20; i++)
+            {
+                _map.InsertOrUpdate($"key{i}", $"value{i}");
+            }
+
+            Assert.Equal(20, _map.Count);
+
+            for (int i = 0; i < 20; i++)
+            {
+                Assert.True(_map.Contains($"key{i}"));
+                Assert.Equal($"value{i}", _map[$"key{i}"]);
+            }
+        }
+
+        [Fact]
+        public void Enumerator_ReturnsAllStringEntries()
+        {       
+            _map.InsertOrUpdate("key1", "value1");
+            _map.InsertOrUpdate("key2", "value2");
+
+            var entries = new List<KeyValuePair<string, string>>(_map.Entries);
+
+            Assert.Equal(2, entries.Count);
+            Assert.Contains(new KeyValuePair<string, string>("key1", "value1"), entries);
+            Assert.Contains(new KeyValuePair<string, string>("key2", "value2"), entries);
+        }
+
+        [Fact]
+        public void Indexer_ThrowsKeyNotFoundExceptionForNonExistingStringKey()
+        {      
+            Assert.Throws<KeyNotFoundException>(() => _map["nonexistent"]);
+        }
+
+        [Fact]
+        public void Indexer_Get_ReturnsValueForExistingStringKey()
+        {       
+            _map.InsertOrUpdate("key1", "value1");
+
+            Assert.Equal("value1", _map["key1"]);
+        }
+
+        [Fact]
+        public void Indexer_Set_UpdatesValueForExistingStringKey()
+        {       
+            _map.InsertOrUpdate("key1", "value1");
+
+            _map["key1"] = "updatedValue1";
+
+            Assert.Equal("updatedValue1", _map["key1"]);
+        }
+
+        [Fact]
+        public void LoadFactorLimit_DoesNotExceedForStringKeys()
+        {
+            var result = new DenseMap<string, string, XxHash3Hasher.String>(4, 0.75);
+
+            result.InsertOrUpdate("key1", "value1");
+            result.InsertOrUpdate("key2", "value2");
+            result.InsertOrUpdate("key3", "value3");
+
+            Assert.True(result.Count <= 4 * 0.75);
+        }
+    }
+
+}
