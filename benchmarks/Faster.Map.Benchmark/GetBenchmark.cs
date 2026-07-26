@@ -1,9 +1,7 @@
 ﻿using BenchmarkDotNet.Attributes;
-using BenchmarkDotNet.Engines;
 using Faster.Map.Benchmark.Utilities;
 using Faster.Map.Core;
 using Faster.Map.Hashing;
-using Faster.Map.Hashing.Algorithm;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -29,7 +27,7 @@ namespace Faster.Map.Benchmark
 
         #region Properties
 
-        [Params(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8)]
+        [Params(/*0.1, 0.2, 0.3, 0.4, 0.5, 0.6,*/ 0.7, 0.8)]
         public static double LoadFactor { get; set; }
 
         [Params(1024 * 1024)]

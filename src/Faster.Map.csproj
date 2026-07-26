@@ -7,9 +7,9 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>Faster.Map</PackageId>
-    <Version>9.0.2</Version>
-    <AssemblyVersion>9.0.2</AssemblyVersion>
-    <FileVersion>9.0.2</FileVersion>
+    <Version>9.0.3</Version>
+    <AssemblyVersion>9.0.3</AssemblyVersion>
+    <FileVersion>9.0.3</FileVersion>
 
     <Authors>Wiljan Ruizendaal</Authors>
     <Title>Fastest .NET hashmap</Title>
@@ -25,14 +25,7 @@
     <DebugType>embedded</DebugType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageReleaseNotes>
-      ### Performance and Architectural Breakthroughs
-
-      * Extreme Throughput Gains: Achieved 7% to 13.7% execution time reduction across all load factors for BlitzMap.
-      * Branchless XOR Signature Collapse: Fused signature validation and slot extraction into a single branchless CPU operation, eliminating redundant ALU instructions on the critical lookup path.
-      * Out-Of-Order (OOO) Software Pipelining: Reordered bucket traversal instructions to trigger hardware memory prefetching, effectively hiding main memory latency during hash collisions.
-      * Cross-Platform Hardware Hashing: Upgraded CrcHasher with comprehensive support for ARM64 (System.Runtime.Intrinsics.Arm) and an optimized software fallback (Knuth's multiplicative hash) for unsupported architectures, retaining zero-cost devirtualization via JIT branch elimination.
-      * GC Heap Integrity: Enforced type-safe uninitialized memory allocation checks (RuntimeHelpers.IsReferenceOrContainsReferences) to guarantee garbage collector stability when storing reference types.
-      * IL and ALU Optimizations: Replaced quadratic probing multiplication with a mathematical incremental accumulator and consolidated memory marshaling to minimize IL bloat and maximize RyuJIT inlining.
+      Major DenseMap performance overhaul achieving C++ SwissTable parity (sub-5ms at 80% load). Optimizations include SIMD fast-path unrolling, entry array mirroring, nuint pointer scaling, and the complete elimination of floating-point and bounds-checking overhead on hot paths.
     </PackageReleaseNotes>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>Faster.Map.snk</AssemblyOriginatorKeyFile>
