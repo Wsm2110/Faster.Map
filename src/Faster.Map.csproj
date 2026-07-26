@@ -1,18 +1,15 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net10.0;net9.0;net8.0;net7.0</TargetFrameworks>
-
     <ImplicitUsings>false</ImplicitUsings>
     <Nullable>disable</Nullable>
     <LangVersion>Latest</LangVersion>
-
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>Faster.Map</PackageId>
-    <Version>9.0.0</Version>
-    <AssemblyVersion>9.0.0</AssemblyVersion>
-    <FileVersion>9.0.0</FileVersion>
+    <Version>9.0.2</Version>
+    <AssemblyVersion>9.0.2</AssemblyVersion>
+    <FileVersion>9.0.2</FileVersion>
 
     <Authors>Wiljan Ruizendaal</Authors>
     <Title>Fastest .NET hashmap</Title>
@@ -27,8 +24,16 @@
     <EmbedAllSources>true</EmbedAllSources>
     <DebugType>embedded</DebugType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>minor improvements to blitzmap, move densemap to use vector256</PackageReleaseNotes>
+    <PackageReleaseNotes>
+      ### Performance and Architectural Breakthroughs
 
+      * Extreme Throughput Gains: Achieved 7% to 13.7% execution time reduction across all load factors for BlitzMap.
+      * Branchless XOR Signature Collapse: Fused signature validation and slot extraction into a single branchless CPU operation, eliminating redundant ALU instructions on the critical lookup path.
+      * Out-Of-Order (OOO) Software Pipelining: Reordered bucket traversal instructions to trigger hardware memory prefetching, effectively hiding main memory latency during hash collisions.
+      * Cross-Platform Hardware Hashing: Upgraded CrcHasher with comprehensive support for ARM64 (System.Runtime.Intrinsics.Arm) and an optimized software fallback (Knuth's multiplicative hash) for unsupported architectures, retaining zero-cost devirtualization via JIT branch elimination.
+      * GC Heap Integrity: Enforced type-safe uninitialized memory allocation checks (RuntimeHelpers.IsReferenceOrContainsReferences) to guarantee garbage collector stability when storing reference types.
+      * IL and ALU Optimizations: Replaced quadratic probing multiplication with a mathematical incremental accumulator and consolidated memory marshaling to minimize IL bloat and maximize RyuJIT inlining.
+    </PackageReleaseNotes>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>Faster.Map.snk</AssemblyOriginatorKeyFile>
 

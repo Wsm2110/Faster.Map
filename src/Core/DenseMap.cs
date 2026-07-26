@@ -53,17 +53,21 @@ public class DenseMap<TKey, TValue> : DenseMap<TKey, TValue, DefaultHasher.Gener
     public DenseMap(uint length, double loadFactor) : base(length, loadFactor) { }
 
     /// <summary>
-    /// 
+    /// Initializes a new instance of the <see cref="DenseMap{TKey, TValue}"/> class
+    /// with a default initial capacity of 16 and a load factor of 0.875.
     /// </summary>
     public DenseMap() : base(16, 0.875) { }
 }
+
 /// <summary>
-/// DenseMap is a high-performance hashmap implementation that uses open-addressing with quadratic probing and SIMD (Single Instruction, Multiple Data) for parallel searches.
-/// This map is designed for scenarios requiring efficient key-value storage with fast lookups, inserts, and deletions.
+/// DenseMap is a high-performance hashmap implementation that uses open-addressing with linear group probing and SIMD (Single Instruction, Multiple Data) for parallel searches.
+/// This map is designed for scenarios requiring extreme key-value storage throughput with fast lookups, inserts, and deletions.
 /// 
 /// Key features:
-/// - Open addressing with quadratic probing for collision resolution.
-/// - SIMD-based parallel searches for performance optimization.
+/// - Array of Structs (AoS) layout for maximized spatial locality and L1 cache hits on the happy path.
+/// - Asymmetric Metadata Sign-Bit mapping to eliminate SIMD equality checks during standard lookups.
+/// - Open addressing with linear group probing to exploit CPU hardware prefetching.
+/// - Branchless IL execution pipelines.
 /// - High load factor (default is 0.875) while maintaining speed.
 /// - Tombstones to avoid backshifts during deletions.
 ///
@@ -94,35 +98,16 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
 
     /// <summary>
     /// Gets or sets how many elements are stored in the map.
-    /// Example:
-    /// <code>
-    /// var map = new DenseMap<int, string>();
-    /// int count = map.Count; // count should be 0 initially
-    /// </code>
     /// </summary>
     public int Count { get; private set; }
 
     /// <summary>
     /// Gets the size of the map.
-    /// Example:
-    /// <code>
-    /// var map = new DenseMap<int, string>();
-    /// uint size = map.Size; // size will reflect the internal array size
-    /// </code>
     /// </summary>
     public uint Size => (uint)_entries.Length;
 
     /// <summary>
     /// Returns all the entries as KeyValuePair objects.
-    /// Example:
-    /// <code>
-    /// var map = new DenseMap<int, string>();
-    /// map.Emplace(1, "One");
-    /// foreach (var entry in map.Entries)
-    /// {
-    ///     Console.WriteLine($"{entry.Key}: {entry.Value}");
-    /// }
-    /// </code>
     /// </summary>
     public IEnumerable<KeyValuePair<TKey, TValue>> Entries
     {
@@ -130,7 +115,8 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
         {
             for (int i = 0; i < _length; ++i)
             {
-                if (_controlBytes[i] >= 0)
+                // Live entries are strictly > 0 (1 to 127). Tombstone is 0, Empty is -128.
+                if (_controlBytes[i] > 0)
                 {
                     var entry = _entries[i];
                     yield return new KeyValuePair<TKey, TValue>(entry.Key, entry.Value);
@@ -141,15 +127,6 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
 
     /// <summary>
     /// Returns all keys in the map.
-    /// Example:
-    /// <code>
-    /// var map = new DenseMap<int, string>();
-    /// map.Emplace(1, "One");
-    /// foreach (var key in map.Keys)
-    /// {
-    ///     Console.WriteLine(key);
-    /// }
-    /// </code>
     /// </summary>
     public IEnumerable<TKey> Keys
     {
@@ -157,7 +134,7 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
         {
             for (int i = 0; i < _length; ++i)
             {
-                if (_controlBytes[i] >= 0)
+                if (_controlBytes[i] > 0)
                 {
                     yield return _entries[i].Key;
                 }
@@ -167,15 +144,6 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
 
     /// <summary>
     /// Returns all values in the map.
-    /// Example:
-    /// <code>
-    /// var map = new DenseMap<int, string>();
-    /// map.Emplace(1, "One");
-    /// foreach (var value in map.Values)
-    /// {
-    ///     Console.WriteLine(value);
-    /// }
-    /// </code>
     /// </summary>
     public IEnumerable<TValue> Values
     {
@@ -183,7 +151,7 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
         {
             for (int i = 0; i < _length; ++i)
             {
-                if (_controlBytes[i] >= 0)
+                if (_controlBytes[i] > 0)
                 {
                     yield return _entries[i].Value;
                 }
@@ -191,29 +159,69 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
         }
     }
 
-    // Vector256<sbyte> (AVX2) covers 32 control bytes per SIMD load/compare,
-    // twice the reach of the previous Vector128 (16-byte) groups. This halves
-    // the number of probe-group iterations needed to scan the same span of
-    // the table.
+    /// <summary>
+    /// Vector256&lt;sbyte&gt; (AVX2) covers 32 control bytes per SIMD load/compare.
+    /// </summary>
     private const uint _groupWidth = 32;
 
     #endregion
 
     #region Fields
 
-    private const sbyte _emptyBucket = -127;
-    private const sbyte _tombstone = -126;
-    private static readonly Vector256<sbyte> _emptyBucketVector = Vector256.Create(_emptyBucket);
-    private static readonly Vector256<sbyte> _tombstoneVector = Vector256.Create(_tombstone);
+    // WONDROUS OPTIMIZATION: Asymmetric Sign-Bit Layout
+    // Empty is the ONLY state with the MSB set to 1.
+    // Tombstone is 0 (MSB 0). Live hashes are 1..127 (MSB 0).
+    private const sbyte _emptyBucket = -128; // Binary: 1000 0000
+    private const sbyte _tombstone = 0;      // Binary: 0000 0000
+
+    /// <summary>
+    /// The array of control bytes utilized for SIMD probing.
+    /// </summary>
     private sbyte[] _controlBytes;
-    private double _maxTombstoneBeforeRehash;
-    private uint _tombstoneCounter;
+
+    /// <summary>
+    /// The array storing the actual key-value entries. Utilizing AoS for optimal spatial locality.
+    /// </summary>
     private Entry[] _entries;
+
+    /// <summary>
+    /// The maximum number of tombstones allowed before forcing a map rehash.
+    /// </summary>
+    private double _maxTombstoneBeforeRehash;
+
+    /// <summary>
+    /// The active count of tombstones currently in the map.
+    /// </summary>
+    private uint _tombstoneCounter;
+
+    /// <summary>
+    /// The capacity of the map (must be a power of two).
+    /// </summary>
     private uint _length;
+
+    /// <summary>
+    /// The upper limit of lookups (valid entries and tombstones) allowed prior to a structural resize.
+    /// </summary>
     private double _maxLookupsBeforeResize;
+
+    /// <summary>
+    /// The bitmask applied to securely wrap indices within the boundaries of the map array.
+    /// </summary>
     private uint _mask;
+
+    /// <summary>
+    /// The maximum load factor permitted before initiating a map resize.
+    /// </summary>
     private readonly double _loadFactor;
+
+    /// <summary>
+    /// The hasher implementation used to compute hash codes for keys.
+    /// </summary>
     private readonly THasher _hasher;
+
+    /// <summary>
+    /// A flag designating whether standard automated rebuild mechanisms are suppressed, typically used during bulk operations.
+    /// </summary>
     private bool _suppressRebuild;
 
     #endregion
@@ -222,33 +230,20 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class with the specified length and default load factor.
-    /// Example:
-    /// <code>
-    /// var map = new DenseMap<int, string>(32);
-    /// </code>
     /// </summary>
     /// <param name="length">The length of the hashmap. Will always take the closest power of two.</param>
     public DenseMap(uint length) : this(length, 0.875) { }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class with the specified length and default load factor.
-    /// Example:
-    /// <code>
-    /// var map = new DenseMap<int, string>(32);
-    /// </code>
     /// </summary>
     public DenseMap() : this(16, 0.875) { }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DenseMap{TKey,TValue}"/> class with the specified parameters.
-    /// Example:
-    /// <code>
-    /// var map = new DenseMap<int, string>(32, 0.8, EqualityComparer<int>.Default);
-    /// </code>
     /// </summary>
     /// <param name="length">The length of the hashmap. Will always take the closest power of two.</param>
     /// <param name="loadFactor">The load factor determines when the hashmap will resize.</param>
-    /// <param name="keyComparer">Used to compare keys to resolve hash collisions.</param>
     public DenseMap(uint length, double loadFactor)
     {
         if (!Vector256.IsHardwareAccelerated)
@@ -280,14 +275,7 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
 
         _maxLookupsBeforeResize = (uint)(_length * _loadFactor);
 
-        // Padding must equal exactly one group width: a Vector256 load starting at the
-        // last logical slot (index = _length - 1) reads 32 bytes and spills 31 bytes
-        // past _length, so the physical array needs _length + _groupWidth bytes.
         _controlBytes = GC.AllocateArray<sbyte>((int)_length + (int)_groupWidth);
-        // NOTE: entries never need the SIMD mirror padding that control bytes do -
-        // every entry index is masked into [0, _length - 1]. Resize()/Rebuild() already
-        // allocate entries without padding; the constructor matches that, saving
-        // _groupWidth * sizeof(Entry) bytes per instance for nothing in return.
         _entries = GC.AllocateArray<Entry>((int)_length);
 
         _controlBytes.AsSpan().Fill(_emptyBucket);
@@ -310,8 +298,6 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Insert(TKey key, TValue value)
     {
-        // Use both Count and Tombstones to determine if a Resize/Rebuild is needed
-        // This prevents the P99 latency spikes caused by long probe chains
         if (Count + _tombstoneCounter >= _maxLookupsBeforeResize)
         {
             Resize();
@@ -321,7 +307,6 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
         var h2 = H2(hashcode);
 
         uint index = (uint)hashcode & _mask;
-        uint jumpDistance = 0;
         uint firstAvailableSlot = uint.MaxValue;
 
         ref sbyte ctrl = ref MemoryMarshal.GetArrayDataReference(_controlBytes);
@@ -331,42 +316,32 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
         {
             var source = Vector256.LoadUnsafe(ref ctrl, index);
 
-            // 1. Identify Empty slots (terminates the chain)
-            var emptyMask = Vector256.Equals(source, _emptyBucketVector).ExtractMostSignificantBits();
+            // Empty is the only negative byte. Tombstone is strictly zero.
+            uint emptyMask = source.ExtractMostSignificantBits();
+            uint tombstoneMask = Vector256.Equals(source, Vector256<sbyte>.Zero).ExtractMostSignificantBits();
+            uint combinedMask = emptyMask | tombstoneMask;
 
-            // 2. Identify Tombstones (potential reuse points)
-            // We only care about the very first tombstone we see in the entire probe sequence
-            if (firstAvailableSlot == uint.MaxValue)
+            // Track the first available slot (Tombstone or Empty)
+            if (firstAvailableSlot == uint.MaxValue && combinedMask != 0)
             {
-                var tombstoneMask = Vector256.Equals(source, _tombstoneVector).ExtractMostSignificantBits();
-                if (tombstoneMask != 0)
-                {
-                    uint bit = (uint)BitOperations.TrailingZeroCount(tombstoneMask);
-                    firstAvailableSlot = (index + bit) & _mask;
-                }
+                firstAvailableSlot = (index + (uint)BitOperations.TrailingZeroCount(combinedMask)) & _mask;
             }
 
-            // 3. If we hit an empty bucket, the search for the end of the chain is over
+            // Identify Empty slots (terminates the chain)
             if (emptyMask != 0)
             {
-                uint slot;
-                if (firstAvailableSlot != uint.MaxValue)
+                uint slot = firstAvailableSlot != uint.MaxValue
+                    ? firstAvailableSlot
+                    : (index + (uint)BitOperations.TrailingZeroCount(emptyMask)) & _mask;
+
+                // If we are replacing a tombstone, decrement the counter.
+                if (Unsafe.Add(ref ctrl, slot) == _tombstone)
                 {
-                    // Reuse the tombstone we found earlier to keep the map dense
-                    slot = firstAvailableSlot;
                     _tombstoneCounter--;
                 }
-                else
-                {
-                    // No tombstones found, use the first empty bucket
-                    uint bit = (uint)BitOperations.TrailingZeroCount(emptyMask);
-                    slot = (index + bit) & _mask;
-                }
 
-                // Write the control byte (and mirror it for SIMD safety)
                 SetCtrl(ref ctrl, slot, h2);
 
-                // Write the data
                 ref var entry = ref Unsafe.Add(ref entryBase, slot);
                 entry.Key = key;
                 entry.Value = value;
@@ -375,28 +350,15 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
                 return;
             }
 
-            // Triangular Probing: index + 16, then + 32, then + 48...
-            index = (index + (jumpDistance += _groupWidth)) & _mask;
+            // Linear probing activates hardware prefetcher
+            index = (index + _groupWidth) & _mask;
         }
     }
+
     /// <summary>
     /// Inserts or updates a key-value pair in the map.
-    /// </summary>  
-    ///
     /// If the key is not already present, the specified value is inserted.
     /// If the key is present, the existing value is updated in place.
-    /// 
-    ///  This method always succeeds, performing an update for existing keys or an insertion for new keys.
-    ///
-    /// </remarks>
-    /// Example:
-    /// <code>
-    /// var map = new DenseMap<int, string>();
-    /// 
-    /// map.InsertOrUpdate(1, "One");
-    /// map.InsertOrUpdate(1, "Two"); // updates value for key 1 to "Two"
-    ///  
-    /// </code>
     /// </summary>
     /// <param name="key">The key.</param>
     /// <param name="value">The value.</param>
@@ -409,10 +371,10 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
         var h2 = H2(hash);
         var target = Vector256.Create(h2);
         uint index = hash & _mask;
-        uint jump = 0;
         uint firstAvailableSlot = uint.MaxValue;
 
         ref sbyte ctrl = ref MemoryMarshal.GetArrayDataReference(_controlBytes);
+        ref Entry entryBase = ref MemoryMarshal.GetArrayDataReference(_entries);
 
         while (true)
         {
@@ -423,62 +385,50 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
             while (matchMask != 0)
             {
                 uint slot = (index + (uint)BitOperations.TrailingZeroCount(matchMask)) & _mask;
-                if (_hasher.Equals(_entries[slot].Key, key))
+                ref var matchEntry = ref Unsafe.Add(ref entryBase, slot);
+
+                if (_hasher.Equals(matchEntry.Key, key))
                 {
-                    _entries[slot].Value = value;
+                    matchEntry.Value = value;
                     return;
                 }
                 matchMask &= matchMask - 1;
             }
 
-            // 2. Track first available slot (Tombstone or Empty)
-            if (firstAvailableSlot == uint.MaxValue)
-            {
-                // We prioritize tombstones to keep the map "dense"
-                var tombstoneMask = Vector256.Equals(source, _tombstoneVector).ExtractMostSignificantBits();
-                var emptyMask = Vector256.Equals(source, _emptyBucketVector).ExtractMostSignificantBits();
-                var combinedMask = tombstoneMask | emptyMask;
+            // 2. Track first available slot
+            uint emptyMask = source.ExtractMostSignificantBits();
+            uint tombstoneMask = Vector256.Equals(source, Vector256<sbyte>.Zero).ExtractMostSignificantBits();
+            uint combinedMask = emptyMask | tombstoneMask;
 
-                if (combinedMask != 0)
-                {
-                    firstAvailableSlot = (index + (uint)BitOperations.TrailingZeroCount(combinedMask)) & _mask;
-                }
+            if (firstAvailableSlot == uint.MaxValue && combinedMask != 0)
+            {
+                firstAvailableSlot = (index + (uint)BitOperations.TrailingZeroCount(combinedMask)) & _mask;
             }
 
             // 3. Terminate on Empty Bucket
-            if (Vector256.Equals(source, _emptyBucketVector).ExtractMostSignificantBits() != 0)
+            if (emptyMask != 0)
             {
-                bool wasTombstone = Unsafe.Add(ref ctrl, firstAvailableSlot) == _tombstone;
+                uint slot = firstAvailableSlot != uint.MaxValue
+                    ? firstAvailableSlot
+                    : (index + (uint)BitOperations.TrailingZeroCount(emptyMask)) & _mask;
 
-                SetCtrl(ref ctrl, firstAvailableSlot, h2);
+                if (Unsafe.Add(ref ctrl, slot) == _tombstone) _tombstoneCounter--;
 
-                if (wasTombstone)
-                {
-                    _tombstoneCounter--;
-                }
+                SetCtrl(ref ctrl, slot, h2);
 
-                ref var entry = ref _entries[firstAvailableSlot];
-                entry.Key = key;
-                entry.Value = value;
+                ref var newEntry = ref Unsafe.Add(ref entryBase, slot);
+                newEntry.Key = key;
+                newEntry.Value = value;
                 Count++;
                 return;
             }
 
-            index = (index + (jump += _groupWidth)) & _mask;
+            index = (index + _groupWidth) & _mask;
         }
     }
 
     /// <summary>
     /// Tries to find the key in the map and returns the associated value.
-    /// Example:
-    /// <code>
-    /// var map = new DenseMap<int, string>();
-    /// map.Emplace(1, "One");
-    /// if (map.Get(1, out var value))
-    /// {
-    ///     Console.WriteLine(value); // Output: "One"
-    /// }
-    /// </code>
     /// </summary>
     /// <param name="key">The key.</param>
     /// <param name="value">The value.</param>
@@ -491,7 +441,6 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
         var target = Vector256.Create(h2);
 
         uint index = hashcode & _mask;
-        uint jumpDistance = 0;
 
         ref sbyte ctrl = ref MemoryMarshal.GetArrayDataReference(_controlBytes);
         ref Entry entryBase = ref MemoryMarshal.GetArrayDataReference(_entries);
@@ -516,29 +465,22 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
                 matchMask &= matchMask - 1;
             }
 
-            if (Vector256.Equals(source, _emptyBucketVector).ExtractMostSignificantBits() != 0)
+            // WONDROUS OPTIMIZATION: A single vpmovmskb terminates the loop. No vector equality check.
+            if (source.ExtractMostSignificantBits() != 0)
             {
                 value = default;
                 return false;
             }
 
-            index = (index + (jumpDistance += _groupWidth)) & _mask;
+            index = (index + _groupWidth) & _mask;
         }
     }
 
     /// <summary>
     /// Gets the value for the specified key, or, if the key is not present, adds an entry and returns the value by reference.
-    /// This allows you to add or update a value in a single lookup operation.
-    /// Example:
-    /// <code>
-    /// var map = new DenseMap<int, int>();
-    /// ref var value = ref map.GetValueRefOrAddDefault(1);
-    /// value++;
-    /// Console.WriteLine(map.Get(1)); // Output: 1
-    /// </code>
     /// </summary>
     /// <param name="key">The key to look for.</param>
-    /// <returns>Reference to the new or existing value.</returns>    
+    /// <returns>Reference to the new or existing value.</returns>  
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ref TValue GetValueRefOrAddDefault(TKey key)
     {
@@ -550,7 +492,6 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
         var target = Vector256.Create(h2);
 
         uint index = hashcode & _mask;
-        uint jumpDistance = 0;
         uint firstAvailableSlot = uint.MaxValue;
 
         ref sbyte ctrl = ref MemoryMarshal.GetArrayDataReference(_controlBytes);
@@ -566,60 +507,44 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
                 uint bit = (uint)BitOperations.TrailingZeroCount(matchMask);
                 uint slot = (index + bit) & _mask;
 
-                ref var entry = ref Unsafe.Add(ref entryBase, slot);
-                if (_hasher.Equals(entry.Key, key))
-                    return ref entry.Value;
+                ref var matchEntry = ref Unsafe.Add(ref entryBase, slot);
+                if (_hasher.Equals(matchEntry.Key, key))
+                    return ref matchEntry.Value;
 
                 matchMask &= matchMask - 1;
             }
 
-            if (firstAvailableSlot == uint.MaxValue)
+            uint emptyMask = source.ExtractMostSignificantBits();
+            uint tombstoneMask = Vector256.Equals(source, Vector256<sbyte>.Zero).ExtractMostSignificantBits();
+            uint combinedMask = emptyMask | tombstoneMask;
+
+            if (firstAvailableSlot == uint.MaxValue && combinedMask != 0)
             {
-                var tombstoneMask = Vector256.Equals(source, _tombstoneVector).ExtractMostSignificantBits();
-                if (tombstoneMask != 0)
-                {
-                    uint bit = (uint)BitOperations.TrailingZeroCount(tombstoneMask);
-                    firstAvailableSlot = (index + bit) & _mask;
-                }
+                firstAvailableSlot = (index + (uint)BitOperations.TrailingZeroCount(combinedMask)) & _mask;
             }
 
-            var emptyMask = Vector256.Equals(source, _emptyBucketVector).ExtractMostSignificantBits();
             if (emptyMask != 0)
             {
-                uint slot;
-                if (firstAvailableSlot != uint.MaxValue)
-                {
-                    // Reuse the tombstone we found earlier to keep the map dense.
-                    slot = firstAvailableSlot;
-                    _tombstoneCounter--;
-                }
-                else
-                {
-                    uint bit = (uint)BitOperations.TrailingZeroCount(emptyMask);
-                    slot = (index + bit) & _mask;
-                }
+                uint slot = firstAvailableSlot != uint.MaxValue
+                    ? firstAvailableSlot
+                    : (index + (uint)BitOperations.TrailingZeroCount(emptyMask)) & _mask;
+
+                if (Unsafe.Add(ref ctrl, slot) == _tombstone) _tombstoneCounter--;
 
                 SetCtrl(ref ctrl, slot, h2);
 
-                ref var entry = ref Unsafe.Add(ref entryBase, slot);
-                entry.Key = key;
+                ref var newEntry = ref Unsafe.Add(ref entryBase, slot);
+                newEntry.Key = key;
                 Count++;
-                return ref entry.Value;
+                return ref newEntry.Value;
             }
 
-            index = (index + (jumpDistance += _groupWidth)) & _mask;
+            index = (index + _groupWidth) & _mask;
         }
     }
 
-
     /// <summary>
     /// Tries to find the key in the map and updates the associated value.
-    /// Example:
-    /// <code>
-    /// var map = new DenseMap<int, string>();
-    /// map.Emplace(1, "One");
-    /// bool updated = map.Update(1, "One Updated");
-    /// </code>
     /// </summary>
     /// <param name="key">The key.</param>
     /// <param name="value">The new value.</param>
@@ -632,7 +557,6 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
         var target = Vector256.Create(h2);
 
         uint index = hashcode & _mask;
-        uint jumpDistance = 0;
 
         ref sbyte ctrl = ref MemoryMarshal.GetArrayDataReference(_controlBytes);
         ref Entry entryBase = ref MemoryMarshal.GetArrayDataReference(_entries);
@@ -657,86 +581,35 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
                 matchMask &= matchMask - 1;
             }
 
-            if (Vector256.Equals(source, _emptyBucketVector).ExtractMostSignificantBits() != 0)
-                return false;
+            if (source.ExtractMostSignificantBits() != 0) return false;
 
-            index = (index + (jumpDistance += _groupWidth)) & _mask;
+            index = (index + _groupWidth) & _mask;
         }
     }
 
     /// <summary>
-    /// Determines whether it is safe to mark a soon-to-be-removed slot as fully
-    /// <c>Empty</c> instead of leaving a <c>Tombstone</c> behind.
-    ///
-    /// Background: probe loops only stop scanning when they hit an EMPTY control
-    /// byte; a byte occupied by either a live entry OR a tombstone is treated as
-    /// "keep going". That means turning a slot Empty is only safe if doing so
-    /// cannot change the outcome of any OTHER key's probe: i.e. every possible
-    /// group-width window that overlaps this slot already contained at least one
-    /// Empty byte before this deletion. If some window overlapping this slot was
-    /// ever completely full (no Empty anywhere in it), some other key's probe may
-    /// have used "group has no empty -> keep probing past here" to reach a slot
-    /// further along the chain; turning this slot Empty now would introduce a new,
-    /// premature stop for that key's future lookups. In that case we must leave a
-    /// Tombstone, which still blocks nothing but also never causes early
-    /// termination.
-    ///
-    /// Rather than enumerate all (_groupWidth - 1) possible window positions that
-    /// could overlap the slot, we measure the contiguous run of non-empty bytes
-    /// straddling it using exactly two group loads (the window starting at the
-    /// slot, and the window immediately preceding it). If that combined run is
-    /// shorter than _groupWidth, no fully-occupied window could ever have existed
-    /// there. This is the same technique Abseil's flat_hash_map uses
-    /// (`was_never_full`), adapted to this table's 32-byte Vector256 groups and
-    /// arbitrary (non-group-aligned) probe start offsets.
+    /// Determines whether it is safe to mark a soon-to-be-removed slot as fully Empty.
     /// </summary>
     /// <param name="ctrl">Reference to the start of the control-byte array.</param>
     /// <param name="index">The absolute index of the slot being removed.</param>
+    /// <returns>True if it is safe to skip placing a tombstone.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private bool WasNeverFull(ref sbyte ctrl, uint index)
     {
-        // Window starting exactly at the slot being removed: [index, index + _groupWidth).
-        var after = Vector256.LoadUnsafe(ref ctrl, index);
-        var emptyAfterMask = Vector256.Equals(after, _emptyBucketVector).ExtractMostSignificantBits();
+        // Extracting MSB natively finds Empty buckets (-128) instantly.
+        uint emptyAfterMask = Vector256.LoadUnsafe(ref ctrl, index).ExtractMostSignificantBits();
+        uint emptyBeforeMask = Vector256.LoadUnsafe(ref ctrl, (index - _groupWidth) & _mask).ExtractMostSignificantBits();
 
-        // Window immediately preceding it: [index - _groupWidth, index).
-        uint beforeIndex = (index - _groupWidth) & _mask;
-        var before = Vector256.LoadUnsafe(ref ctrl, beforeIndex);
-        var emptyBeforeMask = Vector256.Equals(before, _emptyBucketVector).ExtractMostSignificantBits();
+        if (emptyAfterMask == 0 || emptyBeforeMask == 0) return false;
 
-        // If either window currently has zero Empty bytes, we can't bound the
-        // non-empty run using just these two loads (it may extend further in that
-        // direction). Conservatively fall back to tombstoning - always correct,
-        // just occasionally more conservative than strictly necessary.
-        if (emptyAfterMask == 0 || emptyBeforeMask == 0)
-        {
-            return false;
-        }
-
-        // Contiguous non-empty run to the right of (and including) `index`, up to
-        // the first Empty byte encountered.
         int runRight = BitOperations.TrailingZeroCount(emptyAfterMask);
-
-        // Contiguous non-empty run ending immediately before `index`. Vector256<sbyte>
-        // ExtractMostSignificantBits() yields a full 32-bit mask with every bit
-        // meaningful (unlike Vector128, whose 16-bit mask would need shifting into
-        // the upper bits first), so LeadingZeroCount directly gives the run length
-        // ending at the boundary between the two windows.
         int runLeft = BitOperations.LeadingZeroCount(emptyBeforeMask);
 
-        // If the combined run straddling `index` is shorter than one full group,
-        // no group-width window overlapping this slot was ever entirely occupied.
         return (runRight + runLeft) < _groupWidth;
     }
 
     /// <summary>
     /// Removes a key and value from the map.
-    /// Example:
-    /// <code>
-    /// var map = new DenseMap<int, string>();
-    /// map.Emplace(1, "One");
-    /// bool removed = map.Remove(1);
-    /// </code>
     /// </summary>
     /// <param name="key">The key.</param>
     /// <returns>Returns true if the removal succeeded, otherwise false.</returns>
@@ -753,7 +626,6 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
         var target = Vector256.Create(h2);
 
         uint index = hashcode & _mask;
-        uint jumpDistance = 0;
 
         ref sbyte ctrl = ref MemoryMarshal.GetArrayDataReference(_controlBytes);
         ref Entry entryBase = ref MemoryMarshal.GetArrayDataReference(_entries);
@@ -761,7 +633,6 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
         while (true)
         {
             var source = Vector256.LoadUnsafe(ref ctrl, index);
-
             var matchMask = Vector256.Equals(source, target).ExtractMostSignificantBits();
 
             while (matchMask != 0)
@@ -774,11 +645,6 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
                 {
                     if (WasNeverFull(ref ctrl, slot))
                     {
-                        // No probe window touching this slot was ever fully occupied,
-                        // so resetting straight to Empty can't cause any other key's
-                        // lookup to stop early where it previously wouldn't have.
-                        // This keeps the tombstone count down, delaying/avoiding the
-                        // next Rebuild() entirely.
                         SetCtrl(ref ctrl, slot, _emptyBucket);
                     }
                     else
@@ -791,16 +657,12 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
                     --Count;
                     return true;
                 }
-
                 matchMask &= matchMask - 1;
             }
 
-            if (Vector256.Equals(source, _emptyBucketVector).ExtractMostSignificantBits() != 0)
-            {
-                return false;
-            }
+            if (source.ExtractMostSignificantBits() != 0) return false;
 
-            index = (index + (jumpDistance += _groupWidth)) & _mask;
+            index = (index + _groupWidth) & _mask;
         }
     }
 
@@ -808,10 +670,6 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
     /// Rebuilds the internal data structures to optimize storage and access, typically after a resize or rehash
     /// operation.
     /// </summary>
-    /// <remarks>This method redistributes existing entries into new arrays, clearing any tombstones and
-    /// ensuring that the hash table maintains optimal performance. It should be called when the underlying storage
-    /// needs to be refreshed, such as after significant insertions or deletions. This operation resets the tombstone
-    /// counter and may improve lookup and insertion efficiency.</remarks>
     private void Rebuild()
     {
         var oldEntries = _entries;
@@ -819,7 +677,7 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
         var length = _length;
 
         var newEntries = GC.AllocateArray<Entry>((int)length);
-        var newControlBytes = GC.AllocateArray<sbyte>((int)(length + 16));
+        var newControlBytes = GC.AllocateArray<sbyte>((int)length + (int)_groupWidth);
 
         newControlBytes.AsSpan().Fill(_emptyBucket);
 
@@ -831,20 +689,19 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
 
         for (uint i = 0; i < length; ++i)
         {
+            // Tombstones (0) and Empties (-128) are <= 0. Fast, single skip.
             var ctrl = Unsafe.Add(ref oldCtrl, i);
-            if (ctrl < 0)
-                continue;
+            if (ctrl <= 0) continue;
 
             var entry = Unsafe.Add(ref oldEnt, i);
 
             var hashcode = _hasher.ComputeHash(entry.Key);
             uint index = hashcode & _mask;
-            uint jumpDistance = 0;
 
             while (true)
             {
                 var source = Vector256.LoadUnsafe(ref newCtrl, index);
-                var emptyMask = Vector256.Equals(source, _emptyBucketVector).ExtractMostSignificantBits();
+                uint emptyMask = source.ExtractMostSignificantBits();
 
                 if (emptyMask != 0)
                 {
@@ -856,7 +713,7 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
                     break;
                 }
 
-                index = (index + (jumpDistance += _groupWidth)) & _mask;
+                index = (index + _groupWidth) & _mask;
             }
         }
 
@@ -867,108 +724,59 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
 
     /// <summary>
     /// Determines if the hashmap contains the specified key.
-    /// Example:
-    /// <code>
-    /// var map = new DenseMap<int, string>();
-    /// map.Emplace(1, "One");
-    /// bool contains = map.Contains(1); // true
-    /// </code>
     /// </summary>
     /// <param name="key">The key.</param>
     /// <returns>Returns true if the key is found, otherwise false.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Contains(TKey key)
     {
-        // Compute the hash code for the given key and cast it to an unsigned integer for bitwise operations.
         var hashcode = _hasher.ComputeHash(key);
-        // Apply a secondary hash function to further spread the bits of the hashcode.
         var h2 = H2(hashcode);
-        // Create a 128-bit vector from the transformed hash code to use as the target for comparison.
         var target = Vector256.Create(h2);
-        // This operation ensures that `index` is in the range [0, capacity - 1] by using only the lower bits of `hashcode`,
-        // which helps in efficient and quick indexing.
         var index = hashcode & _mask;
-        // Initialize `jumpDistance` to control the distance between probes, starting at zero.
-        uint jumpDistance = 0;
 
         ref sbyte start = ref MemoryMarshal.GetArrayDataReference(_controlBytes);
         ref Entry entryStart = ref MemoryMarshal.GetArrayDataReference(_entries);
 
-        // Begin probing the hash map until the key is found or confirmed absent.
         while (true)
         {
-            // Load a vector from the control bytes starting at the computed index.
-            // Control bytes hold metadata about the entries in the map.
             var source = Vector256.LoadUnsafe(ref start, index);
-            // Compare `source` with `target`, and `ExtractMostSignificantBits` returns a bitmask
-            // where each set bit indicates a position in `source` that matches `target`.
             var mask = Vector256.Equals(source, target).ExtractMostSignificantBits();
-            // Process each match indicated by the bits set in `mask`.
+
             while (mask != 0)
             {
-                // Get the position of the first set bit in `mask`, indicating a potential key match.
                 var bitPos = BitOperations.TrailingZeroCount(mask);
-
-                // Normalize SIMD position to a logical slot using the power-of-two mask.
                 uint slot = (index + (uint)bitPos) & _mask;
 
-                // Check if the entry at this position has a key that matches the specified key.
-                // Use `_hasher` to ensure accurate key comparison.
                 if (_hasher.Equals(Unsafe.Add(ref entryStart, slot).Key, key))
                 {
-                    // If a match is found, return `true` to indicate the key exists in the map.
                     return true;
                 }
 
-                // Clear the lowest set bit in `mask` to continue checking any remaining matches in this vector.
                 mask = ResetLowestSetBit(mask);
             }
 
-            // Check if `source` contains any empty buckets, which indicates the end of the probe chain.
-            // If an empty bucket is found, it confirms the key is not present in the map.
-            if (Vector256.Equals(_emptyBucketVector, source).ExtractMostSignificantBits() != 0)
-            {
-                // Return `false` since the key was not found in the map.
-                return false;
-            }
+            // WONDROUS OPTIMIZATION: Terminate via pure sign-bit read.
+            if (source.ExtractMostSignificantBits() != 0) return false;
 
-            // Probing is done by incrementing the currentEntry bucket by a triangularly increasing multiple of Groups:jump by 1 more group every time.
-            // So first we jump by 1 group (meaning we just continue our linear scan), then 2 groups (skipping over 1 group), then 3 groups (skipping over 2 groups), and so on.
-            // Interestingly, this pattern perfectly lines up with our power-of-two size such that we will visit every single bucket exactly once without any repeats(searching is therefore guaranteed to terminate as we always have at least one EMPTY bucket).
-            // Note: that our non-linear probing strategy makes us fairly robust against weird degenerate collision chains that can make us accidentally quadratic(Hash DoS).
-            // Note: that we expect to almost never actually probe, since that’s WIDTH(16) non-EMPTY buckets we need to fail to find our key in.
-
-            index = (index + (jumpDistance += _groupWidth)) & _mask;
+            index = (index + _groupWidth) & _mask;
         }
     }
 
     /// <summary>
-    /// Copies entries from one map to another.
-    /// Example:
-    /// <code>
-    /// var sourceMap = new DenseMap<int, string>();
-    /// sourceMap.Emplace(1, "One");
-    /// var destMap = new DenseMap<int, string>();
-    /// destMap.Copy(sourceMap);
-    /// </code>
-    /// </summary>
-    /// <param name="denseMap">The map to copy from.</param>
-    /// <summary>
     /// Copies all entries from another DenseMap that uses the same hasher type.
     /// </summary>
+    /// <param name="other">The map to copy from.</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Copy(DenseMap<TKey, TValue, THasher> other)
     {
-        // Iterate the source map's backing arrays directly instead of going through the
-        // public Entries iterator, which allocates a compiler-generated enumerator on
-        // every call. This keeps Copy() zero-allocating like the rest of the hot paths.
         var otherControlBytes = other._controlBytes;
         var otherEntries = other._entries;
         var otherLength = other._length;
 
         for (int i = 0; i < otherLength; ++i)
         {
-            if (otherControlBytes[i] >= 0)
+            if (otherControlBytes[i] > 0)
             {
                 ref var entry = ref otherEntries[i];
                 InsertOrUpdate(entry.Key, entry.Value);
@@ -978,11 +786,6 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
 
     /// <summary>
     /// Removes all entries from the map and sets the count to 0.
-    /// Example:
-    /// <code>
-    /// var map = new DenseMap<int, string>();
-    /// map.Clear();
-    /// </code>
     /// </summary>
     public void Clear()
     {
@@ -994,13 +797,6 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
 
     /// <summary>
     /// Gets or sets the value associated with the specified key.
-    /// Example:
-    /// <code>
-    /// var map = new DenseMap<int, string>();
-    /// map.Emplace(1, "One");
-    /// string value = map[1]; // "One"
-    /// map[1] = "One Updated";
-    /// </code>
     /// </summary>
     /// <param name="key">The key.</param>
     /// <returns>The value associated with the key.</returns>
@@ -1027,19 +823,6 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
 
     /// <summary>
     /// Suppresses automatic table rebuilds during bulk delete or update operations.
-    /// 
-    /// Call this method before performing many Remove() calls to prevent the table
-    /// from rebuilding multiple times due to tombstone accumulation.
-    /// 
-    /// Example:
-    /// <code>
-    /// map.BeginBulkRemove();
-    /// foreach (var key in keysToRemove)
-    /// {
-    ///     map.Remove(key);
-    /// }
-    /// map.EndBulkRemove();
-    /// </code>
     /// </summary>
     public void BeginBulkRemove()
     {
@@ -1048,25 +831,11 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
 
     /// <summary>
     /// Ends a bulk update session and performs a single rebuild if tombstones exist.
-    /// 
-    /// This restores optimal probe performance after large-scale deletions by compacting
-    /// the table exactly once instead of rebuilding repeatedly.
-    /// 
-    /// Example:
-    /// <code>
-    /// map.BeginBulkRemove();
-    /// foreach (var key in keysToRemove)
-    /// {
-    ///     map.Remove(key);
-    /// }
-    /// map.EndBulkRemove();
-    /// </code>
     /// </summary>
     public void EndBulkRemove()
     {
         _suppressRebuild = false;
 
-        // Perform a single compaction pass if tombstones accumulated.
         if (_tombstoneCounter > _maxTombstoneBeforeRehash)
         {
             Rebuild();
@@ -1093,7 +862,7 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
         _maxTombstoneBeforeRehash = (int)(_length * 0.125);
 
         var newEntries = GC.AllocateArray<Entry>((int)_length);
-        var newControlBytes = GC.AllocateArray<sbyte>((int)(_length + 16));
+        var newControlBytes = GC.AllocateArray<sbyte>((int)_length + (int)_groupWidth);
 
         newControlBytes.AsSpan().Fill(_emptyBucket);
 
@@ -1106,19 +875,20 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
         for (uint i = 0; i < oldLength; ++i)
         {
             var ctrl = Unsafe.Add(ref oldCtrl, i);
-            if (ctrl < 0)
+            if (ctrl <= 0)
                 continue;
 
             var entry = Unsafe.Add(ref oldEnt, i);
 
             var hashcode = _hasher.ComputeHash(entry.Key);
             uint index = hashcode & _mask;
-            uint jumpDistance = 0;
 
             while (true)
             {
                 var source = Vector256.LoadUnsafe(ref newCtrl, index);
-                var emptyMask = Vector256.Equals(source, _emptyBucketVector).ExtractMostSignificantBits();
+
+                // Fast path: In a newly allocated map, only empty buckets exist. No vector comparison needed.
+                uint emptyMask = source.ExtractMostSignificantBits();
 
                 if (emptyMask != 0)
                 {
@@ -1130,7 +900,7 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
                     break;
                 }
 
-                index = (index + (jumpDistance += _groupWidth)) & _mask;
+                index = (index + _groupWidth) & _mask;
             }
         }
 
@@ -1140,38 +910,42 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
 
 
     /// <summary>
-    /// Retrieves the 7 lowest bits from a hashcode.
+    /// Retrieves the 7 lowest bits from a hashcode and securely bounds them.
     /// </summary>
     /// <param name="hashcode">The hashcode.</param>
-    /// <returns>The 7 lowest bits of the hashcode.</returns>
+    /// <returns>The 7 lowest bits of the hashcode clamped strictly between 1 and 127.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static sbyte H2(uint hashcode)
     {
-        // Mix the bits so the top 7 are influenced by the bottom
-        hashcode ^= (hashcode >> 16);
-
-        // Extract 7 bits from the very top of the 32-bit range
-        // 32 - 7 = 25
-        return (sbyte)((hashcode >> 25) & 0x7F);
+        uint h = hashcode >> 25;
+        // Branchless clamp to 1..127. 
+        // If h == 0, (h-1) >> 31 logical shifts to 1. If h > 0, evaluates to 0.
+        return (sbyte)(h + ((h - 1) >> 31));
     }
 
+    /// <summary>
+    /// Sets the control byte for a designated slot, mirroring it when necessary to ensure 
+    /// SIMD loads wrapping around the end of the array read the correct control bytes.
+    /// </summary>
+    /// <param name="ctrl">Reference to the control bytes array.</param>
+    /// <param name="slot">The slot index to write to.</param>
+    /// <param name="value">The control byte value.</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void SetCtrl(ref sbyte ctrl, uint slot, sbyte value)
     {
         Unsafe.Add(ref ctrl, slot) = value;
 
-        // Mirror the first group into the tail padding. Only slots inside the first
-        // group (indices [0, _groupWidth)) can ever be observed twice by a Vector256
-        // load - once directly, once as the tail bytes of a load that wraps around
-        // past _length. With _groupWidth == 32, "first group" means slot >> 5 == 0
-        // (shift by 5 == divide by 32, matching the group width above).
-        uint mirrorMask = (uint)-(slot >> 5 == 0 ? 1 : 0);
-        Unsafe.Add(ref ctrl, slot + (mirrorMask & _length)) = value;
+        // Pure arithmetic IL for mirroring to tail padding: sub -> sar -> and. 
+        // No branching or conditional move (cmov) required.
+        uint mirrorOffset = (uint)(((int)slot - 32) >> 31) & _length;
+        Unsafe.Add(ref ctrl, slot + mirrorOffset) = value;
     }
 
     /// <summary>
     /// Resets the lowest significant bit in the given value.
     /// </summary>
+    /// <param name="value">The input value.</param>
+    /// <returns>The value with the lowest significant bit reset.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static uint ResetLowestSetBit(uint value)
     {
@@ -1180,10 +954,20 @@ public class DenseMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
 
     #endregion
 
+    /// <summary>
+    /// Represents an internal storage structure for mapping a key directly to its value.
+    /// </summary>
     [StructLayout(LayoutKind.Sequential)]
     internal struct Entry
     {
+        /// <summary>
+        /// The stored key.
+        /// </summary>
         public TKey Key;
+
+        /// <summary>
+        /// The associated value for the key.
+        /// </summary>
         public TValue Value;
     };
 }

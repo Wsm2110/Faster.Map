@@ -26,7 +26,8 @@ public class BlitzMap<TKey, TValue> : BlitzMap<TKey, TValue, DefaultHasher.Gener
 
 /// <summary>
 /// A high-performance hash map implementation utilizing raw Sentinel values to bypass ALU packing 
-/// and struct-based hashing for zero virtual dispatch.
+/// and struct-based hashing for zero virtual dispatch. Optimized for extreme throughput utilizing 
+/// XOR signature collapsing and software pipelined traversal.
 /// </summary>
 public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKey>
 {
@@ -91,7 +92,15 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
         uint entryCap = (uint)(cap * loadFactor);
         if (entryCap < cap * loadFactor) entryCap++;
 
-        _entries = GC.AllocateUninitializedArray<Entry>((int)entryCap);
+        // Ensure GC safety: Objects containing references must not exist in uninitialized memory
+        if (RuntimeHelpers.IsReferenceOrContainsReferences<Entry>())
+        {
+            _entries = new Entry[(int)entryCap];
+        }
+        else
+        {
+            _entries = GC.AllocateUninitializedArray<Entry>((int)entryCap);
+        }
 
         _numBuckets = cap >> 1;
         _maxCountBeforeResize = (uint)(cap * loadFactor);
@@ -119,9 +128,10 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
             uint rootPacked = (uint)data;
             if (rootPacked == INACTIVE) goto NotFound;
 
-            if ((rootPacked & ~mask) == sig)
+            uint slot = rootPacked ^ sig;
+            if (slot <= mask)
             {
-                ref Entry entry = ref Unsafe.Add(ref entries, rootPacked & mask);
+                ref Entry entry = ref Unsafe.Add(ref entries, slot);
                 if (_hasher.Equals(key, entry.Key))
                 {
                     value = entry.Value;
@@ -136,18 +146,22 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
             {
                 ref Bucket node = ref Unsafe.Add(ref buckets, next);
                 ulong nodeData = Unsafe.As<Bucket, ulong>(ref node);
+
+                // Software Pipelining: Extract Next immediately for CPU branch pre-fetching
+                next = (uint)(nodeData >> 32);
                 uint nodePacked = (uint)nodeData;
 
-                if ((nodePacked & ~mask) == sig)
+                slot = nodePacked ^ sig;
+                if (slot <= mask)
                 {
-                    ref Entry entry = ref Unsafe.Add(ref entries, nodePacked & mask);
+                    ref Entry entry = ref Unsafe.Add(ref entries, slot);
                     if (_hasher.Equals(key, entry.Key))
                     {
                         value = entry.Value;
                         return true;
                     }
                 }
-                next = (uint)(nodeData >> 32);
+
                 if (next == INACTIVE) break;
             }
         }
@@ -156,9 +170,10 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
             uint rootPacked = root.Signature;
             if (rootPacked == INACTIVE) goto NotFound;
 
-            if ((rootPacked & ~mask) == sig)
+            uint slot = rootPacked ^ sig;
+            if (slot <= mask)
             {
-                ref Entry entry = ref Unsafe.Add(ref entries, rootPacked & mask);
+                ref Entry entry = ref Unsafe.Add(ref entries, slot);
                 if (_hasher.Equals(key, entry.Key))
                 {
                     value = entry.Value;
@@ -172,18 +187,20 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
             while (true)
             {
                 ref Bucket node = ref Unsafe.Add(ref buckets, next);
+                next = node.Next;
                 uint nodePacked = node.Signature;
 
-                if ((nodePacked & ~mask) == sig)
+                slot = nodePacked ^ sig;
+                if (slot <= mask)
                 {
-                    ref Entry entry = ref Unsafe.Add(ref entries, nodePacked & mask);
+                    ref Entry entry = ref Unsafe.Add(ref entries, slot);
                     if (_hasher.Equals(key, entry.Key))
                     {
                         value = entry.Value;
                         return true;
                     }
                 }
-                next = node.Next;
+
                 if (next == INACTIVE) break;
             }
         }
@@ -210,9 +227,10 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
             uint rootPacked = (uint)data;
             if (rootPacked == INACTIVE) return ref Unsafe.NullRef<TValue>();
 
-            if ((rootPacked & ~mask) == sig)
+            uint slot = rootPacked ^ sig;
+            if (slot <= mask)
             {
-                ref Entry entry = ref Unsafe.Add(ref entries, rootPacked & mask);
+                ref Entry entry = ref Unsafe.Add(ref entries, slot);
                 if (_hasher.Equals(key, entry.Key))
                 {
                     return ref entry.Value;
@@ -226,17 +244,20 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
             {
                 ref Bucket node = ref Unsafe.Add(ref buckets, next);
                 ulong nodeData = Unsafe.As<Bucket, ulong>(ref node);
+
+                next = (uint)(nodeData >> 32);
                 uint nodePacked = (uint)nodeData;
 
-                if ((nodePacked & ~mask) == sig)
+                slot = nodePacked ^ sig;
+                if (slot <= mask)
                 {
-                    ref Entry entry = ref Unsafe.Add(ref entries, nodePacked & mask);
+                    ref Entry entry = ref Unsafe.Add(ref entries, slot);
                     if (_hasher.Equals(key, entry.Key))
                     {
                         return ref entry.Value;
                     }
                 }
-                next = (uint)(nodeData >> 32);
+
                 if (next == INACTIVE) break;
             }
         }
@@ -245,9 +266,10 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
             uint rootPacked = root.Signature;
             if (rootPacked == INACTIVE) return ref Unsafe.NullRef<TValue>();
 
-            if ((rootPacked & ~mask) == sig)
+            uint slot = rootPacked ^ sig;
+            if (slot <= mask)
             {
-                ref Entry entry = ref Unsafe.Add(ref entries, rootPacked & mask);
+                ref Entry entry = ref Unsafe.Add(ref entries, slot);
                 if (_hasher.Equals(key, entry.Key))
                 {
                     return ref entry.Value;
@@ -260,17 +282,19 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
             while (true)
             {
                 ref Bucket node = ref Unsafe.Add(ref buckets, next);
+                next = node.Next;
                 uint nodePacked = node.Signature;
 
-                if ((nodePacked & ~mask) == sig)
+                slot = nodePacked ^ sig;
+                if (slot <= mask)
                 {
-                    ref Entry entry = ref Unsafe.Add(ref entries, nodePacked & mask);
+                    ref Entry entry = ref Unsafe.Add(ref entries, slot);
                     if (_hasher.Equals(key, entry.Key))
                     {
                         return ref entry.Value;
                     }
                 }
-                next = node.Next;
+
                 if (next == INACTIVE) break;
             }
         }
@@ -280,37 +304,70 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
     [MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
     public bool Contains(TKey key)
     {
+        uint mask = _mask;
         uint hash = _hasher.ComputeHash(key);
-        uint main = hash & _mask;
-        uint sig = hash & ~_mask;
+        uint sig = hash & ~mask;
 
         ref Bucket buckets = ref MemoryMarshal.GetArrayDataReference(_buckets);
         ref Entry entries = ref MemoryMarshal.GetArrayDataReference(_entries);
-        ref Bucket root = ref Unsafe.Add(ref buckets, main);
+        ref Bucket root = ref Unsafe.Add(ref buckets, hash & mask);
 
-        uint rootPacked = root.Signature;
-        if (rootPacked == INACTIVE) return false;
-
-        if ((rootPacked & ~_mask) == sig)
+        if (BitConverter.IsLittleEndian)
         {
-            if (_hasher.Equals(key, Unsafe.Add(ref entries, rootPacked & _mask).Key))
-                return true;
-        }
+            ulong data = Unsafe.As<Bucket, ulong>(ref root);
+            uint rootPacked = (uint)data;
+            if (rootPacked == INACTIVE) return false;
 
-        uint next = root.Next;
-        while (next != INACTIVE)
-        {
-            ref Bucket node = ref Unsafe.Add(ref buckets, next);
-            uint nodePacked = node.Signature;
-
-            if ((nodePacked & ~_mask) == sig)
+            uint slot = rootPacked ^ sig;
+            if (slot <= mask)
             {
-                if (_hasher.Equals(key, Unsafe.Add(ref entries, nodePacked & _mask).Key))
-                {
+                if (_hasher.Equals(key, Unsafe.Add(ref entries, slot).Key))
                     return true;
+            }
+
+            uint next = (uint)(data >> 32);
+            while (next != INACTIVE)
+            {
+                ref Bucket node = ref Unsafe.Add(ref buckets, next);
+                ulong nodeData = Unsafe.As<Bucket, ulong>(ref node);
+
+                next = (uint)(nodeData >> 32);
+                uint nodePacked = (uint)nodeData;
+
+                slot = nodePacked ^ sig;
+                if (slot <= mask)
+                {
+                    if (_hasher.Equals(key, Unsafe.Add(ref entries, slot).Key))
+                        return true;
                 }
             }
-            next = node.Next;
+        }
+        else
+        {
+            uint rootPacked = root.Signature;
+            if (rootPacked == INACTIVE) return false;
+
+            uint slot = rootPacked ^ sig;
+            if (slot <= mask)
+            {
+                if (_hasher.Equals(key, Unsafe.Add(ref entries, slot).Key))
+                    return true;
+            }
+
+            uint next = root.Next;
+            while (next != INACTIVE)
+            {
+                ref Bucket node = ref Unsafe.Add(ref buckets, next);
+                next = node.Next;
+                uint nodePacked = node.Signature;
+
+                slot = nodePacked ^ sig;
+                if (slot <= mask)
+                {
+                    if (_hasher.Equals(key, Unsafe.Add(ref entries, slot).Key))
+                        return true;
+                }
+            }
         }
         return false;
     }
@@ -318,43 +375,86 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
     [MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
     public bool Update(TKey key, TValue value)
     {
+        uint mask = _mask;
         uint hash = _hasher.ComputeHash(key);
-        uint main = hash & _mask;
-        uint sig = hash & ~_mask;
+        uint sig = hash & ~mask;
 
         ref Bucket buckets = ref MemoryMarshal.GetArrayDataReference(_buckets);
         ref Entry entries = ref MemoryMarshal.GetArrayDataReference(_entries);
-        ref Bucket root = ref Unsafe.Add(ref buckets, main);
+        ref Bucket root = ref Unsafe.Add(ref buckets, hash & mask);
 
-        uint rootPacked = root.Signature;
-        if (rootPacked == INACTIVE) return false;
-
-        if ((rootPacked & ~_mask) == sig)
+        if (BitConverter.IsLittleEndian)
         {
-            ref Entry entry = ref Unsafe.Add(ref entries, rootPacked & _mask);
-            if (_hasher.Equals(key, entry.Key))
-            {
-                entry.Value = value;
-                return true;
-            }
-        }
+            ulong data = Unsafe.As<Bucket, ulong>(ref root);
+            uint rootPacked = (uint)data;
+            if (rootPacked == INACTIVE) return false;
 
-        uint next = root.Next;
-        while (next != INACTIVE)
-        {
-            ref Bucket node = ref Unsafe.Add(ref buckets, next);
-            uint nodePacked = node.Signature;
-
-            if ((nodePacked & ~_mask) == sig)
+            uint slot = rootPacked ^ sig;
+            if (slot <= mask)
             {
-                ref Entry entry = ref Unsafe.Add(ref entries, nodePacked & _mask);
+                ref Entry entry = ref Unsafe.Add(ref entries, slot);
                 if (_hasher.Equals(key, entry.Key))
                 {
                     entry.Value = value;
                     return true;
                 }
             }
-            next = node.Next;
+
+            uint next = (uint)(data >> 32);
+            while (next != INACTIVE)
+            {
+                ref Bucket node = ref Unsafe.Add(ref buckets, next);
+                ulong nodeData = Unsafe.As<Bucket, ulong>(ref node);
+
+                next = (uint)(nodeData >> 32);
+                uint nodePacked = (uint)nodeData;
+
+                slot = nodePacked ^ sig;
+                if (slot <= mask)
+                {
+                    ref Entry entry = ref Unsafe.Add(ref entries, slot);
+                    if (_hasher.Equals(key, entry.Key))
+                    {
+                        entry.Value = value;
+                        return true;
+                    }
+                }
+            }
+        }
+        else
+        {
+            uint rootPacked = root.Signature;
+            if (rootPacked == INACTIVE) return false;
+
+            uint slot = rootPacked ^ sig;
+            if (slot <= mask)
+            {
+                ref Entry entry = ref Unsafe.Add(ref entries, slot);
+                if (_hasher.Equals(key, entry.Key))
+                {
+                    entry.Value = value;
+                    return true;
+                }
+            }
+
+            uint next = root.Next;
+            while (next != INACTIVE)
+            {
+                ref Bucket node = ref Unsafe.Add(ref buckets, next);
+                next = node.Next;
+                uint nodePacked = node.Signature;
+
+                slot = nodePacked ^ sig;
+                if (slot <= mask)
+                {
+                    ref Entry entry = ref Unsafe.Add(ref entries, slot);
+                    if (_hasher.Equals(key, entry.Key))
+                    {
+                        entry.Value = value;
+                        return true;
+                    }
+                }
+            }
         }
         return false;
     }
@@ -364,9 +464,10 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
     {
         if (_count == _maxCountBeforeResize) Resize();
 
+        uint mask = _mask;
         uint hash = _hasher.ComputeHash(key);
-        uint main = hash & _mask;
-        uint sig = hash & ~_mask;
+        uint main = hash & mask;
+        uint sig = hash & ~mask;
 
         ref Bucket buckets = ref MemoryMarshal.GetArrayDataReference(_buckets);
         ref Entry entries = ref MemoryMarshal.GetArrayDataReference(_entries);
@@ -382,9 +483,8 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
             return true;
         }
 
-        uint packed = slotSig;
-        uint index = packed & _mask;
-        uint owner = _hasher.ComputeHash(Unsafe.Add(ref entries, index).Key) & _mask;
+        uint index = slotSig & mask;
+        uint owner = _hasher.ComputeHash(Unsafe.Add(ref entries, index).Key) & mask;
 
         if (owner != main)
         {
@@ -396,7 +496,7 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
             return true;
         }
 
-        if ((packed & ~_mask) == sig && _hasher.Equals(key, Unsafe.Add(ref entries, index).Key))
+        if ((slotSig ^ sig) <= mask && _hasher.Equals(key, Unsafe.Add(ref entries, index).Key))
             return false;
 
         if (bucket.Next == INACTIVE)
@@ -416,21 +516,21 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
         while (true)
         {
             ref Bucket node = ref Unsafe.Add(ref buckets, next);
-            packed = node.Signature;
+            next = node.Next;
+            uint packed = node.Signature;
 
-            if ((packed & ~_mask) == sig)
+            uint slot = packed ^ sig;
+            if (slot <= mask)
             {
-                uint slot = packed & _mask;
                 if (_hasher.Equals(key, Unsafe.Add(ref entries, slot).Key))
                     return false;
             }
 
-            if (node.Next == INACTIVE)
+            if (next == INACTIVE)
             {
                 bucket = ref node;
                 break;
             }
-            next = node.Next;
         }
 
         uint newBucket = FindEmptyBucket(ref buckets, main, 1);
@@ -449,9 +549,10 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
     {
         if (_count == _maxCountBeforeResize) Resize();
 
+        uint mask = _mask;
         uint hash = _hasher.ComputeHash(key);
-        uint main = hash & _mask;
-        uint sig = hash & ~_mask;
+        uint main = hash & mask;
+        uint sig = hash & ~mask;
 
         ref Bucket buckets = ref MemoryMarshal.GetArrayDataReference(_buckets);
         ref Entry entries = ref MemoryMarshal.GetArrayDataReference(_entries);
@@ -467,9 +568,8 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
             return true;
         }
 
-        uint packed = slotSig;
-        uint index = packed & _mask;
-        uint owner = _hasher.ComputeHash(Unsafe.Add(ref entries, index).Key) & _mask;
+        uint index = slotSig & mask;
+        uint owner = _hasher.ComputeHash(Unsafe.Add(ref entries, index).Key) & mask;
 
         if (owner != main)
         {
@@ -481,7 +581,7 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
             return true;
         }
 
-        if ((packed & ~_mask) == sig)
+        if ((slotSig ^ sig) <= mask)
         {
             ref Entry entry = ref Unsafe.Add(ref entries, index);
             if (_hasher.Equals(key, entry.Key))
@@ -508,11 +608,12 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
         while (true)
         {
             ref Bucket node = ref Unsafe.Add(ref buckets, next);
-            packed = node.Signature;
+            next = node.Next;
+            uint packed = node.Signature;
 
-            if ((packed & ~_mask) == sig)
+            uint slot = packed ^ sig;
+            if (slot <= mask)
             {
-                uint slot = packed & _mask;
                 ref Entry entry = ref Unsafe.Add(ref entries, slot);
                 if (_hasher.Equals(key, entry.Key))
                 {
@@ -521,12 +622,11 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
                 }
             }
 
-            if (node.Next == INACTIVE)
+            if (next == INACTIVE)
             {
                 bucket = ref node;
                 break;
             }
-            next = node.Next;
         }
 
         uint newBucket = FindEmptyBucket(ref buckets, main, 1);
@@ -543,43 +643,78 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     public bool Remove(TKey key)
     {
+        uint mask = _mask;
         uint hash = _hasher.ComputeHash(key);
-        uint main = hash & _mask;
-        uint sig = hash & ~_mask;
+        uint main = hash & mask;
+        uint sig = hash & ~mask;
 
         ref Bucket buckets = ref MemoryMarshal.GetArrayDataReference(_buckets);
         ref Entry entries = ref MemoryMarshal.GetArrayDataReference(_entries);
         ref Bucket root = ref Unsafe.Add(ref buckets, main);
 
-        uint slotSig = root.Signature;
-        if (slotSig == INACTIVE) return false;
-
-        uint packed = slotSig;
-        uint slot = packed & _mask;
-
-        if ((packed & ~_mask) == sig && _hasher.Equals(key, Unsafe.Add(ref entries, slot).Key))
+        if (BitConverter.IsLittleEndian)
         {
-            EraseBucket(ref buckets, main, main);
-            EraseSlot(ref buckets, ref entries, slot);
-            return true;
-        }
+            ulong data = Unsafe.As<Bucket, ulong>(ref root);
+            uint rootPacked = (uint)data;
+            if (rootPacked == INACTIVE) return false;
 
-        uint next = root.Next;
-        while (next != INACTIVE)
-        {
-            uint b = next;
-            ref Bucket node = ref Unsafe.Add(ref buckets, b);
-
-            packed = node.Signature;
-            slot = packed & _mask;
-
-            if ((packed & ~_mask) == sig && _hasher.Equals(key, Unsafe.Add(ref entries, slot).Key))
+            uint slot = rootPacked ^ sig;
+            if (slot <= mask && _hasher.Equals(key, Unsafe.Add(ref entries, slot).Key))
             {
-                EraseBucket(ref buckets, b, main);
+                EraseBucket(ref buckets, main, main);
                 EraseSlot(ref buckets, ref entries, slot);
                 return true;
             }
-            next = node.Next;
+
+            uint next = (uint)(data >> 32);
+            while (next != INACTIVE)
+            {
+                uint b = next;
+                ref Bucket node = ref Unsafe.Add(ref buckets, b);
+
+                ulong nodeData = Unsafe.As<Bucket, ulong>(ref node);
+                next = (uint)(nodeData >> 32);
+                uint nodePacked = (uint)nodeData;
+
+                slot = nodePacked ^ sig;
+                if (slot <= mask && _hasher.Equals(key, Unsafe.Add(ref entries, slot).Key))
+                {
+                    EraseBucket(ref buckets, b, main);
+                    EraseSlot(ref buckets, ref entries, slot);
+                    return true;
+                }
+            }
+        }
+        else
+        {
+            uint slotSig = root.Signature;
+            if (slotSig == INACTIVE) return false;
+
+            uint slot = slotSig ^ sig;
+            if (slot <= mask && _hasher.Equals(key, Unsafe.Add(ref entries, slot).Key))
+            {
+                EraseBucket(ref buckets, main, main);
+                EraseSlot(ref buckets, ref entries, slot);
+                return true;
+            }
+
+            uint next = root.Next;
+            while (next != INACTIVE)
+            {
+                uint b = next;
+                ref Bucket node = ref Unsafe.Add(ref buckets, b);
+
+                next = node.Next;
+                uint nodePacked = node.Signature;
+
+                slot = nodePacked ^ sig;
+                if (slot <= mask && _hasher.Equals(key, Unsafe.Add(ref entries, slot).Key))
+                {
+                    EraseBucket(ref buckets, b, main);
+                    EraseSlot(ref buckets, ref entries, slot);
+                    return true;
+                }
+            }
         }
         return false;
     }
@@ -640,7 +775,15 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
         int bucketCount = _length;
         int entryCount = (int)(_length * _loadFactor);
 
-        _entries = GC.AllocateUninitializedArray<Entry>(entryCount);
+        if (RuntimeHelpers.IsReferenceOrContainsReferences<Entry>())
+        {
+            _entries = new Entry[entryCount];
+        }
+        else
+        {
+            _entries = GC.AllocateUninitializedArray<Entry>(entryCount);
+        }
+
         _buckets = GC.AllocateUninitializedArray<Bucket>(bucketCount);
         _buckets.AsSpan().Fill(new Bucket { Signature = INACTIVE, Next = INACTIVE });
 
@@ -659,9 +802,10 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
     [MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
     private void RebuildBucketsInternal(ref Bucket buckets, ref Entry entries, uint slot, TKey key)
     {
+        uint mask = _mask;
         uint hash = _hasher.ComputeHash(key);
-        uint main = hash & _mask;
-        uint sig = hash & ~_mask;
+        uint main = hash & mask;
+        uint sig = hash & ~mask;
 
         ref Bucket bucket = ref Unsafe.Add(ref buckets, main);
         uint slotSig = bucket.Signature;
@@ -673,9 +817,8 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
             return;
         }
 
-        uint packed = slotSig;
-        uint index = packed & _mask;
-        uint owner = _hasher.ComputeHash(Unsafe.Add(ref entries, index).Key) & _mask;
+        uint index = slotSig & mask;
+        uint owner = _hasher.ComputeHash(Unsafe.Add(ref entries, index).Key) & mask;
 
         if (owner != main)
         {
@@ -759,46 +902,48 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
     [MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
     private uint FindEmptyBucket(ref Bucket buckets, uint index, uint cint)
     {
+        uint mask = _mask;
         ref Bucket baseRef = ref buckets;
-        uint baseIndex = index & _mask;
+        uint baseIndex = index & mask;
 
-        uint bucket = (baseIndex + 1) & _mask;
+        uint bucket = (baseIndex + 1) & mask;
         if (Unsafe.Add(ref baseRef, bucket).Signature == INACTIVE) return bucket;
 
-        uint next = (bucket + 1) & _mask;
+        uint next = (bucket + 1) & mask;
         if (Unsafe.Add(ref baseRef, next).Signature == INACTIVE) return next;
 
         uint n = 1;
+        uint t = 1; // Increment accumulator offsets quadratic multiplication
         while (n < quadraticProbeLength)
         {
-            uint t = (n * (n + 1)) >> 1;
-
-            bucket = (baseIndex + t + cint) & _mask;
+            bucket = (baseIndex + t + cint) & mask;
             if (Unsafe.Add(ref baseRef, bucket).Signature == INACTIVE) return bucket;
 
-            next = (bucket + 1) & _mask;
+            next = (bucket + 1) & mask;
             if (Unsafe.Add(ref baseRef, next).Signature == INACTIVE) return next;
+
             n++;
+            t += n;
         }
 
         uint last = _last;
         while (true)
         {
-            last = (last + 1) & _mask;
+            last = (last + 1) & mask;
             if (Unsafe.Add(ref baseRef, last).Signature == INACTIVE)
             {
                 _last = last;
                 return last;
             }
 
-            last = (last + 1) & _mask;
+            last = (last + 1) & mask;
             if (Unsafe.Add(ref baseRef, last).Signature == INACTIVE)
             {
                 _last = last;
                 return last;
             }
 
-            uint medium = (last + _numBuckets) & _mask;
+            uint medium = (last + _numBuckets) & mask;
             if (Unsafe.Add(ref baseRef, medium).Signature == INACTIVE)
             {
                 _last = medium;
@@ -851,8 +996,7 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
             return;
         }
 
-        // Freshly compute the bucket pointing to the physical memory we are moving.
-        // Bypassing brittle map-state caching guarantees stability across Robin Hood operations.
+        // Bypassing map-state cache safeguards data stability across Robin Hood operations.
         uint lastBucket = SigToBucket(ref buckets, ref entries, lastSlot);
 
         Unsafe.Add(ref entries, slot) = Unsafe.Add(ref entries, lastSlot);
@@ -861,21 +1005,22 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
             Unsafe.Add(ref entries, lastSlot) = default;
 
         ref var node = ref Unsafe.Add(ref buckets, lastBucket);
-        uint sig = node.Signature & ~_mask;
+        uint mask = _mask;
+        uint sig = node.Signature & ~mask;
         node.Signature = sig | slot;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private uint SigToBucket(ref Bucket buckets, ref Entry entries, uint index)
     {
+        uint mask = _mask;
         uint hash = _hasher.ComputeHash(Unsafe.Add(ref entries, index).Key);
-        uint main = hash & _mask;
+        uint main = hash & mask;
 
         ref var root = ref Unsafe.Add(ref buckets, main);
 
-        // Guard against Sentinel collision: If the index aligns with the _mask exactly, 
-        // 0xFFFFFFFF & _mask will falsely evaluate true without this guard.
-        if (root.Signature != INACTIVE && (root.Signature & _mask) == index) return main;
+        // Guard against Sentinel collision evaluation
+        if (root.Signature != INACTIVE && (root.Signature & mask) == index) return main;
 
         uint next = root.Next;
         while (true)
@@ -886,7 +1031,7 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
             uint b = next;
             ref Bucket node = ref Unsafe.Add(ref buckets, b);
 
-            if (node.Signature != INACTIVE && (node.Signature & _mask) == index)
+            if (node.Signature != INACTIVE && (node.Signature & mask) == index)
                 return b;
 
             next = node.Next;
@@ -911,7 +1056,7 @@ public class BlitzMap<TKey, TValue, THasher> where THasher : struct, IHasher<TKe
         }
     }
 
-    [StructLayout(LayoutKind.Sequential)]
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public struct Bucket
     {
         public uint Signature;
